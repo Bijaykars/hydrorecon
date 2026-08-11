@@ -5,7 +5,7 @@
 | **Date** | 2026-08-11 |
 | **URL** | `http://127.0.0.1:5174/` |
 | **Branch** | `master` |
-| **Commit** | — (the pre-existing staged worktree was preserved) |
+| **Commit** | `807af56` (application) + `3f1781b` (static hosting entry) |
 | **PR** | — |
 | **Tier** | Standard, with before/after repair pass |
 | **Scope** | Full single-page app; desktop and mobile; river discovery, direct click, intake, powerhouse, upstream-service failure, and map performance |
@@ -204,4 +204,3 @@ the intake and completed reach states respectively.
 | Known external constraint | Free Open-Meteo availability and quota |
 
 **PR summary:** QA found 8 issues, fixed 8, and raised the health score from 76 to 99.
-
