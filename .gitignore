@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# local env — this app has no secrets, but keep the habit
+.env
+.env.*
+!.env.example
+
+*.log
+npm-debug.log*
