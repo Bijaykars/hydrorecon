@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
-    "check": "node --experimental-strip-types --no-warnings checks/hydro.check.ts",
+    "check": "node --experimental-strip-types --no-warnings checks/hydro.check.ts && node --experimental-strip-types --no-warnings checks/plants.check.ts",
     "build:dhm": "node pipeline/build-dhm-stations.mjs",
     "build:rivers": "node pipeline/build-hydrorivers.mjs"
   },

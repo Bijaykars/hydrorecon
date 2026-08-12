@@ -107,9 +107,31 @@ function centroid(poly: [number, number][]): [number, number] {
 }
 
 /**
- * Pick a turbine for this duty point, or null when it falls outside every
- * mapped region (HydroGenerate raises there; a screening tool should just say
- * so rather than stop).
+ * Net-head ranges from the ESHA 2004 Guide, Table 6.3. An independent published
+ * source, used as the fallback when the duty point escapes the regions above.
+ */
+const ESHA_HEAD_RANGE: Record<TurbineType, [number, number]> = {
+  Kaplan: [2, 40],
+  Propeller: [2, 40],
+  Francis: [25, 350],
+  Pelton: [50, 1300],
+  Crossflow: [5, 200],
+  Turgo: [50, 250],
+};
+
+/** Above this, crossflow and Turgo are not the machines anyone installs. */
+const SMALL_MACHINE_MAX_CMS = 10;
+
+/**
+ * Pick a turbine for this duty point.
+ *
+ * HydroGenerate's regions come first. They are screening envelopes drawn for
+ * small hydro, though, and they do not reach large Himalayan schemes: Upper
+ * Tamakoshi is a built 456 MW Pelton plant running 66 m³/s, and the Pelton
+ * region stops at 60. Rather than return "no machine" for a station that
+ * demonstrably exists, fall back to the ESHA 2004 head bands — a second
+ * published source — and pick the machine whose band most tightly brackets the
+ * head, on a log scale so a 50–1300 m band does not win by sheer width.
  */
 export function selectTurbine(designFlowCms: number, headM: number): TurbineType | null {
   let best: TurbineType | null = null;
@@ -123,7 +145,26 @@ export function selectTurbine(designFlowCms: number, headM: number): TurbineType
       best = type;
     }
   }
-  return best;
+  if (best) return best;
+  if (!(headM > 0) || !(designFlowCms > 0)) return null;
+
+  let fallback: TurbineType | null = null;
+  let bestFit = Infinity;
+  for (const type of Object.keys(ESHA_HEAD_RANGE) as TurbineType[]) {
+    const [lo, hi] = ESHA_HEAD_RANGE[type];
+    if (headM < lo || headM > hi) continue;
+    // Propeller is a fixed-blade Kaplan; never select it over Kaplan here.
+    if (type === 'Propeller') continue;
+    if (designFlowCms > SMALL_MACHINE_MAX_CMS && (type === 'Crossflow' || type === 'Turgo')) {
+      continue;
+    }
+    const fit = Math.abs(Math.log(headM / Math.sqrt(lo * hi)));
+    if (fit < bestFit) {
+      bestFit = fit;
+      fallback = type;
+    }
+  }
+  return fallback;
 }
 
 /** Turbine manufacture / design coefficient. HydroGenerate's default. */
