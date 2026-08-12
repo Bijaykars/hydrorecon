@@ -26,6 +26,16 @@ export type Reach = {
   /** How far the click was from the mapped centreline, km. */
   distanceKm: number;
   point: { lat: number; lon: number };
+  /**
+   * Fraction of the upstream catchment lying below 5000 m and below 3000 m.
+   *
+   * Nepal's own HYDEST regression needs these, and nothing else supplies them:
+   * dry-season flow depends on the catchment below the snowline, and flood peaks
+   * on the catchment below 3000 m. Built by pipeline/build-hypsometry.mjs from
+   * HydroBASINS sub-basins and terrain. NaN outside the coverage.
+   */
+  below5000Frac: number;
+  below3000Frac: number;
 };
 
 type RiverNet = {
@@ -40,6 +50,13 @@ type RiverNet = {
   grid: Map<number, number[]>;
   /** Reach indices keyed by their first vertex, for downstream walking. */
   byFirst: Map<number, number[]>;
+  /**
+   * Two bytes per reach: catchment fraction below 5000 m, then below 3000 m,
+   * each quantised to 0-254 with 255 meaning unknown. Null if the file is
+   * missing, which must stay survivable — hypsometry is an enhancement, and the
+   * app worked before it existed.
+   */
+  hypso: Uint8Array | null;
 };
 
 const GRID_DEG = 0.1;
@@ -126,7 +143,23 @@ function load(): Promise<RiverNet> {
       if (bucket) bucket.push(i);
       else byFirst.set(k, [i]);
     }
-    return { count, scale, upland, dis, ord, start, len, xy, grid, byFirst };
+    /**
+     * Catchment hypsometry, fetched alongside. Optional on purpose: it is an
+     * 82 KB enhancement that unlocks Nepal's own HYDEST regression, and every
+     * other feature must keep working when it is absent or fails to load.
+     */
+    let hypso: Uint8Array | null = null;
+    try {
+      const hr = await fetch(`${import.meta.env.BASE_URL}nepal-hypso.dat`);
+      if (hr.ok) {
+        const hb = new Uint8Array(await hr.arrayBuffer());
+        if (hb.length === count * 2) hypso = hb;
+      }
+    } catch {
+      // Enhancement only — never block the river network on it.
+    }
+
+    return { count, scale, upland, dis, ord, start, len, xy, grid, byFirst, hypso };
   })().catch((e) => {
     net = null; // allow a retry
     throw e;
@@ -193,6 +226,9 @@ export async function nearestReach(lat: number, lon: number): Promise<ReachHit |
     strahler: n.ord[i],
     distanceKm: hit.distanceKm,
     point: hit.point,
+    // 255 is the "no hypsometry here" sentinel; 0-254 spans 0..1.
+    below5000Frac: n.hypso && n.hypso[i * 2] !== 255 ? n.hypso[i * 2] / 254 : NaN,
+    below3000Frac: n.hypso && n.hypso[i * 2 + 1] !== 255 ? n.hypso[i * 2 + 1] / 254 : NaN,
   });
 
   let nearestI = -1;

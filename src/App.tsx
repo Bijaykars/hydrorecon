@@ -24,6 +24,14 @@ import { haversineKm, minMonthlyMean, wetDryEnergy, type PlantParams } from './e
 import { licencesAlong, loadLicences, type Licence } from './context.ts';
 import { gaugesFor, type Gauge } from './gauges.ts';
 import {
+  RETURN_PERIODS,
+  designFlood,
+  driestMonthFlow,
+  drySeasonAgreement,
+  drySeasonFlows,
+  monthMean,
+} from './engine/hydest.ts';
+import {
   download,
   fileStem,
   schemesToCsv,
@@ -495,6 +503,53 @@ export default function App() {
     };
   }, [study]);
 
+  /**
+   * Nepal's own regression, run on this catchment.
+   *
+   * Every other flow figure here comes from a global model. This one is fitted
+   * to Nepali gauge records, so where it agrees the estimate is genuinely
+   * corroborated, and where it does not the engineer should know before
+   * anything is built on the number.
+   */
+  const hydest = useMemo(() => {
+    const r = study?.reach;
+    if (!r || !Number.isFinite(r.below5000Frac) || !(r.uplandKm2 > 0)) return null;
+    const input = {
+      totalKm2: r.uplandKm2,
+      below5000Km2: r.below5000Frac * r.uplandKm2,
+      below3000Km2: r.below3000Frac * r.uplandKm2,
+    };
+    const driest = driestMonthFlow(input);
+    if (!driest) return null;
+
+    /**
+     * Compare against the flow the app ACTUALLY uses, not the raw model.
+     *
+     * The engine takes its magnitude from the mapped network and only its
+     * day-to-day shape from the flood model, because the model's ~5 km cell is
+     * frequently not on this channel. Comparing HYDEST against the unscaled
+     * series therefore compares it against a number this app has already
+     * identified as wrong and thrown away — on the Marsyangdi that manufactured
+     * a "15.7x disagreement" out of a cell reading 1.15 m3/s on a river carrying
+     * a hundred. Same double-counting the uncertainty band had to be rescued
+     * from earlier.
+     */
+    const seriesMean = meanOf(study.flow.values);
+    const networkMean = study.path[0]?.meanCms ?? 0;
+    const ratio = networkMean > 0 && seriesMean > 0 ? networkMean / seriesMean : 1;
+    const modelled = monthMean(study.flow.dates, study.flow.values, driest.month) * ratio;
+    return {
+      input,
+      driest,
+      months: drySeasonFlows(input),
+      modelledCms: modelled,
+      agreement: Number.isFinite(modelled) ? drySeasonAgreement(driest.cms, modelled) : null,
+      floods: RETURN_PERIODS.map((t) => ({ t: t as number, cms: designFlood(input, t) })).filter(
+        (f): f is { t: number; cms: number } => f.cms !== null
+      ),
+    };
+  }, [study]);
+
   const found = useMemo(() => {
     if (!input || !study?.followsRiver) return null;
     return discover(input);
@@ -745,6 +800,7 @@ export default function App() {
         error={error}
         licences={licences}
         gauges={gauges}
+        hydest={hydest}
         wideSearch={wideSearch}
         onWideSearch={setWideSearch}
         canExport={Boolean(exportCtx && exportCtx.schemes.length > 0)}

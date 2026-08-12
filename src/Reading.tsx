@@ -3,6 +3,7 @@ import type { Assumptions, Pt, Study } from './App.tsx';
 import type { DiscoverResult, Scheme } from './engine/discover.ts';
 import type { Uncertainty } from './engine/uncertainty.ts';
 import type { Licence } from './context.ts';
+import { MONTH_NAMES } from './engine/hydest.ts';
 import {
   DISCHARGE_GAUGE_COUNT,
   RIVER_GAUGE_COUNT,
@@ -101,6 +102,14 @@ export function Reading(props: {
   setAssume: (a: Assumptions) => void;
   licences: Licence[] | null;
   gauges: Gauge[] | null;
+  hydest: {
+    input: { totalKm2: number; below5000Km2: number; below3000Km2: number };
+    driest: { month: number; cms: number };
+    months: { month: number; cms: number }[];
+    modelledCms: number;
+    agreement: { ratio: number; agree: boolean } | null;
+    floods: { t: number; cms: number }[];
+  } | null;
   wideSearch: boolean;
   onWideSearch: (v: boolean) => void;
   canExport: boolean;
@@ -126,6 +135,7 @@ export function Reading(props: {
     setAssume,
     licences,
     gauges,
+    hydest,
     wideSearch,
     onWideSearch,
     canExport,
@@ -482,6 +492,75 @@ export function Reading(props: {
             <span className="text-amber">construction</span> licences are a hard constraint on this
             water; a survey licence means someone is already studying it. The public snapshot lags,
             so check the current register before relying on this.
+          </p>
+        </div>
+      )}
+
+      {/* ---- Nepal's own regression, as an independent third opinion ---- */}
+      {hydest && (
+        <div className="border-b border-line px-3.5 py-3">
+          <div className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
+            HYDEST · Nepal's national method
+          </div>
+          <div className="flex items-baseline gap-2 text-[11px]">
+            <span className="text-muted">driest month</span>
+            <span className="num font-semibold text-ink">
+              {n(hydest.driest.cms, 2)} m³/s
+            </span>
+            <span className="text-faint">{MONTH_NAMES[hydest.driest.month]}</span>
+          </div>
+          {hydest.agreement && (
+            <div
+              className={`mt-1 text-[10px] leading-snug ${
+                hydest.agreement.agree ? 'text-muted' : 'text-amber'
+              }`}
+            >
+              {hydest.agreement.agree ? (
+                <>
+                  The global model gives {n(hydest.modelledCms, 2)} m³/s for the same month —{' '}
+                  within {n(hydest.agreement.ratio, 1)}×. Two methods built from different data
+                  agree, which is the strongest corroboration available without a gauge.
+                </>
+              ) : (
+                <>
+                  The global model gives {n(hydest.modelledCms, 2)} m³/s for the same month —{' '}
+                  {n(hydest.agreement.ratio, 1)}× apart. Nepal's own regression and the flood model
+                  disagree about the dry season here, and the dry season is what sets firm power.
+                </>
+              )}
+            </div>
+          )}
+          <div className="mt-2 grid grid-cols-5 gap-1">
+            {hydest.months.map((m) => (
+              <div key={m.month} className="text-center">
+                <div className="text-[9px] text-faint">{MONTH_NAMES[m.month]}</div>
+                <div className="num text-[10px] text-river">{n(m.cms, 1)}</div>
+              </div>
+            ))}
+          </div>
+          {hydest.floods.length > 0 && (
+            <div className="mt-2 border-t border-line pt-2">
+              <div className="mb-1 text-[10px] uppercase tracking-[0.08em] text-faint">
+                design flood, m³/s
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px]">
+                {hydest.floods
+                  .filter((f) => [2, 100, 500].includes(f.t))
+                  .map((f) => (
+                    <span key={f.t}>
+                      <span className="text-faint">Q{f.t}</span>{' '}
+                      <span className="num text-ink">{n(f.cms, 0)}</span>
+                    </span>
+                  ))}
+              </div>
+            </div>
+          )}
+          <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
+            WECS/DHM 1990, fitted to Nepal's own gauged records — the method a feasibility study
+            would use for an ungauged site. Needs the catchment below 5000 m ({n(hydest.input.below5000Km2, 0)} of{' '}
+            {n(hydest.input.totalKm2, 0)} km²) and below 3000 m ({n(hydest.input.below3000Km2, 0)} km²).
+            Only Jan–May and the floods are shown: the monsoon months need rainfall data this app
+            does not have yet, and a guessed monsoon flow would be worse than none.
           </p>
         </div>
       )}

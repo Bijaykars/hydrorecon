@@ -9,14 +9,15 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
-    "check": "node --experimental-strip-types --no-warnings checks/hydro.check.ts && node --experimental-strip-types --no-warnings checks/plants.check.ts && node --experimental-strip-types --no-warnings checks/hydrogenerate.check.ts && node --experimental-strip-types --no-warnings checks/export.check.ts && node --experimental-strip-types --no-warnings checks/gauges.check.ts && node --experimental-strip-types --no-warnings checks/waterway.check.ts",
+    "check": "node --experimental-strip-types --no-warnings checks/hydro.check.ts && node --experimental-strip-types --no-warnings checks/plants.check.ts && node --experimental-strip-types --no-warnings checks/hydrogenerate.check.ts && node --experimental-strip-types --no-warnings checks/export.check.ts && node --experimental-strip-types --no-warnings checks/gauges.check.ts && node --experimental-strip-types --no-warnings checks/waterway.check.ts && node --experimental-strip-types --no-warnings checks/hydest.check.ts",
     "desktop": "npm run build && electron desktop/main.cjs",
     "desktop:dev": "electron desktop/main.cjs",
     "desktop:pack": "npm run build && electron-builder --dir",
     "desktop:dist": "npm run build && electron-builder",
     "build:dhm": "node pipeline/build-dhm-stations.mjs",
     "build:rivers": "node pipeline/build-hydrorivers.mjs",
-    "probe:dem": "node checks/dem-vs-survey.probe.mjs"
+    "probe:dem": "node checks/dem-vs-survey.probe.mjs",
+    "build:hypso": "node pipeline/build-hypsometry.mjs"
   },
   "dependencies": {
     "maplibre-gl": "^5.6.0",
