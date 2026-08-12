@@ -24,7 +24,22 @@ import stationsRaw from './data/dhm-stations.json' with { type: 'json' };
 import { downstreamPath, hasReachData, nearestReach } from './rivers.ts';
 import { haversineKm } from './engine/hydro.ts';
 
-type RawStation = { n: string; y: number; x: number; e: number | null; r: number };
+type RawStation = {
+  n: string;
+  y: number;
+  x: number;
+  e: number | null;
+  r: number;
+  /** 1 when the station records manual discharge (Q_M), not only water level. */
+  q?: number;
+  /** DHM series id for that discharge record, to quote in a data request. */
+  qs?: number;
+  rv?: string;
+  b?: string;
+  d?: string;
+  w?: number;
+  g?: number;
+};
 
 /** How the gauge sits relative to the study site, hydrologically. */
 export type Relation =
@@ -44,6 +59,25 @@ export type Gauge = {
   /** Catchment above the gauge, km², from the mapped network. Null off-network. */
   uplandKm2: number | null;
   relation: Relation;
+  /**
+   * Whether DHM records DISCHARGE here, or only water level.
+   *
+   * This is the difference between a record you can use and one you would still
+   * have to convert. A stage record without its rating curve is not a flow
+   * series, and that curve is a separate thing to obtain — so of two otherwise
+   * equal stations, the one gauging discharge is worth far more. 194 of the
+   * bundled stations carry a manual discharge series; the rest are stage only.
+   */
+  measuresDischarge: boolean;
+  /** DHM's own series id for that discharge record, for quoting in a request. */
+  seriesId: number | null;
+  /** River, basin and district as DHM records them. */
+  river: string | null;
+  basin: string | null;
+  district: string | null;
+  /** DHM's published flood thresholds at this gauge board, m. */
+  warnLevelM: number | null;
+  dangerLevelM: number | null;
   /**
    * Multiply the gauge's discharge by this to get discharge here.
    *
@@ -130,9 +164,13 @@ export async function gaugesFor(
   }
 
   return out.sort((a, b) => {
-    // Connected before unconnected, then closest in catchment size.
-    const rank = (g: Gauge) => (g.relation === 'nearby catchment' ? 1 : 0);
-    if (rank(a) !== rank(b)) return rank(a) - rank(b);
+    // Connected first — only a gauge on this water is measuring this river.
+    const connected = (g: Gauge) => (g.relation === 'nearby catchment' ? 1 : 0);
+    if (connected(a) !== connected(b)) return connected(a) - connected(b);
+    // Then a real discharge record over a stage-only one: without its rating
+    // curve a stage series is not flow, and the curve is a separate request.
+    if (a.measuresDischarge !== b.measuresDischarge) return a.measuresDischarge ? -1 : 1;
+    // Then closest in catchment size, since that is what transfers cleanly.
     const off = (g: Gauge) =>
       g.areaRatio ? Math.abs(Math.log(g.areaRatio)) : Number.POSITIVE_INFINITY;
     if (off(a) !== off(b)) return off(a) - off(b);
@@ -201,6 +239,13 @@ async function resolve(
     distanceKm,
     uplandKm2,
     relation,
+    measuresDischarge: st.q === 1,
+    seriesId: st.qs ?? null,
+    river: st.rv ?? null,
+    basin: st.b ?? null,
+    district: st.d ?? null,
+    warnLevelM: st.w ?? null,
+    dangerLevelM: st.g ?? null,
     areaRatio,
     trustworthy:
       relation !== 'nearby catchment' &&
@@ -229,3 +274,12 @@ export function transferAdvice(g: Gauge): string {
 
 /** Total gauges bundled, for saying how thin the network is somewhere. */
 export const RIVER_GAUGE_COUNT = RIVER_GAUGES.length;
+/** How many of those hold an actual discharge record rather than stage alone. */
+export const DISCHARGE_GAUGE_COUNT = RIVER_GAUGES.filter((s) => s.q === 1).length;
+
+/** What kind of record DHM holds here, said plainly. */
+export function recordKind(g: Gauge): string {
+  return g.measuresDischarge
+    ? `discharge record${g.seriesId ? ` (DHM series ${g.seriesId})` : ''}`
+    : 'water level only — a rating curve is needed too';
+}

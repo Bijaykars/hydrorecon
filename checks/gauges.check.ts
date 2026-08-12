@@ -11,7 +11,13 @@
  */
 import assert from 'node:assert/strict';
 import stationsRaw from '../src/data/dhm-stations.json' with { type: 'json' };
-import { transferAdvice, RIVER_GAUGE_COUNT, type Gauge } from '../src/gauges.ts';
+import {
+  DISCHARGE_GAUGE_COUNT,
+  RIVER_GAUGE_COUNT,
+  recordKind,
+  transferAdvice,
+  type Gauge,
+} from '../src/gauges.ts';
 
 let passed = 0;
 const ok = (name: string, fn: () => void) => {
@@ -20,7 +26,10 @@ const ok = (name: string, fn: () => void) => {
   console.log(`  ok  ${name}`);
 };
 
-type RawStation = { n: string; y: number; x: number; e: number | null; r: number };
+type RawStation = {
+  n: string; y: number; x: number; e: number | null; r: number;
+  q?: number; qs?: number; rv?: string; b?: string; d?: string; w?: number; g?: number;
+};
 const stations = stationsRaw as RawStation[];
 
 console.log('\ngauges: the bundled DHM inventory');
@@ -29,14 +38,62 @@ ok('river gauges are separated from rainfall stations', () => {
   const rivers = stations.filter((s) => s.r === 1);
   const rain = stations.filter((s) => s.r === 0);
   assert.equal(rivers.length, RIVER_GAUGE_COUNT, 'exported count must match the file');
-  assert.ok(rivers.length > 150 && rivers.length < 400, `${rivers.length} river gauges`);
-  assert.ok(rain.length > rivers.length, 'the file is mostly rainfall stations');
+  assert.ok(rivers.length > 150 && rivers.length < 500, `${rivers.length} river gauges`);
+  assert.ok(rain.length > 0, 'rainfall stations must still be present');
   // Every river gauge must be inside Nepal, or the distance search is meaningless.
   for (const s of rivers) {
     assert.ok(
       s.y > 26 && s.y < 31 && s.x > 80 && s.x < 89,
       `${s.n} at ${s.y},${s.x} is outside Nepal`
     );
+  }
+});
+
+ok("Nepal's major river gauges are classified, not missed", () => {
+  // These are named "<River> at <Place>" with no "River" or "Khola" in them, so
+  // the old name-matching classifier was blind to them — the Arun, the Bheri
+  // and the Budhi Gandaki among them. They are found by what the instrument
+  // reports instead, which is not free text.
+  const rivers = stations.filter((s) => s.r === 1);
+  for (const want of ['Arun at', 'Bheri at', 'Budhi Gandaki at', 'Babai at', 'Chamelia at']) {
+    assert.ok(
+      rivers.some((s) => s.n.startsWith(want)),
+      `no river gauge matching "${want}" — classification has regressed`
+    );
+  }
+});
+
+ok('discharge stations are identified and carry a citable series id', () => {
+  const q = stations.filter((s) => s.r === 1 && s.q === 1);
+  assert.equal(q.length, DISCHARGE_GAUGE_COUNT, 'exported discharge count must match');
+  assert.ok(q.length > 100, `only ${q.length} stations gauge discharge`);
+  assert.ok(q.length < stations.filter((s) => s.r === 1).length, 'not every gauge measures flow');
+  for (const s of q) {
+    assert.ok(Number.isInteger(s.qs) && s.qs! > 0, `${s.n}: discharge flag without a series id`);
+  }
+});
+
+ok('no personal data rides along in the bundle', () => {
+  // The upstream feed carries observer names, mobile numbers, home addresses,
+  // bank accounts and PAN numbers. The pipeline takes fields by allow-list, and
+  // this is the backstop if that list is ever widened carelessly.
+  const json = JSON.stringify(stations);
+  for (const pattern of [/\b9[678]\d{8}\b/, /account/i, /\bPAN\b/, /observer/i, /\bbank\b/i]) {
+    const hit = pattern.exec(json);
+    assert.ok(!hit, `personal data in the bundle: ${hit?.[0]}`);
+  }
+});
+
+ok('flood thresholds are plausible gauge-board readings', () => {
+  for (const s of stations.filter((x) => x.w || x.g)) {
+    for (const v of [s.w, s.g]) {
+      if (v === undefined) continue;
+      assert.ok(v > 0 && v < 30, `${s.n}: ${v} m is not a gauge-board level`);
+    }
+    // Danger is above warning, or the two have been swapped.
+    if (s.w !== undefined && s.g !== undefined) {
+      assert.ok(s.g >= s.w, `${s.n}: danger ${s.g} m below warning ${s.w} m`);
+    }
   }
 });
 
@@ -50,6 +107,13 @@ const g = (over: Partial<Gauge>): Gauge => ({
   distanceKm: 2,
   uplandKm2: 1000,
   relation: 'upstream',
+  measuresDischarge: true,
+  seriesId: 12345,
+  river: 'Test Khola',
+  basin: 'Koshi',
+  district: 'Somewhere',
+  warnLevelM: 3.5,
+  dangerLevelM: 4.5,
   areaRatio: 1,
   trustworthy: true,
   ...over,
@@ -90,6 +154,14 @@ ok('a trustworthy gauge must be connected AND in range — both, not either', ()
   );
   // The advice for a good one names a factor and nothing else.
   assert.match(transferAdvice(g({ relation: 'downstream', areaRatio: 0.75 })), /0\.75x/);
+});
+
+ok('a stage-only station says so, rather than implying it holds flow', () => {
+  const stage = recordKind(g({ measuresDischarge: false, seriesId: null }));
+  assert.match(stage, /rating curve/i, 'stage without a curve is not a flow record');
+  assert.doesNotMatch(stage, /series/i, 'no series id to quote when there is no discharge record');
+  // And a discharge one quotes the id DHM would need to find it.
+  assert.match(recordKind(g({ measuresDischarge: true, seriesId: 15381 })), /series 15381/);
 });
 
 console.log(`\n${passed} gauge checks passed\n`);

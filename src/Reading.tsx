@@ -3,7 +3,13 @@ import type { Assumptions, Pt, Study } from './App.tsx';
 import type { DiscoverResult, Scheme } from './engine/discover.ts';
 import type { Uncertainty } from './engine/uncertainty.ts';
 import type { Licence } from './context.ts';
-import { RIVER_GAUGE_COUNT, transferAdvice, type Gauge } from './gauges.ts';
+import {
+  DISCHARGE_GAUGE_COUNT,
+  RIVER_GAUGE_COUNT,
+  recordKind,
+  transferAdvice,
+  type Gauge,
+} from './gauges.ts';
 import { Fdc, RiverProfile } from './charts.tsx';
 import { buildFdc } from './engine/hydro.ts';
 
@@ -500,6 +506,12 @@ export function Reading(props: {
                   <span className="block text-[9.5px] text-faint">
                     {g.relation} · {n(g.distanceKm, 1)} km away
                     {g.uplandKm2 ? ` · ${n(g.uplandKm2, 0)} km² catchment` : ''}
+                    {g.basin ? ` · ${g.basin} basin` : ''}
+                  </span>
+                  <span
+                    className={`block text-[9.5px] ${g.measuresDischarge ? 'text-river' : 'text-faint'}`}
+                  >
+                    {recordKind(g)}
                   </span>
                   <span className="block text-[9.5px] text-muted">{transferAdvice(g)}</span>
                 </span>
@@ -508,9 +520,10 @@ export function Reading(props: {
           </div>
           <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
             Flow is the largest error in this estimate and a gauged record is the only thing that
-            shrinks it. DHM operates {RIVER_GAUGE_COUNT} river stations; their readings are not
-            public (the API requires a key), so request the record for the station above and scale
-            it by catchment area. That is what a feasibility study would do with it.
+            shrinks it. DHM runs {RIVER_GAUGE_COUNT} river stations, {DISCHARGE_GAUGE_COUNT} of them
+            recording discharge rather than water level alone. The readings are not public — the API
+            requires a key, and refuses DHM's own portal too — so request the record for the station
+            above and scale it by catchment area, which is what a feasibility study would do with it.
           </p>
         </div>
       )}

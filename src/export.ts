@@ -11,7 +11,7 @@
  */
 import type { Scheme } from './engine/discover.ts';
 import type { Licence } from './context.ts';
-import { transferAdvice, type Gauge } from './gauges.ts';
+import { recordKind, transferAdvice, type Gauge } from './gauges.ts';
 
 export type ExportContext = {
   at: { lat: number; lon: number };
@@ -106,10 +106,13 @@ function provenance(c: ExportContext): string[] {
         .map(
           (g) =>
             `  ${g.name} — ${g.relation}, ${g.distanceKm.toFixed(1)} km away` +
-            `${g.uplandKm2 ? `, ${g.uplandKm2.toFixed(0)} km2 catchment` : ''}\n` +
+            `${g.uplandKm2 ? `, ${g.uplandKm2.toFixed(0)} km2 catchment` : ''}` +
+            `${g.basin ? `, ${g.basin} basin` : ''}\n` +
+            `    holds: ${recordKind(g)}\n` +
             `    ${transferAdvice(g)}`
         ),
-      '  station values are not public (the DHM API requires a key); locations are.'
+      '  station values are not public (the DHM API requires a key, and refuses',
+      "  DHM's own portal too); locations and what each station measures are."
     );
   }
   if (c.licences.length > 0) {
