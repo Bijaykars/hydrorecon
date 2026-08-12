@@ -21,6 +21,13 @@ import {
 import { discover, evaluate, type Scheme, type SchemeInput } from './engine/discover.ts';
 import { haversineKm, minMonthlyMean, wetDryEnergy, type PlantParams } from './engine/hydro.ts';
 import { licencesAlong, loadLicences, type Licence } from './context.ts';
+import {
+  download,
+  fileStem,
+  schemesToCsv,
+  schemesToGeoJson,
+  type ExportContext,
+} from './export.ts';
 import { Reading } from './Reading.tsx';
 
 export type Pt = { lat: number; lon: number };
@@ -604,6 +611,44 @@ export default function App() {
     setBusy(null);
   }, [at]);
 
+  /** Everything a downloaded file needs to explain itself. */
+  const exportCtx = useMemo((): ExportContext | null => {
+    if (!at || !study || !found) return null;
+    return {
+      at,
+      schemes: found.schemes,
+      selected: scheme,
+      path: study.path,
+      demSource: study.dem.source,
+      demResolutionM: study.dem.resolutionM,
+      flowYears: study.flow.dates.length / 365.25,
+      flowMeanCms: meanOf(study.flow.values),
+      networkMeanCms: study.reach?.meanDischargeCms ?? null,
+      tracedFromTerrain: Boolean(study.tracedFromTerrain),
+      evaluated: found.evaluated,
+      licences: licences ?? [],
+      assumptions: {
+        exceedance: assume.exceedance,
+        efficiency: assume.efficiency,
+        headLossFrac: assume.headLossFrac,
+        residualFrac: assume.residualFrac,
+      },
+    };
+  }, [at, study, found, scheme, licences, assume]);
+
+  const onExport = useCallback(
+    (kind: 'csv' | 'geojson') => {
+      if (!exportCtx) return;
+      const stem = fileStem(exportCtx.at);
+      if (kind === 'csv') {
+        download(`${stem}.csv`, 'text/csv;charset=utf-8', schemesToCsv(exportCtx));
+      } else {
+        download(`${stem}.geojson`, 'application/geo+json', schemesToGeoJson(exportCtx));
+      }
+    },
+    [exportCtx]
+  );
+
   const reset = useCallback(() => {
     setAt(null);
     setStudy(null);
@@ -642,6 +687,8 @@ export default function App() {
         busy={busy}
         error={error}
         licences={licences}
+        canExport={Boolean(exportCtx && exportCtx.schemes.length > 0)}
+        onExport={onExport}
         neighbours={neighbours}
         onProbe={runProbe}
         onReset={reset}

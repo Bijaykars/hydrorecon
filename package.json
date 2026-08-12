@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
-    "check": "node --experimental-strip-types --no-warnings checks/hydro.check.ts && node --experimental-strip-types --no-warnings checks/plants.check.ts && node --experimental-strip-types --no-warnings checks/hydrogenerate.check.ts",
+    "check": "node --experimental-strip-types --no-warnings checks/hydro.check.ts && node --experimental-strip-types --no-warnings checks/plants.check.ts && node --experimental-strip-types --no-warnings checks/hydrogenerate.check.ts && node --experimental-strip-types --no-warnings checks/export.check.ts",
     "desktop": "npm run build && electron desktop/main.cjs",
     "desktop:dev": "electron desktop/main.cjs",
     "desktop:pack": "npm run build && electron-builder --dir",

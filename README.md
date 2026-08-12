@@ -26,6 +26,15 @@ deploys free to any static host and works the same running locally.
 
 The URL holds the whole session, so a link reproduces the exact reading.
 
+## Taking the work away
+
+Two exports, because engineers want two different things: a **CSV** of the numbers
+to put in front of a colleague, and a **GeoJSON** of the geometry to drop into
+QGIS beside their own layers. Both carry a header naming every source,
+assumption and limitation — including a warning listing any licensed project
+already on the reach — so the file still explains itself a year later. The link
+in the address bar reopens the exact study.
+
 ## Is the river already taken?
 
 Before any engineering, a developer needs to know who already holds the water.
@@ -60,7 +69,7 @@ driest month, and the household figure used for the plain-language comparison. A
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm run check    # 81 assert-based checks
+npm run check    # 86 assert-based checks
 npm run build    # typecheck + production build
 ```
 

@@ -91,6 +91,8 @@ export function Reading(props: {
   assume: Assumptions;
   setAssume: (a: Assumptions) => void;
   licences: Licence[] | null;
+  canExport: boolean;
+  onExport: (kind: 'csv' | 'geojson') => void;
   busy: string | null;
   error: string | null;
   neighbours: { lat: number; lon: number; meanCms: number }[] | null;
@@ -110,6 +112,8 @@ export function Reading(props: {
     assume,
     setAssume,
     licences,
+    canExport,
+    onExport,
     busy,
     error,
     neighbours,
@@ -547,6 +551,35 @@ export function Reading(props: {
               {study.followsRiver && ` Walked ${n(study.path[study.path.length - 1].km, 1)} km downstream.`}
             </div>
           )}
+        </div>
+      )}
+
+      {canExport && (
+        <div className="border-b border-line px-3.5 py-3">
+          <div className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
+            Take it with you
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => onExport('csv')}
+              className="flex-1 rounded-md border border-line bg-panel-2 px-2 py-1.5 text-[11.5px] text-ink hover:border-river hover:text-river"
+            >
+              CSV — the numbers
+            </button>
+            <button
+              type="button"
+              onClick={() => onExport('geojson')}
+              className="flex-1 rounded-md border border-line bg-panel-2 px-2 py-1.5 text-[11.5px] text-ink hover:border-river hover:text-river"
+            >
+              GeoJSON — for QGIS
+            </button>
+          </div>
+          <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
+            Every alternative, plus a header naming each source, assumption and limitation — so the
+            file still explains itself when nobody remembers where it came from. The link in your
+            address bar reopens this exact study.
+          </p>
         </div>
       )}
 
