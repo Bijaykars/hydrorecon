@@ -275,6 +275,35 @@ export function Reading(props: {
                 <span className="text-faint">× ρg →</span>
                 <span className="num font-semibold text-ink">{n(scheme.capacityMW, 2)} MW</span>
               </div>
+              {scheme.waterway && (
+                <div className="mt-1.5 rounded-md border border-line px-2.5 py-2">
+                  <div className="mb-1 text-[10px] uppercase tracking-[0.08em] text-faint">
+                    the waterway costs {n(scheme.grossHeadM - scheme.netHeadM, 1)} m of that drop
+                    {' · '}
+                    {n(scheme.waterway.lossFrac * 100, 1)}%
+                  </div>
+                  {scheme.waterway.segments.map((s) => (
+                    <div key={s.kind} className="flex items-baseline gap-1.5 text-[10px] leading-tight">
+                      <span className="w-14 shrink-0 text-muted">{s.kind}</span>
+                      <span className="num text-river">
+                        {s.lengthM >= 1000
+                          ? `${n(s.lengthM / 1000, 2)} km`
+                          : `${n(s.lengthM, 0)} m`}
+                      </span>
+                      <span className="text-faint">·</span>
+                      <span className="num text-river">{n(s.diameterM, 2)} m</span>
+                      <span className="text-faint">·</span>
+                      <span className="num text-river">{n(s.velocityMs, 1)} m/s</span>
+                      <span className="ml-auto num text-ink">−{n(s.lossM, 2)} m</span>
+                    </div>
+                  ))}
+                  <p className="mt-1 text-[9.5px] leading-snug text-faint">
+                    Sized for this duty point, not assumed: ESHA 2004 economic diameter capped at
+                    5 m/s, Darcy–Weisbach with Swamee–Jain friction, Manning for the headrace. This
+                    is why a longer waterway is not free.
+                  </p>
+                </div>
+              )}
               {scheme.turbine ? (
                 <div className="mt-1 text-[10px] leading-snug text-faint">
                   <b className="text-muted">{scheme.turbine}</b> selected for this duty point —
@@ -561,15 +590,6 @@ export function Reading(props: {
             display={`${Math.round(assume.efficiency * 100)}%`}
             onChange={(v) => set('efficiency', v)}
             note="Turbine efficiency comes from the machine's own curve, not this."
-          />
-          <Slider
-            label="Head loss"
-            value={assume.headLossFrac}
-            min={0}
-            max={0.2}
-            step={0.005}
-            display={`${(assume.headLossFrac * 100).toFixed(1)}%`}
-            onChange={(v) => set('headLossFrac', v)}
           />
           <Slider
             label="Residual flow"

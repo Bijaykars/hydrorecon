@@ -13,6 +13,7 @@
  */
 import { annualEnergy, buildFdc, flowAtExceedance, type FdcPoint, type PlantParams } from './hydro.ts';
 import { turbineCurve, type TurbineType } from './turbine.ts';
+import { sizeWaterway, type Waterway } from './waterway.ts';
 
 export type SchemeInput = {
   /** Evenly spaced points down the river, with elevation attached. */
@@ -29,6 +30,13 @@ export type SchemeInput = {
   residualCms: number;
   exceedance: number;
   efficiency: number;
+  /**
+   * Fallback head loss, as a fraction of gross.
+   *
+   * Normally unused: every scheme sizes its own headrace and penstock and pays
+   * what they actually cost (engine/waterway.ts). This is what remains for duty
+   * points too small to size.
+   */
   headLossFrac: number;
   minFlowFrac: number;
   /**
@@ -70,6 +78,8 @@ export type Scheme = {
   turbine: TurbineType | null;
   /** Best-point turbine efficiency, before the generator. */
   turbinePeak: number;
+  /** Headrace and penstock sized for this duty point, and what they cost in head. */
+  waterway: Waterway | null;
   /** Why this one is on the list at all. */
   reasons: string[];
 };
@@ -157,7 +167,25 @@ export function evaluate(
   if (qDesign <= 0) return null;
 
   const gross = zi - zj;
-  const netForSelection = Math.max(0, gross) * (1 - input.headLossFrac);
+  const waterwayKm = Math.max(1e-6, path[j].km - path[i].km);
+
+  /**
+   * What the conveyance costs THIS scheme, rather than a flat percentage.
+   *
+   * The search compares waterway lengths directly against each other, so
+   * charging every candidate the same friction quietly favoured the longest one
+   * — it collected the extra flow and drop of a longer reach without ever paying
+   * for the canal and pipe needed to carry it. Sizing each candidate's own
+   * headrace and penstock removes that bias. `headLossFrac` stays as the
+   * fallback for duty points too small to size.
+   */
+  const waterway = sizeWaterway({
+    designFlowCms: qDesign,
+    grossHeadM: Math.max(0, gross),
+    alongRiverM: waterwayKm * 1000,
+  });
+  const headLossFrac = waterway ? waterway.lossFrac : input.headLossFrac;
+  const netForSelection = Math.max(0, gross) * (1 - headLossFrac);
   // Pick the machine for this duty point, then let its part-load curve drive
   // every day of the record. `efficiency` is the generator/transformer train
   // that sits behind the runner.
@@ -165,7 +193,7 @@ export function evaluate(
 
   const params: PlantParams = {
     grossHeadM: Math.max(0, gross),
-    headLossFrac: input.headLossFrac,
+    headLossFrac,
     // Rated power uses the machine's own best-point efficiency when known.
     efficiency: curve ? curve.peak * efficiency : efficiency,
     designFlowCms: qDesign,
@@ -175,7 +203,6 @@ export function evaluate(
   };
   const scaled = ratio === 1 ? series : series.map((v) => v * ratio);
   const e = annualEnergy(scaled, params);
-  const waterwayKm = Math.max(1e-6, path[j].km - path[i].km);
 
   return {
     i,
@@ -194,6 +221,7 @@ export function evaluate(
     gwhPerKm: e.gwhPerYear / waterwayKm,
     turbine: curve?.type ?? null,
     turbinePeak: curve?.peak ?? efficiency,
+    waterway,
     reasons: [],
   };
 }

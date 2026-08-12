@@ -423,17 +423,26 @@ const steady = (path: ReturnType<typeof ramp>) => ({
 ok('evaluate reproduces P = rho*g*Q*H*eta by hand', () => {
   const s = evaluate(steady(ramp()), 0, 50)!;
   assert.ok(s, 'expected a scheme');
-  // 50 steps x 0.12 km x 40 m/km = 240 m of drop, no losses declared.
+  // 50 steps x 0.12 km x 40 m/km = 240 m of drop.
   near(s.grossHeadM, 240, 1e-9);
-  near(s.netHeadM, 240, 1e-9);
   near(s.waterwayKm, 6, 1e-9);
   near(s.designFlowCms, 12, 1e-9); // flat series -> Q40 = 12, no residual
-  // Rated power now runs through the selected machine's best-point efficiency
-  // times the 0.85 generator/transformer train, not a flat 0.85 overall.
-  const c = turbineCurve(12, 240)!;
-  assert.ok(c, 'a 12 m3/s, 240 m duty point must select a machine');
+
+  // `headLossFrac: 0` above is only a FALLBACK now. Every scheme gets its own
+  // headrace and penstock sized, and they cost head whatever the caller
+  // declares — a 6 km waterway is not free just because nobody priced it.
+  assert.ok(s.waterway, 'a 12 m3/s, 240 m duty point must be sizeable');
+  assert.ok(
+    s.netHeadM < 240 && s.netHeadM > 240 * 0.9,
+    `net head ${s.netHeadM} m is not a plausible loss on 240 m of gross`
+  );
+  near(s.netHeadM, 240 * (1 - s.waterway!.lossFrac), 1e-9, 'net head vs sized loss');
+
+  // The identity itself is still checked by hand, on the head the engine used.
+  const c = turbineCurve(12, s.netHeadM)!;
+  assert.ok(c, 'a 12 m3/s duty point must select a machine');
   near(s.turbinePeak, c.peak, 1e-12);
-  near(s.capacityMW, (1000 * 9.81 * 12 * 240 * c.peak * 0.85) / 1e6, 1e-9);
+  near(s.capacityMW, (1000 * 9.81 * 12 * s.netHeadM * c.peak * 0.85) / 1e6, 1e-9);
 });
 
 ok('an intake on a bigger catchment gets proportionally more water', () => {
