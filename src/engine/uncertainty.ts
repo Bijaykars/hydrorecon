@@ -88,7 +88,16 @@ export function uncertaintyFor(
   input: SchemeInput,
   scheme: Scheme,
   seriesMeanCms: number,
-  networkMeanCms: number | null
+  networkMeanCms: number | null,
+  /**
+   * Spread of a MEASURED record, when the user has supplied one.
+   *
+   * A gauged series is a different category of input from a global model, and
+   * the band must show that or the import was pointless. Supplied by
+   * measured.ts, which sets it from rating-curve error plus whatever
+   * catchment-area transfer was applied.
+   */
+  measuredSpreadFrac?: number
 ): Uncertainty | null {
   const best = evaluate(input, scheme.i, scheme.j);
   if (!best || best.capacityMW <= 0) return null;
@@ -99,7 +108,12 @@ export function uncertaintyFor(
     ? Math.max(networkMeanCms! / seriesMeanCms, seriesMeanCms / networkMeanCms!)
     : Infinity;
   const corroborated = haveBoth && ratio <= AGREEMENT_RATIO;
-  const flowSpread = corroborated ? FLOW_SPREAD_CORROBORATED : FLOW_SPREAD_ALONE;
+  const measured = measuredSpreadFrac !== undefined && measuredSpreadFrac > 0;
+  const flowSpread = measured
+    ? measuredSpreadFrac!
+    : corroborated
+      ? FLOW_SPREAD_CORROBORATED
+      : FLOW_SPREAD_ALONE;
 
   const withFlow = (mult: number) =>
     evaluate({ ...input, series: input.series.map((v) => v * mult) }, scheme.i, scheme.j);
@@ -142,11 +156,13 @@ export function uncertaintyFor(
     {
       name: 'River flow',
       swingPct: best.capacityMW > 0 ? (flowSwing / best.capacityMW) * 100 : 0,
-      note: corroborated
-        ? 'two global models agree here, but neither is gauged at this site'
-        : haveBoth
-          ? `the flood model's cell is off this channel (${ratio.toFixed(0)}× out), so the mapped network is carrying this alone`
-          : 'a single global model, with nothing checking it',
+      note: measured
+        ? 'a measured record, carrying rating-curve error and any catchment transfer — not a model'
+        : corroborated
+          ? 'two global models agree here, but neither is gauged at this site'
+          : haveBoth
+            ? `the flood model's cell is off this channel (${ratio.toFixed(0)}× out), so the mapped network is carrying this alone`
+            : 'a single global model, with nothing checking it',
     },
     {
       name: 'Head from terrain',

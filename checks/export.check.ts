@@ -16,7 +16,7 @@ const ctx = (over: Partial<ExportContext> = {}): ExportContext => ({
   at: { lat: 28.1, lon: 84.4 }, schemes: [scheme()], selected: null,
   path: Array.from({ length: 11 }, (_, k) => ({ km: k * 0.5, lat: 28.1 - k * 0.01, lon: 84.4 + k * 0.01, elevationM: 1000 - k * 20, meanCms: 12 })),
   demSource: 'Test DEM', demResolutionM: 30, flowYears: 20, flowMeanCms: 12,
-  networkMeanCms: null, band: null, tracedFromTerrain: false, evaluated: 500, licences: [], gauges: [], grid: null,
+  networkMeanCms: null, band: null, tracedFromTerrain: false, evaluated: 500, licences: [], gauges: [], grid: null, measured: null,
   assumptions: { exceedance: 0.4, efficiency: 0.96, headLossFrac: 0.05, residualFrac: 0.1 },
   ...over,
 });
@@ -73,6 +73,29 @@ ok('GeoJSON is valid and geometry-complete', () => {
   // lon, lat, elevation — in that order, which is what GIS expects.
   assert.equal(line.geometry.coordinates[0][0], 84.4);
   assert.equal(line.geometry.coordinates[0][1], 28.1);
+});
+
+
+ok('an export built on a gauge record never claims its flow came from a model', () => {
+  const csv = schemesToCsv(
+    ctx({
+      measured: {
+        name: 'DHM_16836.csv',
+        values: 1824,
+        from: '2015-01-01',
+        to: '2019-12-31',
+        ratio: 0.996,
+        notes: ['1 no-data markers dropped, not read as zero.'],
+      },
+    })
+  );
+  assert.ok(csv.includes('flow: MEASURED'), 'a measured record must be stated as measured');
+  assert.ok(!csv.includes('GloFAS'), 'must not also credit the model it replaced');
+  assert.ok(csv.includes('DHM_16836.csv'), 'the source file must be named');
+  assert.ok(csv.includes('scaled 0.996x'), 'any transfer applied must be on the record');
+  assert.ok(csv.includes('no-data markers dropped'), "the parser's own caveats must travel too");
+  // And the default path still credits the model correctly.
+  assert.ok(schemesToCsv(ctx({})).includes('GloFAS'), 'modelled runs still name their source');
 });
 
 console.log(`\n${passed} export checks passed\n`);

@@ -32,6 +32,19 @@ export type ExportContext = {
   gauges: Gauge[];
   /** Grid connection for the selected scheme, if one is selected. */
   grid: GridLink | null;
+  /**
+   * A measured record, when the engineer supplied one. Its presence changes what
+   * the provenance header may claim: a file built on a gauge record must not say
+   * its flow came from a global model.
+   */
+  measured: {
+    name: string;
+    values: number;
+    from: string | null;
+    to: string | null;
+    ratio: number;
+    notes: string[];
+  } | null;
   assumptions: {
     exceedance: number;
     efficiency: number;
@@ -62,10 +75,21 @@ function provenance(c: ExportContext): string[] {
     `terrain: ${c.demSource}, ~${Math.round(c.demResolutionM)} m sample spacing`,
     'terrain error: global DEMs carry roughly +/-10-16 m vertically in steep ground,',
     '  which propagates directly into head and therefore into capacity',
-    `flow: GloFAS v4 reanalysis via Open-Meteo, ${c.flowYears.toFixed(0)} years, modelled not gauged`,
-    `flow mean at the model cell: ${c.flowMeanCms.toFixed(2)} m3/s`,
+    ...(c.measured
+      ? [
+          `flow: MEASURED — imported from ${c.measured.name}`,
+          `  ${c.measured.values} values` +
+            `${c.measured.from ? `, ${c.measured.from} to ${c.measured.to}` : ', undated'}` +
+            `${c.measured.ratio !== 1 ? `, scaled ${c.measured.ratio.toFixed(3)}x for catchment area` : ''}`,
+          '  this record replaces both global models; the figures below are built on it',
+          ...c.measured.notes.map((nn) => `  note: ${nn}`),
+        ]
+      : [
+          `flow: GloFAS v4 reanalysis via Open-Meteo, ${c.flowYears.toFixed(0)} years, modelled not gauged`,
+          `flow mean at the model cell: ${c.flowMeanCms.toFixed(2)} m3/s`,
+        ]),
   ];
-  if (c.networkMeanCms !== null) {
+  if (c.networkMeanCms !== null && !c.measured) {
     const ratio = Math.max(c.networkMeanCms / c.flowMeanCms, c.flowMeanCms / c.networkMeanCms);
     lines.push(
       `mapped network long-term mean here: ${c.networkMeanCms.toFixed(2)} m3/s`,

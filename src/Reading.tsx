@@ -5,6 +5,7 @@ import type { Uncertainty } from './engine/uncertainty.ts';
 import type { Licence } from './context.ts';
 import { MONTH_NAMES } from './engine/hydest.ts';
 import { connectionVerdict, type GridLink } from './grid.ts';
+import type { MeasuredSeries } from './measured.ts';
 import {
   DISCHARGE_GAUGE_COUNT,
   RIVER_GAUGE_COUNT,
@@ -112,6 +113,9 @@ export function Reading(props: {
     floods: { t: number; cms: number }[];
   } | null;
   grid: GridLink | null;
+  measured: { series: MeasuredSeries; ratio: number; name: string } | null;
+  onImport: (file: File) => void;
+  onClearMeasured: () => void;
   wideSearch: boolean;
   onWideSearch: (v: boolean) => void;
   canExport: boolean;
@@ -139,6 +143,9 @@ export function Reading(props: {
     gauges,
     hydest,
     grid,
+    measured,
+    onImport,
+    onClearMeasured,
     wideSearch,
     onWideSearch,
     canExport,
@@ -612,6 +619,64 @@ export function Reading(props: {
             Only Jan–May and the floods are shown: the monsoon months need rainfall data this app
             does not have yet, and a guessed monsoon flow would be worse than none.
           </p>
+        </div>
+      )}
+
+      {/* ---- a real record, if the engineer has one ---- */}
+      {study && (
+        <div className="border-b border-line px-3.5 py-3">
+          <div className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
+            {measured ? 'flow is measured, not modelled' : 'have a gauge record?'}
+          </div>
+          {measured ? (
+            <>
+              <div className="flex items-baseline gap-2 text-[11px]">
+                <span className="min-w-0 flex-1 truncate text-ink">{measured.name}</span>
+                <button
+                  type="button"
+                  onClick={onClearMeasured}
+                  className="shrink-0 text-[10px] text-faint hover:text-ink"
+                >
+                  remove
+                </button>
+              </div>
+              <div className="mt-1 text-[10px] text-muted">
+                {measured.series.values.length.toLocaleString()} values
+                {measured.series.from ? `, ${measured.series.from} to ${measured.series.to}` : ''}
+                {measured.series.cadence !== 'unknown' ? ` · ${measured.series.cadence}` : ''}
+                {measured.ratio !== 1 ? ` · scaled ${n(measured.ratio, 3)}×` : ''}
+              </div>
+              <ul className="mt-1.5 space-y-0.5">
+                {measured.series.notes.map((note, k) => (
+                  <li key={k} className="text-[9.5px] leading-snug text-faint">
+                    {note}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <>
+              <label className="block cursor-pointer rounded-md border border-dashed border-line px-2.5 py-2.5 text-center text-[11px] text-muted hover:border-river hover:text-ink">
+                <input
+                  type="file"
+                  accept=".csv,.txt,.tsv,text/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) onImport(f);
+                    e.target.value = '';
+                  }}
+                />
+                Load a discharge record
+              </label>
+              <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
+                CSV or text, one row per reading, discharge in m³/s — a date column if you have
+                one. This replaces both global models outright and is the only thing that turns the
+                range above into a measurement. Headers, tabs and no-data markers are handled;
+                Bikram Sambat dates are detected and refused rather than approximated.
+              </p>
+            </>
+          )}
         </div>
       )}
 

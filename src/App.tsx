@@ -24,6 +24,7 @@ import { haversineKm, minMonthlyMean, wetDryEnergy, type PlantParams } from './e
 import { licencesAlong, loadLicences, type Licence } from './context.ts';
 import { gaugesFor, type Gauge } from './gauges.ts';
 import { gridLink } from './grid.ts';
+import { measuredSpread, parseMeasured, scaleSeries, type MeasuredSeries } from './measured.ts';
 import {
   RETURN_PERIODS,
   designFlood,
@@ -139,6 +140,8 @@ export default function App() {
   /** Licensed and operating projects sitting on the studied reach. */
   const [licences, setLicences] = useState<Licence[] | null>(null);
   const [gauges, setGauges] = useState<Gauge[] | null>(null);
+  /** A gauge record the engineer supplied, which outranks every model here. */
+  const [measured, setMeasured] = useState<{ series: MeasuredSeries; ratio: number; name: string } | null>(null);
 
   const atRef = useRef(at);
   atRef.current = at;
@@ -449,11 +452,28 @@ export default function App() {
   // ---------------- discovery ----------------
   const input: SchemeInput | null = useMemo(() => {
     if (!study) return null;
-    const minMonth = minMonthlyMean(study.flow.dates, study.flow.values);
+
+    /**
+     * A measured record, where the engineer has supplied one, replaces the
+     * modelled series outright rather than being blended with it.
+     *
+     * Averaging a gauge against a global model would drag a measurement back
+     * towards a guess, which is the wrong direction. It also switches off the
+     * network rescaling downstream: that exists to correct a model cell that is
+     * not on this channel, and a record measured in this river needs no such
+     * correction — `seriesMeanCms` is set to the record's own mean so the
+     * engine's ratio comes out at 1.
+     */
+    const series = measured ? measured.series.values : study.flow.values;
+    const dates = measured ? measured.series.dates : study.flow.dates;
+    const seriesMean = meanOf(series);
+    const minMonth = minMonthlyMean(dates, series);
     return {
       path: study.path,
-      series: study.flow.values,
-      seriesMeanCms: meanOf(study.flow.values),
+      series,
+      // With a measured record, keep its magnitude: pass the network's own mean
+      // so the rescale is a no-op instead of pulling it onto a modelled figure.
+      seriesMeanCms: measured ? (study.path[0]?.meanCms || seriesMean) : seriesMean,
       residualCms: Number.isFinite(minMonth) ? minMonth * assume.residualFrac : 0,
       exceedance: assume.exceedance,
       efficiency: assume.efficiency,
@@ -461,7 +481,7 @@ export default function App() {
       minFlowFrac: MIN_FLOW_FRAC,
       intakeWindowKm: wideSearch ? Number.POSITIVE_INFINITY : INTAKE_WINDOW_KM,
     };
-  }, [study, assume, wideSearch]);
+  }, [study, assume, wideSearch, measured]);
 
   // Who already holds this river. The registry is one 128 KB download, cached
   // for the session, so this costs nothing after the first study.
@@ -590,9 +610,38 @@ export default function App() {
       input,
       scheme,
       meanOf(study.flow.values),
-      study.reach?.meanDischargeCms ?? null
+      study.reach?.meanDischargeCms ?? null,
+      // A supplied record replaces the model-disagreement logic entirely.
+      measured ? measuredSpread(measured.ratio) : undefined
     );
-  }, [input, scheme, study]);
+  }, [input, scheme, study, measured]);
+
+  /**
+   * Take a record file from the engineer.
+   *
+   * Scaled here rather than in the parser so the raw file is never mutated, and
+   * so the scale factor stays visible next to the result.
+   */
+  const onImport = useCallback(
+    async (file: File) => {
+      setError(null);
+      const text = await file.text();
+      const parsed = parseMeasured(text);
+      if (!parsed.ok) {
+        setError(`${parsed.error}${parsed.hint ? ` ${parsed.hint}` : ''}`);
+        return;
+      }
+      // Pre-fill the transfer factor from the best connected gauge, when it has
+      // a defensible one — that is exactly what this record is likely to be.
+      const suggested = gauges?.find((g) => g.trustworthy && g.areaRatio)?.areaRatio ?? 1;
+      setMeasured({
+        series: scaleSeries(parsed.series, suggested),
+        ratio: suggested,
+        name: file.name,
+      });
+    },
+    [gauges]
+  );
 
   const seasons = useMemo(() => {
     if (!study || !scheme) return null;
@@ -748,6 +797,16 @@ export default function App() {
       licences: licences ?? [],
       gauges: gauges ?? [],
       grid,
+      measured: measured
+        ? {
+            name: measured.name,
+            values: measured.series.values.length,
+            from: measured.series.from,
+            to: measured.series.to,
+            ratio: measured.ratio,
+            notes: measured.series.notes,
+          }
+        : null,
       assumptions: {
         exceedance: assume.exceedance,
         efficiency: assume.efficiency,
@@ -755,7 +814,7 @@ export default function App() {
         residualFrac: assume.residualFrac,
       },
     };
-  }, [at, study, found, scheme, licences, gauges, grid, assume, uncertainty]);
+  }, [at, study, found, scheme, licences, gauges, grid, measured, assume, uncertainty]);
 
   const onExport = useCallback(
     (kind: 'csv' | 'geojson') => {
@@ -780,6 +839,7 @@ export default function App() {
     setFlowOnly(null);
     setLicences(null);
     setGauges(null);
+    setMeasured(null);
     setWideSearch(false);
   }, []);
 
@@ -814,6 +874,9 @@ export default function App() {
         gauges={gauges}
         hydest={hydest}
         grid={grid}
+        measured={measured}
+        onImport={onImport}
+        onClearMeasured={() => setMeasured(null)}
         wideSearch={wideSearch}
         onWideSearch={setWideSearch}
         canExport={Boolean(exportCtx && exportCtx.schemes.length > 0)}
