@@ -17,3 +17,8 @@ Thumbs.db
 
 *.log
 npm-debug.log*
+
+# tool exhaust from other agents
+.openai/
+.gstack/
+.codex-dev.*

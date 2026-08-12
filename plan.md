@@ -384,6 +384,11 @@ Rough effort: 1–3 working sessions each.
 - **M0 — Reset & skeleton.** Checkpoint commit; execute §3 delete/keep; new scaffold (Vite + React 19
   + TS strict + Tailwind + shadcn); workbench layout shell; zustand store; `Traced<T>` provenance
   core + evidence-tree panel primitive; worker plumbing; data manifest; CI scripts.
+  **Status 2026-08-12: DONE ahead of schedule** — reset executed, workbench UI built and
+  browser-verified (map + rail + tabs + bespoke long profile + Ctrl-K + lazy Cesium 3D on keyless
+  Re:Earth terrain + provenance popovers + mobile), typecheck/36 checks/prod build green.
+  Deferred from M0 to their milestones: comlink worker plumbing (first needed M2), data manifest
+  (first data pipeline, M1).
 - **M1 — Nepal atlas & site context.** Build-time pipeline v1 (OSM extract → grid/roads; ICIMOD
   lakes; faults; DoED+GEM projects; protected areas; landslides; HydroBASINS). Layer system with
   the doc's 2D layer list; click reach → context panel: catchment, hydrology evidence stack v1
