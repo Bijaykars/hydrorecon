@@ -1,76 +1,77 @@
-# Ghatta — open hydropower engineering workbench
+# Ghatta — run-of-river screening
 
-![MIT](https://img.shields.io/badge/license-MIT-blue) ![status](https://img.shields.io/badge/stage-M0%20·%20UI-orange) ![stack](https://img.shields.io/badge/stack-Vite%20·%20React%2019%20·%20TS%20strict-3178c6) ![checks](https://img.shields.io/badge/math%20checks-36%20passing-brightgreen)
+![MIT](https://img.shields.io/badge/license-MIT-blue) ![no backend](https://img.shields.io/badge/backend-none-success) ![no API keys](https://img.shields.io/badge/API%20keys-none-success) ![checks](https://img.shields.io/badge/math%20checks-36%20passing-brightgreen)
 
-A **Nepal-first, browser-only workbench for early hydropower project development**: click a river,
-understand the site, draft complete scheme alternatives (intake → waterway → penstock →
-powerhouse), compare them honestly, and trace every number back to its evidence. No backend, no
-API keys — every byte comes from open data, so it deploys free and stays exactly as live as a
-local copy.
+**Click a river. Click downstream. Get the power.**
 
-> **घट्ट (ghatta)** — the traditional Nepali water mill.
+Place an intake and a powerhouse on any river in the world and Ghatta reads the flow from a
+20-year reanalysis and the head straight off terrain tiles, then shows you capacity, annual
+energy, and exactly where every number came from.
 
-**Stage: M0 (workbench UI).** The full product plan, research evidence and milestones live in
-[plan.md](plan.md) and [docs/research/](docs/research/). Scheme numbers currently run through the
-validated physics kernel on **sample-labelled** synthetic flow series; the discovery and hydrology
-engines land in M1–M3.
+No backend, no account, no API key. Every request goes from your browser to a public API, so it
+deploys free to any static host and works the same running locally.
 
-| | |
-|---|---|
-| ![Site context](docs/workbench-site.png) | ![Hydrology evidence](docs/workbench-hydrology.png) |
-| ![Schemes + longitudinal profile](docs/workbench-schemes.png) | ![3D terrain](docs/workbench-3d.png) |
+![Ghatta](docs/screenshot.png)
 
-## What works today
+## How it works
 
-- **2D planning map** — MapLibre + OpenFreeMap dark carto, discharge-scaled **HydroRIVERS**
-  network (42,197 Nepal reaches, bundled, validated ±7% vs published catchments), hillshade,
-  satellite toggle, **1,115 real DHM stations**.
-- **Click a river** → reach card with upstream catchment and long-term mean flow, honest snap
-  distance, and a *"larger channel nearby"* guard (caught a 4,500× catchment understatement in
-  testing).
-- **3D scene** — CesiumJS on a keyless global quantized-mesh terrain (Re:Earth / Mapterhorn,
-  CC-BY), lazy-loaded only when you enter 3D. Underground mode lands in M4.
-- **Hydrology evidence stack** — never one number: each source carries a
-  `measured / modelled / estimated / assumed / sample` chip; FDC and monthly regime with NEA PPA
-  seasons and the Nepali residual-flow basis (10% of minimum monthly mean).
-- **Scheme cards, compare table, energy-vs-cost scatter** and a bespoke **longitudinal profile**
-  (ground, canal/tunnel/penstock invert, HGL, tunnel cover, low-cover warnings, hover readout).
-- **Provenance on click** — every traced value opens its method, source and quality.
-- **Ctrl-K palette**, resizable panels, phone layout, reduced-motion respected.
+1. **Click a river** → the intake. Flow at that point comes from the GloFAS v4 reanalysis
+   (20 years of daily discharge, m³/s, global).
+2. **Click downstream** → the powerhouse. Head comes from Terrarium DEM tiles sampled along the
+   line between the two, bilinearly interpolated.
+3. **Read the answer.** `ρ · g · Q · H · η` is printed as a visible chain, not hidden. Annual
+   energy dispatches every day of the 20-year record through the same equation, honouring
+   residual flow, turbine capacity and the minimum-flow shutdown.
+4. **Drag either marker** to tune it. Everything recomputes.
+
+The URL holds the whole session, so a link reproduces the exact reading.
+
+## What it refuses to hide
+
+- **Two models, one river.** Where a mapped river network is available it reports its independent
+  long-term mean beside GloFAS's. If they disagree by more than 2×, the app says so loudly — the
+  ~5 km model grid can sit on a different channel entirely, and that is a 5× error in your answer,
+  not a rounding difference.
+- **Every figure states its source** underneath it — which DEM, what grid spacing, how many years
+  of record, how far the model cell is from your click, whether the flow came from the network or
+  a cache.
+- **Modelled is not measured.** GloFAS is a model. It is labelled as one.
+- **DEM error is real.** Global terrain carries roughly ±10–16 m of vertical error in steep
+  ground, which is stated next to the head it produced.
+
+## Assumptions you control
+
+Design flow exceedance (Q15–Q85), overall efficiency, head loss, residual flow as a share of the
+driest month, and the household figure used for the plain-language comparison. All live.
 
 ## Quickstart
 
 ```bash
 npm install
-npm run dev        # workbench at http://localhost:5173
-npm run check      # 36 assert-based physics checks
-npm run build      # typecheck + production build (dist/)
+npm run dev      # http://localhost:5173
+npm run check    # 36 assert-based physics checks
+npm run build    # typecheck + production build
 ```
 
-Deploys as a static site (Vercel/Netlify/Pages). No environment variables.
+## Data sources
 
-## Data sources (in this build)
-
-| Source | Access | License | Powers |
+| Source | Access | Licence | Powers |
 |---|---|---|---|
-| HydroRIVERS v1.0 (Nepal extract, `pipeline/build-hydrorivers.mjs`) | bundled 525 KB gz | HydroSHEDS license (attribution) | River network, catchment area, mean flow |
-| DHM station catalog (`pipeline/build-dhm-stations.mjs`) | bundled | Government of Nepal, public | Station context |
+| GloFAS v4 via Open-Meteo | runtime, keyless, CORS ✓ | CC-BY 4.0 | Daily discharge, 20 years, worldwide |
+| Re:Earth Terrain (Mapterhorn / Copernicus GLO-30) | runtime, keyless, CORS ✓ | CC-BY 4.0 | Elevation profile and head |
+| AWS Terrain Tiles | runtime, keyless, CORS ✓ | public domain / attribution | Hillshade, and DEM fallback |
 | OpenFreeMap / OpenMapTiles / OSM | runtime, keyless | ODbL | Basemap |
-| AWS Terrain Tiles (Terrarium) | runtime, keyless, CORS ✓ | Mapzen/USGS et al. | Hillshade |
-| Re:Earth Terrain · Mapterhorn (Copernicus GLO-30) | runtime, keyless, CORS ✓ | CC-BY 4.0 | 3D quantized-mesh terrain |
-| Esri World Imagery | runtime, keyless | Esri terms (attribution) | Satellite layer |
-| NEA FY2024/25 published figures | constants | public report | Households equivalent, PPA seasons |
+| HydroRIVERS v1.0 extract | bundled, 525 KB gz | HydroSHEDS licence | Catchment area, click snapping, the cross-check |
 
-The full source hunt — with real CORS probes, licenses and dead ends — is in
-[docs/research/2026-08-12-data-hunt.md](docs/research/2026-08-12-data-hunt.md).
+Every runtime endpoint had its `access-control-allow-origin` verified with a real request — see
+[docs/research/](docs/research/).
 
 ## What this is not
 
-A prefeasibility **screening** companion, not a feasibility study. Nothing here is a basis for
-investment, licensing or design; the UI says so next to the numbers, not in a footer. DEM-derived
-heads carry ±10–16 m vertical error in steep terrain; modelled flows are labelled modelled; sample
-data is labelled sample.
+Screening, not a feasibility study. It is enough to rank ideas and decide what to survey next; it
+is not a basis for investment, licensing or design. The profile is a straight line between two
+points, not a routed waterway. Costs are not modelled at all.
 
-## License
+## Licence
 
-[MIT](LICENSE). Data files keep their upstream licenses (tracked per-asset; see plan.md §4).
+[MIT](LICENSE). Bundled data keeps its upstream licence.

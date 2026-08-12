@@ -3,23 +3,17 @@
 @theme {
   --color-bg: #0b0f14;
   --color-panel: #10161d;
-  --color-panel-2: #151d26;
-  --color-panel-3: #1a2430;
+  --color-panel-2: #172029;
   --color-ink: #e6edf3;
   --color-muted: #8fa3b5;
-  --color-faint: #64788c;
+  --color-faint: #5f7183;
   --color-line: #1e2a38;
-  --color-line-strong: #2c3d52;
   --color-river: #4db8ff;
-  --color-river-soft: #4db8ff22;
   --color-green: #3fb950;
-  --color-blue: #58a6ff;
   --color-amber: #d29922;
   --color-red: #f85149;
-  --color-purple: #bc8cff;
 
   --font-sans: ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, 'Segoe UI Mono', monospace;
 }
 
 :root {
@@ -47,24 +41,35 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Scrollbars that fit the instrument look. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-line-strong) transparent;
+/* Intake / powerhouse pins. One element, coloured by a custom property. */
+.marker {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--c);
+  border: 2.5px solid #0b0f14;
+  box-shadow:
+    0 0 0 1.5px var(--c),
+    0 2px 10px rgba(0, 0, 0, 0.6);
+  cursor: grab;
 }
-*::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-*::-webkit-scrollbar-thumb {
-  background: var(--color-line-strong);
-  border-radius: 4px;
-}
-*::-webkit-scrollbar-track {
-  background: transparent;
+.marker:active {
+  cursor: grabbing;
 }
 
-/* MapLibre chrome, repainted dark. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2c3d52 transparent;
+}
+*::-webkit-scrollbar {
+  width: 7px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #2c3d52;
+  border-radius: 4px;
+}
+
+/* MapLibre chrome, repainted to match. */
 .maplibregl-ctrl-group {
   background: var(--color-panel) !important;
   border: 1px solid var(--color-line) !important;
@@ -80,45 +85,20 @@ body {
   filter: invert(0.85);
 }
 .maplibregl-ctrl-attrib {
-  background: rgba(11, 15, 20, 0.75) !important;
-  color: var(--color-muted) !important;
+  background: rgba(11, 15, 20, 0.72) !important;
+  color: var(--color-faint) !important;
   font-size: 10px !important;
 }
 .maplibregl-ctrl-attrib a {
-  color: var(--color-muted) !important;
+  color: var(--color-faint) !important;
 }
 .maplibregl-ctrl-scale {
   background: rgba(11, 15, 20, 0.6) !important;
-  border-color: var(--color-line-strong) !important;
-  color: var(--color-muted) !important;
-}
-.maplibregl-popup-content {
-  background: var(--color-panel-2) !important;
-  color: var(--color-ink) !important;
-  border: 1px solid var(--color-line-strong);
-  border-radius: 8px;
-  padding: 8px 10px !important;
-  font-size: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-}
-.maplibregl-popup-tip {
-  border-top-color: var(--color-line-strong) !important;
-  border-bottom-color: var(--color-line-strong) !important;
-}
-.maplibregl-popup-close-button {
+  border-color: #2c3d52 !important;
   color: var(--color-muted) !important;
 }
 .maplibregl-canvas {
   cursor: crosshair;
-}
-
-/* Panel separators (react-resizable-panels v4). */
-[data-group] [role='separator'] {
-  transition: background-color 120ms;
-}
-[data-group] [role='separator']:hover,
-[data-group] [role='separator']:active {
-  background: var(--color-river) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,5 +1,20 @@
 # Nepal-First Open Hydropower Engineering Workbench — Build Plan
 
+> **Status 2026-08-12 — scope deliberately cut.** After using the M0 workbench as a user, the
+> tabbed multi-panel shell was judged furniture: four tabs to hunt through, a three-point Pareto
+> scatter, a compare table repeating the cards above it, a hard-coded list of Nepali rivers in the
+> command palette (which contradicted the global-equal decision), and a 4.2 MB 3D globe that
+> showed terrain the hillshade already showed. All of it was removed.
+>
+> What shipped instead is the **irreducible engineering act**: place an intake, place a
+> powerhouse, get head from terrain and flow from GloFAS, see `ρgQHη` worked out, drag to tune.
+> One screen, no tabs, works anywhere on Earth, three dependencies. Real data replaced the sample
+> generator entirely.
+>
+> Removed dependencies: cesium, echarts, cmdk, sonner, zustand, react-resizable-panels
+> (−4.8 MB). The sections below remain the roadmap for what to add back — but each item now has to
+> earn its place against a working, minimal app rather than being assumed.
+
 > Source vision: `Nepal_First_Open_Hydropower_Engineering_Workbench.docx` (21 sections, digested below).
 > This plan turns that vision into a staged, honest build. It reuses the validated pieces of the
 > previous RiverPower app (physics kernel, Nepal datasets, Phase 1 CORS research) and deletes the rest.
