@@ -16,7 +16,7 @@ const ctx = (over: Partial<ExportContext> = {}): ExportContext => ({
   at: { lat: 28.1, lon: 84.4 }, schemes: [scheme()], selected: null,
   path: Array.from({ length: 11 }, (_, k) => ({ km: k * 0.5, lat: 28.1 - k * 0.01, lon: 84.4 + k * 0.01, elevationM: 1000 - k * 20, meanCms: 12 })),
   demSource: 'Test DEM', demResolutionM: 30, flowYears: 20, flowMeanCms: 12,
-  networkMeanCms: null, band: null, tracedFromTerrain: false, evaluated: 500, licences: [], gauges: [],
+  networkMeanCms: null, band: null, tracedFromTerrain: false, evaluated: 500, licences: [], gauges: [], grid: null,
   assumptions: { exceedance: 0.4, efficiency: 0.96, headLossFrac: 0.05, residualFrac: 0.1 },
   ...over,
 });

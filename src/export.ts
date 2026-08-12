@@ -12,6 +12,7 @@
 import type { Scheme } from './engine/discover.ts';
 import type { Licence } from './context.ts';
 import { recordKind, transferAdvice, type Gauge } from './gauges.ts';
+import type { GridLink } from './grid.ts';
 
 export type ExportContext = {
   at: { lat: number; lon: number };
@@ -29,6 +30,8 @@ export type ExportContext = {
   evaluated: number;
   licences: Licence[];
   gauges: Gauge[];
+  /** Grid connection for the selected scheme, if one is selected. */
+  grid: GridLink | null;
   assumptions: {
     exceedance: number;
     efficiency: number;
@@ -95,6 +98,26 @@ function provenance(c: ExportContext): string[] {
       `  energy:   ${c.band.energyLow.toFixed(0)} - ${c.band.energyHigh.toFixed(0)} GWh/yr ` +
         `(reported ${c.selected.energyGwh.toFixed(0)})`,
       '  the single figures in the table below are midpoints, not measurements'
+    );
+  }
+  if (c.grid) {
+    lines.push(
+      '',
+      'GRID CONNECTION from the powerhouse (straight line — a floor, not a route):',
+      `  nearest mapped line: ${c.grid.nearestKm.toFixed(1)} km` +
+        `${c.grid.nearestKv ? ` at ${c.grid.nearestKv} kV` : ' (voltage not tagged)'}`,
+      c.grid.adequateKm !== null
+        ? `  nearest at ${c.grid.requiredKv} kV or above: ${c.grid.adequateKm.toFixed(1)} km at ${c.grid.adequateKv} kV`
+        : `  NO mapped line at ${c.grid.requiredKv} kV or above within range`,
+      ...(c.grid.nearestSub
+        ? [
+            `  nearest substation: ${c.grid.nearestSub.km.toFixed(1)} km, ` +
+              `${c.grid.nearestSub.name ?? 'unnamed'}${c.grid.nearestSub.kv ? `, ${c.grid.nearestSub.kv} kV` : ''}`,
+          ]
+        : []),
+      '  grid data: OpenStreetMap via Overpass, (c) OpenStreetMap contributors, ODbL 1.0.',
+      '  Coverage is good on the transmission backbone and patchy below 66 kV —',
+      '  an absent line means unmapped, not absent.'
     );
   }
   if (c.gauges.length > 0) {

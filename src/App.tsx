@@ -23,6 +23,7 @@ import { uncertaintyFor } from './engine/uncertainty.ts';
 import { haversineKm, minMonthlyMean, wetDryEnergy, type PlantParams } from './engine/hydro.ts';
 import { licencesAlong, loadLicences, type Licence } from './context.ts';
 import { gaugesFor, type Gauge } from './gauges.ts';
+import { gridLink } from './grid.ts';
 import {
   RETURN_PERIODS,
   designFlood,
@@ -573,6 +574,16 @@ export default function App() {
   );
 
   // How much to trust it, computed by rerunning the engine on perturbed inputs.
+  /**
+   * Getting the power out. Measured from the powerhouse, where the switchyard
+   * goes, and sized against the scheme's own capacity — a nearby 66 kV line is
+   * not a connection for a 150 MW plant.
+   */
+  const grid = useMemo(
+    () => (scheme ? gridLink(scheme.power.lat, scheme.power.lon, scheme.capacityMW) : null),
+    [scheme]
+  );
+
   const uncertainty = useMemo(() => {
     if (!input || !scheme || !study) return null;
     return uncertaintyFor(
@@ -736,6 +747,7 @@ export default function App() {
       evaluated: found.evaluated,
       licences: licences ?? [],
       gauges: gauges ?? [],
+      grid,
       assumptions: {
         exceedance: assume.exceedance,
         efficiency: assume.efficiency,
@@ -743,7 +755,7 @@ export default function App() {
         residualFrac: assume.residualFrac,
       },
     };
-  }, [at, study, found, scheme, licences, gauges, assume, uncertainty]);
+  }, [at, study, found, scheme, licences, gauges, grid, assume, uncertainty]);
 
   const onExport = useCallback(
     (kind: 'csv' | 'geojson') => {
@@ -801,6 +813,7 @@ export default function App() {
         licences={licences}
         gauges={gauges}
         hydest={hydest}
+        grid={grid}
         wideSearch={wideSearch}
         onWideSearch={setWideSearch}
         canExport={Boolean(exportCtx && exportCtx.schemes.length > 0)}

@@ -1,0 +1,163 @@
+/**
+ * Nepal's transmission grid, from OpenStreetMap.
+ *
+ *   npm run build:grid
+ *
+ * WHY: a scheme's distance to a line that can actually take its power is one of
+ * the few things that decides a Nepali small-hydro project outright, and the app
+ * had nothing to say about it. Twenty megawatts three kilometres from a 132 kV
+ * line is a different proposition from the same twenty megawatts sixty
+ * kilometres up a valley, and the difference is frequently larger than every
+ * refinement to the energy estimate put together.
+ *
+ * SOURCE AND LICENCE: OpenStreetMap via the Overpass API, © OpenStreetMap
+ * contributors, ODbL 1.0. The extract written here is a derived database and
+ * stays ODbL — that is a licence on the DATA file, not on this repository's MIT
+ * code, the same split already used for the bundled HydroRIVERS extract.
+ * Attribution ships with the app and in every export.
+ *
+ * Overpass rejects anonymous requests with 406, so the User-Agent below is
+ * required, not decoration.
+ */
+import { writeFileSync } from 'node:fs';
+
+const ENDPOINT = 'https://overpass-api.de/api/interpreter';
+const UA = 'Ghatta/0.2 (open-source hydropower screening; github.com/Bijaykars)';
+const OUT = 'src/data/nepal-grid.json';
+
+/**
+ * Below this a line cannot evacuate a hydropower plant of any size worth
+ * screening — 400 V and 11 kV tags are local distribution, not a connection
+ * point. Keeping them would make every site look conveniently close to the grid.
+ */
+const MIN_KV = 30;
+
+const ask = async (ql) => {
+  const r = await fetch(ENDPOINT, {
+    method: 'POST',
+    body: 'data=' + encodeURIComponent(ql),
+    headers: { 'user-agent': UA, 'content-type': 'application/x-www-form-urlencoded' },
+  });
+  if (!r.ok) throw new Error(`Overpass: HTTP ${r.status} — ${(await r.text()).slice(0, 120)}`);
+  return (await r.json()).elements ?? [];
+};
+
+/**
+ * Highest voltage on a tag, in kV.
+ *
+ * OSM writes volts, and multi-circuit towers carry several separated by ';'
+ * ("132000;66000"). The highest is what the line can carry, so that is what a
+ * developer would connect to.
+ */
+const kvOf = (tags) => {
+  const raw = tags?.voltage;
+  if (!raw) return 0; // untagged — kept, but flagged as unknown
+  const best = Math.max(...String(raw).split(';').map((v) => Number(v) || 0));
+  return best > 0 ? Math.round(best / 1000) : 0;
+};
+
+const AREA = 'area["ISO3166-1"="NP"][admin_level=2]->.np;';
+
+console.log('fetching transmission lines…');
+const lineEls = await ask(
+  `[out:json][timeout:240];${AREA}(way["power"="line"](area.np););out tags geom;`
+);
+console.log(`  ${lineEls.length} ways`);
+
+console.log('fetching substations…');
+const subEls = await ask(
+  `[out:json][timeout:240];${AREA}(way["power"="substation"](area.np);node["power"="substation"](area.np););out tags center;`
+);
+console.log(`  ${subEls.length} substations`);
+
+/** Round to ~11 m. Finer than that is false precision for a screening distance. */
+const r4 = (v) => Math.round(v * 1e4) / 1e4;
+
+/**
+ * Drop vertices that do not change where the line runs.
+ *
+ * Perpendicular-distance simplification: only the distance to the nearest point
+ * on a line matters here, so a vertex that sits within a tolerance of the
+ * straight segment spanning its neighbours carries no information. At 150 m the
+ * error is well inside the uncertainty of the tags themselves.
+ */
+function simplify(pts, tolDeg) {
+  if (pts.length <= 2) return pts;
+  const keep = new Array(pts.length).fill(false);
+  keep[0] = keep[pts.length - 1] = true;
+  const stack = [[0, pts.length - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop();
+    let worst = -1;
+    let worstD = 0;
+    const [ay, ax] = pts[a];
+    const [by, bx] = pts[b];
+    const dy = by - ay;
+    const dx = bx - ax;
+    const len2 = dx * dx + dy * dy;
+    for (let i = a + 1; i < b; i++) {
+      const [py, px] = pts[i];
+      let t = len2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      const ex = ax + t * dx - px;
+      const ey = ay + t * dy - py;
+      const d = Math.hypot(ex, ey);
+      if (d > worstD) {
+        worstD = d;
+        worst = i;
+      }
+    }
+    if (worstD > tolDeg && worst > 0) {
+      keep[worst] = true;
+      stack.push([a, worst], [worst, b]);
+    }
+  }
+  return pts.filter((_, i) => keep[i]);
+}
+
+const TOL_DEG = 150 / 111320; // ~150 m
+
+const lines = [];
+let vertsIn = 0;
+let vertsOut = 0;
+for (const e of lineEls) {
+  const kv = kvOf(e.tags);
+  if (kv > 0 && kv < MIN_KV) continue; // local distribution, not a connection point
+  const pts = (e.geometry ?? []).filter((g) => g && Number.isFinite(g.lat)).map((g) => [g.lat, g.lon]);
+  if (pts.length < 2) continue;
+  vertsIn += pts.length;
+  const simp = simplify(pts, TOL_DEG).map(([y, x]) => [r4(y), r4(x)]);
+  vertsOut += simp.length;
+  lines.push({ kv, p: simp.flat() });
+}
+
+const subs = [];
+for (const e of subEls) {
+  const lat = e.lat ?? e.center?.lat;
+  const lon = e.lon ?? e.center?.lon;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+  const kv = kvOf(e.tags);
+  if (kv > 0 && kv < MIN_KV) continue;
+  subs.push({
+    n: (e.tags?.name ?? '').trim() || null,
+    kv,
+    y: r4(lat),
+    x: r4(lon),
+  });
+}
+
+const out = {
+  _source: 'OpenStreetMap via Overpass, © OpenStreetMap contributors, ODbL 1.0',
+  _note: 'Derived database. Redistribution of this file is governed by ODbL, not the MIT licence on the code.',
+  lines,
+  subs,
+};
+const json = JSON.stringify(out);
+writeFileSync(OUT, json);
+
+const byKv = new Map();
+for (const l of lines) byKv.set(l.kv, (byKv.get(l.kv) ?? 0) + 1);
+console.log(`\nwrote ${OUT}: ${(json.length / 1024).toFixed(1)} KB`);
+console.log(`  lines:       ${lines.length}  (${vertsIn} vertices simplified to ${vertsOut})`);
+console.log(`  by kV:       ${[...byKv].sort((a, b) => b[0] - a[0]).map(([k, n]) => `${k || '?'}kV:${n}`).join('  ')}`);
+console.log(`  substations: ${subs.length}, ${subs.filter((s) => s.n).length} named`);

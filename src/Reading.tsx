@@ -4,6 +4,7 @@ import type { DiscoverResult, Scheme } from './engine/discover.ts';
 import type { Uncertainty } from './engine/uncertainty.ts';
 import type { Licence } from './context.ts';
 import { MONTH_NAMES } from './engine/hydest.ts';
+import { connectionVerdict, type GridLink } from './grid.ts';
 import {
   DISCHARGE_GAUGE_COUNT,
   RIVER_GAUGE_COUNT,
@@ -110,6 +111,7 @@ export function Reading(props: {
     agreement: { ratio: number; agree: boolean } | null;
     floods: { t: number; cms: number }[];
   } | null;
+  grid: GridLink | null;
   wideSearch: boolean;
   onWideSearch: (v: boolean) => void;
   canExport: boolean;
@@ -136,6 +138,7 @@ export function Reading(props: {
     licences,
     gauges,
     hydest,
+    grid,
     wideSearch,
     onWideSearch,
     canExport,
@@ -161,6 +164,8 @@ export function Reading(props: {
   const rival = study?.reach?.meanDischargeCms;
   const disagreement =
     rival && rival > 0 && meanCms > 0 ? Math.max(rival / meanCms, meanCms / rival) : null;
+
+  const verdict = grid ? connectionVerdict(grid) : null;
 
   const alternatives = found?.schemes ?? [];
 
@@ -492,6 +497,51 @@ export function Reading(props: {
             <span className="text-amber">construction</span> licences are a hard constraint on this
             water; a survey licence means someone is already studying it. The public snapshot lags,
             so check the current register before relying on this.
+          </p>
+        </div>
+      )}
+
+      {/* ---- getting the power out ---- */}
+      {grid && scheme && (
+        <div className="border-b border-line px-3.5 py-3">
+          <div className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
+            grid connection
+          </div>
+          <div className={`text-[11px] leading-snug ${verdict!.hard ? 'text-amber' : 'text-ink'}`}>
+            {verdict!.text}
+          </div>
+          <div className="mt-1.5 space-y-0.5 text-[10px]">
+            <div className="flex items-baseline gap-1.5">
+              <span className="w-24 shrink-0 text-faint">nearest line</span>
+              <span className="num text-river">{n(grid.nearestKm, 1)} km</span>
+              <span className="text-faint">
+                {grid.nearestKv ? `${grid.nearestKv} kV` : 'voltage not tagged'}
+              </span>
+            </div>
+            {grid.adequateKm !== null && (
+              <div className="flex items-baseline gap-1.5">
+                <span className="w-24 shrink-0 text-faint">at {grid.requiredKv} kV+</span>
+                <span className="num text-river">{n(grid.adequateKm, 1)} km</span>
+                <span className="text-faint">{grid.adequateKv} kV</span>
+              </div>
+            )}
+            {grid.nearestSub && (
+              <div className="flex items-baseline gap-1.5">
+                <span className="w-24 shrink-0 text-faint">substation</span>
+                <span className="num text-river">{n(grid.nearestSub.km, 1)} km</span>
+                <span className="min-w-0 flex-1 truncate text-faint">
+                  {grid.nearestSub.name ?? 'unnamed'}
+                  {grid.nearestSub.kv ? ` · ${grid.nearestSub.kv} kV` : ''}
+                </span>
+              </div>
+            )}
+          </div>
+          <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
+            Straight-line distance from the powerhouse — a line is not built straight through this
+            terrain, so treat it as a floor. {n(scheme.capacityMW, 1)} MW would typically connect at{' '}
+            {grid.requiredKv} kV. OpenStreetMap, © contributors, ODbL; coverage is good on the
+            transmission backbone and patchy below 66 kV, so an absent line means unmapped, not
+            absent.
           </p>
         </div>
       )}
