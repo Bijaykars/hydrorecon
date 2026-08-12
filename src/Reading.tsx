@@ -5,6 +5,7 @@ import type { Uncertainty } from './engine/uncertainty.ts';
 import type { Licence } from './context.ts';
 import { MONTH_NAMES } from './engine/hydest.ts';
 import { connectionVerdict, type GridLink } from './grid.ts';
+import type { BenchFit, Desander, SedimentSource } from './engine/sediment.ts';
 import type { ProtectedHit } from './protected.ts';
 import type { MeasuredSeries } from './measured.ts';
 import {
@@ -115,6 +116,8 @@ export function Reading(props: {
   } | null;
   grid: GridLink | null;
   conservation: { inside: ProtectedHit[]; near: ProtectedHit[]; hard: boolean } | null;
+  sediment: { basin: Desander; source: SedimentSource | null } | null;
+  bench: BenchFit | null;
   measured: { series: MeasuredSeries; ratio: number; name: string } | null;
   onImport: (file: File) => void;
   onClearMeasured: () => void;
@@ -146,6 +149,8 @@ export function Reading(props: {
     hydest,
     grid,
     conservation,
+    sediment,
+    bench,
     measured,
     onImport,
     onClearMeasured,
@@ -546,6 +551,85 @@ export function Reading(props: {
             <span className="text-amber">construction</span> licences are a hard constraint on this
             water; a survey licence means someone is already studying it. The public snapshot lags,
             so check the current register before relying on this.
+          </p>
+        </div>
+      )}
+
+      {/* ---- sediment: the basin, and whether the valley has room for it ---- */}
+      {sediment && scheme && (
+        <div className="border-b border-line px-3.5 py-3">
+          <div className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
+            sediment · desanding basin
+          </div>
+          {sediment.source && (
+            <div className="text-[11px] leading-snug">
+              <b className="text-ink">{sediment.source.label}</b>
+              <span className="text-faint">
+                {' · '}
+                {n(sediment.source.highFrac * 100, 0)}% of the catchment above 3000 m
+              </span>
+              <p className="mt-0.5 text-[10px] leading-snug text-muted">{sediment.source.note}</p>
+            </div>
+          )}
+          <div className="mt-1.5 space-y-0.5 text-[10px]">
+            <div className="flex items-baseline gap-1.5">
+              <span className="w-24 shrink-0 text-faint">to catch</span>
+              <span className="num text-river">{n(sediment.basin.particleMm, 2)} mm</span>
+              <span className="text-faint">
+                sand, settling at {n(sediment.basin.settlingMmS, 1)} mm/s
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="w-24 shrink-0 text-faint">basin</span>
+              <span className="num text-river">
+                {n(sediment.basin.totalLengthM, 0)} × {n(sediment.basin.totalWidthM, 1)} ×{' '}
+                {n(sediment.basin.depthM, 1)} m
+              </span>
+              <span className="text-faint">
+                {sediment.basin.bays === 2 ? '2 chambers' : '1 chamber'}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="w-24 shrink-0 text-faint">flat ground</span>
+              <span className="num text-river">{n(sediment.basin.benchNeededM, 0)} m</span>
+              <span className="text-faint">across the valley, beside the intake</span>
+            </div>
+          </div>
+
+          {/* The part terrain can answer. */}
+          {!bench ? (
+            <div className="mt-1.5 text-[10.5px] leading-snug text-muted">
+              Reading the valley cross-section…
+            </div>
+          ) : bench.verdict === 'fits' ? (
+            <div className="mt-1.5 text-[11px] leading-snug text-ink">
+              About <b>{n(bench.widestM, 0)} m</b> of workable bench on the {bench.side} bank,{' '}
+              {n(bench.liftM, 0)} m above the river — enough to hold it.
+            </div>
+          ) : bench.verdict === 'no-room' ? (
+            <div className="mt-1.5 text-[11px] leading-snug text-amber">
+              <b>No bench wide enough.</b>{' '}
+              {bench.widestM === 0
+                ? 'Nothing within 250 m of the intake is flatter than 1 in 4 — this is gorge.'
+                : `The widest workable ground is ${n(bench.widestM, 0)} m against the
+                   ${n(sediment.basin.benchNeededM, 0)} m this basin needs.`}{' '}
+              A site like this ends up with an underground basin, a stepped cut into the hillside,
+              or the intake moved — real money that a headline capacity figure will not show you.
+            </div>
+          ) : (
+            <div className="mt-1.5 text-[11px] leading-snug text-muted">
+              About {n(bench.widestM, 0)} m of workable bench against{' '}
+              {n(sediment.basin.benchNeededM, 0)} m needed — closer than the ~
+              {n(bench.resolutionM, 0)} m the terrain is known to. Too close to call from a DEM.
+              Walk it.
+            </div>
+          )}
+
+          <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
+            Zanke settling velocity for quartz, ideal basin × 2 for turbulence — a screening size,
+            and deliberately on the generous side. Nepal does not publish suspended-sediment records,
+            so the load here is inferred from catchment altitude, not measured. A real design needs
+            a sampling programme; this is the flag that says you will need one.
           </p>
         </div>
       )}

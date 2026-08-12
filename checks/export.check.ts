@@ -16,7 +16,7 @@ const ctx = (over: Partial<ExportContext> = {}): ExportContext => ({
   at: { lat: 28.1, lon: 84.4 }, schemes: [scheme()], selected: null,
   path: Array.from({ length: 11 }, (_, k) => ({ km: k * 0.5, lat: 28.1 - k * 0.01, lon: 84.4 + k * 0.01, elevationM: 1000 - k * 20, meanCms: 12 })),
   demSource: 'Test DEM', demResolutionM: 30, flowYears: 20, flowMeanCms: 12,
-  networkMeanCms: null, band: null, tracedFromTerrain: false, evaluated: 500, licences: [], gauges: [], grid: null, measured: null,
+  networkMeanCms: null, band: null, tracedFromTerrain: false, evaluated: 500, licences: [], gauges: [], grid: null, sediment: null, measured: null,
   assumptions: { exceedance: 0.4, efficiency: 0.96, headLossFrac: 0.05, residualFrac: 0.1 },
   ...over,
 });
@@ -96,6 +96,33 @@ ok('an export built on a gauge record never claims its flow came from a model', 
   assert.ok(csv.includes('no-data markers dropped'), "the parser's own caveats must travel too");
   // And the default path still credits the model correctly.
   assert.ok(schemesToCsv(ctx({})).includes('GloFAS'), 'modelled runs still name their source');
+});
+
+ok('the sediment finding travels with the file, warning included', () => {
+  // A "no room for the basin" finding is one of the few things in this file that
+  // could change a go/no-go, so it must survive the export rather than living
+  // only on screen. It has to be legible without the app open.
+  const csv = schemesToCsv(
+    ctx({
+      sediment: {
+        source: { highFrac: 0.83, label: 'glacier-fed — the hardest case', note: 'quartz-rich.' },
+        bench: { widestM: 12, side: 'left', liftM: 3, verdict: 'no-room', resolutionM: 30 },
+      },
+    })
+  );
+  assert.ok(csv.includes('SEDIMENT:'), 'no sediment section in the provenance header');
+  assert.ok(csv.includes('glacier-fed'), 'the catchment finding must be named');
+  assert.ok(csv.includes('NO ROOM'), 'a no-room finding must be stated, not softened');
+  assert.match(csv, /not measured/, 'the file must not imply the load was measured');
+
+  // Per-scheme basin sizes are columns, and every row must carry one.
+  const rows = csv.split('\n').filter((l) => !l.startsWith('#') && l.trim());
+  const header = rows[0].split(',');
+  const at = (name: string) => rows[1].split(',')[header.indexOf(name)];
+  assert.ok(header.includes('desander_length_m'), 'basin size must be a column');
+  assert.equal(at('desander_target_mm'), '0.20', '190 m net head calls for 0.2 mm removal');
+  assert.ok(Number(at('desander_length_m')) > 20, `basin length came out ${at('desander_length_m')}`);
+  assert.ok(Number(at('desander_bench_needed_m')) > 0, 'bench requirement must be exported');
 });
 
 console.log(`\n${passed} export checks passed\n`);

@@ -13,6 +13,7 @@ import type { Scheme } from './engine/discover.ts';
 import type { Licence } from './context.ts';
 import { recordKind, transferAdvice, type Gauge } from './gauges.ts';
 import type { GridLink } from './grid.ts';
+import { desander, type BenchFit, type SedimentSource } from './engine/sediment.ts';
 
 export type ExportContext = {
   at: { lat: number; lon: number };
@@ -32,6 +33,12 @@ export type ExportContext = {
   gauges: Gauge[];
   /** Grid connection for the selected scheme, if one is selected. */
   grid: GridLink | null;
+  /**
+   * Sediment context for the SITE. The basin itself is per-scheme and computed
+   * in the table below; this is what the catchment delivers and whether the
+   * valley at the selected intake has room, neither of which is per-scheme.
+   */
+  sediment: { source: SedimentSource | null; bench: BenchFit | null } | null;
   /**
    * A measured record, when the engineer supplied one. Its presence changes what
    * the provenance header may claim: a file built on a gauge record must not say
@@ -144,6 +151,31 @@ function provenance(c: ExportContext): string[] {
       '  an absent line means unmapped, not absent.'
     );
   }
+  if (c.sediment?.source || c.sediment?.bench) {
+    lines.push('', 'SEDIMENT:');
+    if (c.sediment.source) {
+      lines.push(
+        `  ${c.sediment.source.label} — ${(c.sediment.source.highFrac * 100).toFixed(0)}% of the catchment above 3000 m`,
+        `  ${c.sediment.source.note}`
+      );
+    }
+    if (c.sediment.bench) {
+      const b = c.sediment.bench;
+      lines.push(
+        b.verdict === 'fits'
+          ? `  room for the basin: about ${b.widestM.toFixed(0)} m of workable bench on the ${b.side} bank, ${b.liftM.toFixed(0)} m above the river`
+          : b.verdict === 'no-room'
+            ? `  NO ROOM for the basin beside the selected intake — widest workable ground ${b.widestM.toFixed(0)} m`
+            : `  room for the basin is too close to call: ${b.widestM.toFixed(0)} m found, against terrain known to ~${b.resolutionM.toFixed(0)} m`
+      );
+    }
+    lines.push(
+      '  Basin sizes in the table are screening estimates: Zanke settling velocity for',
+      '  quartz, ideal basin x2 for turbulence, gravity-fed bench within 20 m of the river.',
+      '  Nepal publishes no suspended-sediment record, so the load is inferred from',
+      '  catchment altitude, not measured. A real design needs a sampling programme.'
+    );
+  }
   if (c.gauges.length > 0) {
     lines.push(
       '',
@@ -206,14 +238,19 @@ export function schemesToCsv(c: ExportContext): string {
     'headrace_diameter_m',
     'turbine',
     'turbine_best_point',
+    'desander_target_mm',
+    'desander_length_m',
+    'desander_width_m',
+    'desander_bench_needed_m',
     'intake_lat',
     'intake_lon',
     'powerhouse_lat',
     'powerhouse_lon',
     'why_kept',
   ];
-  const rows = c.schemes.map((s) =>
-    [
+  const rows = c.schemes.map((s) => {
+    const d = desander({ designFlowCms: s.designFlowCms, netHeadM: s.netHeadM });
+    return [
       `S${c.schemes.indexOf(s) + 1}`,
       c.selected && s.i === c.selected.i && s.j === c.selected.j ? 'yes' : '',
       s.capacityMW.toFixed(3),
@@ -232,6 +269,10 @@ export function schemesToCsv(c: ExportContext): string {
       s.waterway?.segments.find((x) => x.kind === 'headrace')?.diameterM.toFixed(2) ?? '',
       s.turbine ?? 'none in range',
       s.turbinePeak.toFixed(3),
+      d ? d.particleMm.toFixed(2) : '',
+      d ? d.totalLengthM.toFixed(0) : '',
+      d ? d.totalWidthM.toFixed(1) : '',
+      d ? d.benchNeededM.toFixed(0) : '',
       s.intake.lat.toFixed(5),
       s.intake.lon.toFixed(5),
       s.power.lat.toFixed(5),
@@ -239,8 +280,8 @@ export function schemesToCsv(c: ExportContext): string {
       s.reasons.join('; '),
     ]
       .map(cell)
-      .join(',')
-  );
+      .join(',');
+  });
   return [...head, '', cols.join(','), ...rows].join('\n') + '\n';
 }
 

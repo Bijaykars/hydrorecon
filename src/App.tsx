@@ -4,6 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   fetchDischarge,
   fetchPathProfile,
+  fetchProfile,
   meanOf,
   probeNeighbours,
   traceDownhill,
@@ -25,6 +26,7 @@ import { licencesAlong, loadLicences, type Licence } from './context.ts';
 import { gaugesFor, type Gauge } from './gauges.ts';
 import { gridLink } from './grid.ts';
 import { isHardStop, protectedAt, protectedNear } from './protected.ts';
+import { benchFit, desander, sedimentSource, type BenchFit } from './engine/sediment.ts';
 import {
   fillGaps,
   measuredSpread,
@@ -78,6 +80,17 @@ const SEARCH_KM = 22;
  * valley, which is what it used to do.
  */
 const INTAKE_WINDOW_KM = 2;
+
+/**
+ * Half-width of the valley cross-section taken at the intake, m.
+ *
+ * 250 m each side reaches well past any bench a desanding basin could use — the
+ * basin must be gravity-fed from the intake, so anything further out is up the
+ * hillside and out of reach anyway. Sampled at 25 m, near the 30 m posting of
+ * the terrain itself; going finer would interpolate the gorge walls smooth.
+ */
+const HALF_SECTION_M = 250;
+const SECTION_SAMPLES = 21;
 
 /** A point on the studied river with everything the engine needs. */
 export type StudyPoint = {
@@ -634,6 +647,86 @@ export default function App() {
       : null;
   }, [scheme]);
 
+  /**
+   * Sediment: the desanding basin this duty point needs, and what the catchment
+   * is going to throw at it.
+   *
+   * Pure arithmetic, so it sits with the other memos. Whether the valley has
+   * room for the basin needs terrain and is fetched below.
+   */
+  const sediment = useMemo(() => {
+    if (!scheme) return null;
+    const basin = desander({
+      designFlowCms: scheme.designFlowCms,
+      netHeadM: scheme.netHeadM,
+    });
+    return basin
+      ? { basin, source: sedimentSource(study?.reach?.below3000Frac ?? NaN) }
+      : null;
+  }, [scheme, study]);
+
+  /**
+   * Is there flat ground beside the intake to put the basin on?
+   *
+   * A cross-section cut perpendicular to the channel, 500 m wide, sampled at
+   * roughly the DEM's own posting — sampling finer would smooth the very gorge
+   * walls the test exists to detect. The tiles are cached module-side, so
+   * dragging the intake around a valley re-fetches almost nothing.
+   *
+   * This never blocks: no terrain, no answer, and the panel simply says the
+   * question is open.
+   */
+  const [bench, setBench] = useState<BenchFit | null>(null);
+  const intakeLat = scheme?.intake.lat;
+  const intakeLon = scheme?.intake.lon;
+  const benchNeededM = sediment?.basin.benchNeededM;
+  useEffect(() => {
+    const i = scheme?.i;
+    if (!study || i === undefined || !benchNeededM || intakeLat === undefined || intakeLon === undefined) {
+      setBench(null);
+      return;
+    }
+    // River direction from this point to the next, as east/north components.
+    const next = study.path[Math.min(study.path.length - 1, i + 1)];
+    const cos = Math.cos((intakeLat * Math.PI) / 180) || 1;
+    const dy = next.lat - intakeLat;
+    const dx = (next.lon - intakeLon) * cos;
+    const len = Math.hypot(dx, dy);
+    if (!(len > 0)) {
+      setBench(null);
+      return;
+    }
+    const halfDeg = HALF_SECTION_M / 111320;
+    // Rotate the flow direction a quarter turn to cut across the valley.
+    const px = (-dy / len) * halfDeg;
+    const py = (dx / len) * halfDeg;
+    let dead = false;
+    fetchProfile(
+      [intakeLat - py, intakeLon - px / cos],
+      [intakeLat + py, intakeLon + px / cos],
+      SECTION_SAMPLES
+    )
+      .then((prof) => {
+        if (dead) return;
+        setBench(
+          benchFit(
+            prof.points.map((p) => ({
+              offsetM: p.distanceKm * 1000 - HALF_SECTION_M,
+              elevationM: p.elevationM,
+            })),
+            benchNeededM,
+            prof.resolutionM
+          )
+        );
+      })
+      .catch(() => {
+        if (!dead) setBench(null);
+      });
+    return () => {
+      dead = true;
+    };
+  }, [study, scheme?.i, intakeLat, intakeLon, benchNeededM]);
+
   const uncertainty = useMemo(() => {
     if (!input || !scheme || !study) return null;
     return uncertaintyFor(
@@ -838,6 +931,7 @@ export default function App() {
       licences: licences ?? [],
       gauges: gauges ?? [],
       grid,
+      sediment: sediment ? { source: sediment.source, bench } : null,
       measured: measured
         ? {
             name: measured.name,
@@ -855,7 +949,7 @@ export default function App() {
         residualFrac: assume.residualFrac,
       },
     };
-  }, [at, study, found, scheme, licences, gauges, grid, measured, assume, uncertainty]);
+  }, [at, study, found, scheme, licences, gauges, grid, sediment, bench, measured, assume, uncertainty]);
 
   const onExport = useCallback(
     (kind: 'csv' | 'geojson') => {
@@ -916,6 +1010,8 @@ export default function App() {
         hydest={hydest}
         grid={grid}
         conservation={conservation}
+        sediment={sediment}
+        bench={bench}
         measured={measured}
         onImport={onImport}
         onClearMeasured={() => setMeasured(null)}
