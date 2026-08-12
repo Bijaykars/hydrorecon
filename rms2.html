@@ -1,0 +1,1208 @@
+<html class="fluid top-full menuh-top js no-touch csstransforms3d csstransitions content-transitions animations">
+<head>
+	<title>Royalty Management System</title>
+	<!-- Meta -->
+	<meta charset="UTF-8">
+	
+	<meta name="description" content="Royalty Management System">
+	<meta name="author" content="Department of Electricity Development">
+		
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0, minimum-scale=1.0, maximum-scale=1.0">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black">
+	<meta http-equiv="X-UA-Compatible" content="IE=9; IE=8; IE=7; IE=EDGE">
+    	
+	<link href="https://fonts.googleapis.com/css?family=Roboto:100,100i,300,300i,400,400i,500,500i,700,700i,900,900i" rel="stylesheet">
+    	<link href="https://fonts.googleapis.com/css?family=Roboto+Slab:100,300,400,700" rel="stylesheet">
+	
+	<link rel="stylesheet" type="text/css" href="/css/app/color-variable.css">
+    
+    	<link rel="stylesheet" type="text/css" href="/css/nd/pages/module.admin.page.index.min.css">
+   
+    	<link rel="stylesheet" type="text/css" href="/css/app/new-style.css?version=1.0.1">
+
+	<script type="text/javascript" src="/js/nd/components/library/jquery/jquery.min.js"></script>
+    	<script type="text/javascript" src="/js/nd/components/library/jquery/jquery-migrate.min.js"></script>
+    	<script type="text/javascript" src="/js/nd/components/plugins/less-js/less.min.js"></script>
+    	<script type="text/javascript" src="/js/nd/components/library/jquery-ui/js/jquery-ui.min.js"></script>
+    	<script type="text/javascript" src="/js/nd/components/plugins/jquery-ui-touch-punch/jquery.ui.touch-punch.min.js"></script>
+  
+	
+    <style type="text/css">
+         .tabli{width:100% !important;}
+        .tabspan{margin-left: 45px;margin-top: 5px;font-weight: 400;font-size: 14px;display: inline-block !important;}
+        .widget-head, .widget.widget-tabs{background: transparent !important;}
+        .widget.widget-tabs>.widget-head ul li.active{background: unset;}
+        .widget.widget-tabs>.widget-head ul li.active a, .widget.widget-tabs>.widget-head ul li.active a i:before{color: var(--color-primary);}
+        .widget.widget-tabs-vertical .widget-head ul li{border-bottom: none;font-family: 'Roboto Slab',sans-serif;height: auto; min-height: 35px;word-break: break-word;}
+        .setting-tab-ul{margin-right: 15px !important; border-radius: 5px; background: #fff; box-shadow: 0 2px 13px 0 rgba(0, 0, 0, 0.2);padding: 8px 10px;}
+        .widget.widget-tabs>.widget-head ul li a, .widget.widget-tabs>.widget-head ul li.active a,.widget.widget-tabs-double > .widget-head ul li, .widget.widget-tabs-double > .widget-head ul li.active{height: auto;}
+
+	    .top-alert-message {font-size: 12px; text-align: center; padding: 9px 15px; position: fixed; z-index: 10000; cursor: pointer; background: var(--third-color); color: var(--fourth-color); width:100%; border-radius: 1px;}
+        .top-alert-message .link{font-weight: bold; color: var(--fourth-color); text-decoration: underline;}
+        .top-alert-message .close-link{position: fixed; right: 10px; top: 8px; color: var(--fourth-color);}
+		html.sidebar-full #menu { width: 175px; }
+		html.sidebar-full.sidebar-collapsible #menu .slim-scroll>ul>li ul li a, html.sidebar-full.sidebar-collapsible #menu>ul>li ul li a{ font-size: 11px;}
+		.customBlockRightLink{	text-align: right;margin-top: 10px;}
+        .tootltiptitle{color:#000;border-bottom: 1px solid var(--color-border);padding: 10px 12px;font-weight:600;}
+        .tootltipcontent{font-size:11px;line-height: 19px;font-weight:normal;padding:10px 12px;}
+        .tooltiptable tr > td{line-height: 6px !important;}
+        .modal-backdrop{background: whitesmoke !important;}
+        .page-title{position: relative; z-index: 1;}
+        /* custime top menu & side bar */ 
+                .navbar.main.top-most-menu{ background-color: #d1d1d1 !important; border-bottom-color: #bbbbbb !important;}
+                .navbar.main.top-most-menu .topnav>li{border-right-color: #bbbbbb !important;}
+                html.top-full.no-touch .navbar.main.top-most-menu .topnav>li:hover:not(.active)>a{background-color: #bbbbbb !important;}
+                html.top-full.no-touch .navbar.main.top-most-menu .topnav>li:hover:not(.active)>a.glyphicons i:before{color: #34547f;}
+                .navbar.main.top-most-menu .goog-te-gadget-simple{background-color: inherit !important;}
+                .navbar.main.top-most-menu .text-primary, .top-most-menu .glyphicon-primary i:before{color: #34547f !important;}
+                .navbar.main.top-most-menu .topnav>li.mega-menu .mega-sub{background-color: #bbbbbb !important;}
+                .navbar.main.top-most-menu .topnav>li.mega-menu .mega-sub h4{color: #34547f !important;}
+                .navbar.main.top-most-menu .topnav>li.mega-menu .mega-sub-inner ul li a{color: #777 !important;}
+                html.sidebar-full #menu.right-most-sidebar {background-color: #d1d1d1 !important;}
+                html.sidebar-full #menu.right-most-sidebar .slim-scroll>ul>li, html.sidebar-full #menu>ul>li{border-bottom: 1px solid #bbbbbb !important;}
+                html.sidebar.sidebar-full body .menu-right #menu.right-most-sidebar .slim-scroll>ul, html.sidebar.sidebar-full body .menu-right #menu>ul{border-top-color: #bbbbbb !important; border-left-color: #bbbbbb !important; }
+                html.sidebar-full.no-touch #menu.right-most-sidebar .slim-scroll>ul li:hover:not(.active)>a, html.sidebar-full.no-touch #menu>ul li:hover:not(.active)>a{background-color: #bbbbbb !important;}
+                html.sidebar-full.no-touch #menu.right-most-sidebar .slim-scroll>ul li:hover:not(.active)>a.glyphicons i:before, html.sidebar-full.no-touch #menu>ul li:hover:not(.active)>a.glyphicons i:before{color: #34547f !important;}
+                .navbar .btn-navbar, #menu.right-most-sidebar .btn-navbar{background-color: inherit !important; border-bottom-color: #bbbbbb !important; border-top-color: #bbbbbb !important; }
+                #menu.right-most-sidebar .appbrand{border-bottom-color: #bbbbbb !important;}
+                #menu.right-most-sidebar .appbrand .text-primary{color: #34547f !important;}
+                html.sidebar-full.sidebar-collapsible #menu.right-most-sidebar .slim-scroll>ul>li ul li, html.sidebar-full.sidebar-collapsible #menu.right-most-sidebar>ul>li ul li{border-bottom: 1px solid #bbbbbb !important;}
+                /* **** */  
+                /* dashboard menu icone */
+                .menu-block .glyphicons{padding: 0 10px;}
+                .menu-block .menu-item{display: inline-block; border: 1px solid #efefef; float: left;}
+                .menu-item > .cus-tooltip-cont > .tooltip > .tooltip-inner{text-align: center !important;}
+                i.cus-icon:before{font-size: 14px; position: relative !important; color: #9d9d9d; vertical-align: middle;}
+                .modal .modal-header{padding: 15px 10px;}
+                .modal-dialog{left:0 !important;}
+                .modal-open{overflow:auto;}
+                .modal {background:none !important;}
+                @media print {
+                    @page {
+                        margin: 0;  /* this affects the margin in the printer settings */
+                    }
+                }
+                .picto-brdcmb:before{left: 1px;top: 11px;position: absolute;font-size: 17px;}
+                .picto-addon:before{position: absolute;left: 0;font-size: 30px;color: var(--fourth-color);}
+                .block-msg {letter-spacing: 1px;}
+                .block-msg a {color: white !important;text-decoration: underline;}
+                .field-validation-error{ background-color:Red; color:White;display:inline-block;}
+        </style>
+    
+<style type="text/css">
+    .select2-container{padding:2px !important;background:var(--fourth-color);border-color:none !important;border: 1px solid #ededed; margin: 0px 0px 5px 0px;}
+    .select2-container .select2-choice{background:none !important;height: auto;line-height:27px;}
+    .select2-container.select2-drop-above .select2-choice{border:none;}
+    .select2-container-active .select2-choice, .select2-container-active .select2-choices{box-shadow:none;}
+    .select2-drop-mask {z-index: 999990;} .select2-drop {z-index: 999992;} .select2-search {z-index: 999994;}
+</style>
+<style type="text/css">
+    .s_alert, .s_inform { margin-left: 10px; color:var(--color-danger);}
+    .block-student {color: #000 !important;}
+    .s_alert + div.tooltip > .tooltip-inner, .s_inform + div.tooltip > .tooltip-inner {
+        text-align: left;
+    }
+    .s_inform+ div.tooltip td{padding: 0px 3px !important; border: 0 !important; line-height: 20px;}
+    .pc_alert,.absent_alert{position: absolute;top: -7px;font-size: 8px;}
+    .student-name-head .pc_alert{top:-5px;left:15px;}
+    .student-name-head .absent_alert{top: -5px; left:24px !important;}
+    .token-input-dropdown{max-height: 200px;overflow: auto !important;}
+</style>
+<style id="holderjs-style" type="text/css">
+    .holderjs-fluid {font-size:16px;font-weight:bold;text-align:center;font-family:sans-serif;margin:0}
+    .holderjs-fluid {font-size:16px;font-weight:bold;text-align:center;font-family:sans-serif;margin:0}
+</style>
+    <style type="text/css">
+        .blinking{ animation:blinkingText 2.0s infinite;}
+       @keyframes blinkingText{ 0%{     color: #fff;    }49%{    color: #fff; }60%{    color: transparent; }99%{    color:transparent;  }100%{   color: #fff;    }}    
+    </style>
+ 
+</head>
+ 
+<body class="  pace-done" style="">
+    
+    <div class="pace pace-inactive">
+        <div class="pace-progress" data-progress-text="100%" data-progress="99" style="transform: translate3d(100%, 0px, 0px);">
+            <div class="pace-progress-inner"></div>
+        </div>
+        <div class="pace-activity"></div>
+    </div>
+
+<!-- add spinner element -->
+    <style type="text/css">
+    .spinner-block{z-index: 99999!important;position: fixed;margin: auto;width: 100%;height: 100%;background: rgba(97,97,97,0.5);top: 0px;} 
+    .spinner {margin: auto;width: 40px;height: 40px;position: relative;text-align: center;top:45%;-webkit-animation: sk-rotate 2.0s infinite linear;animation: sk-rotate 2.0s infinite linear;}
+    .dot1, .dot2 {width: 60%;height: 60%;display: inline-block;position: absolute;top: 0;background-color: #fff;border-radius: 100%;-webkit-animation: sk-bounce 2.0s infinite ease-in-out;animation: sk-bounce 2.0s infinite ease-in-out;}
+    .dot2 {top: auto;bottom: 0;-webkit-animation-delay: -1.0s;animation-delay: -1.0s;}
+
+    @-webkit-keyframes sk-rotate { 100% { -webkit-transform: rotate(360deg) }}
+    @keyframes sk-rotate { 100% { transform: rotate(360deg); -webkit-transform: rotate(360deg) }}
+    @-webkit-keyframes sk-bounce {0%, 100% { -webkit-transform: scale(0.0) } 50% { -webkit-transform: scale(1.0) }}
+    @keyframes sk-bounce {0%, 100% { transform: scale(0.0);-webkit-transform: scale(0.0);} 50% { transform: scale(1.0);-webkit-transform: scale(1.0);}}   
+</style>
+<!-- spinner block html-->
+<div class="spinner-block hidden" style="">
+    <div class="spinner">
+      <div class="dot1"></div>
+      <div class="dot2"></div>
+    </div>
+</div> 
+<!-- spinner block html-->    <!-- add spinner element -->
+
+    <!-- Main Container Fluid -->
+	<div class="">
+		
+		<!-- Sidebar menu & content wrapper -->
+		<div id="wrapper">
+			<!-- Content -->
+			<div id="content" style="min-height: 815px;">
+			
+				<link rel="stylesheet" type="text/css" href="/css/app/top-menu.css">
+                
+                <style type="text/css">
+    .goog-te-gadget-simple{ border : 0px !important;}
+    .goog-te-gadget-simple .goog-te-menu-value{color:#7e8c9a !important;font-weight: 600;}
+    .parentMenuLabel{ font-size:16px !important; font-weight: 700 !important ;  }
+    .cusMenuLabel{ font-size:14px !important ; font-weight: 700 !important ; padding: 15px 0 0 0 !important;  }
+    .cusChildMenuBlock{ padding-left: 5px; margin-top: -10px; }
+    .cusChildMenuBlock li { line-height:20px !important ; }
+    .cusChildMenuBlock a { font-size: 12px !important; }
+    .customSimpleSubMenuLink{ padding-top: 3px ; padding-bottom: 3px; }
+    .customSimpleSubMenuLink a,.traLanguage a{  font-size: 12px !important; }
+    .btn-secondary {background: #DBDBDB none repeat scroll 0% 0%; border-color: #DBDBDB; color: #393939;}
+    .btn-secondary:hover {background: #E5412D none repeat scroll 0% 0%; border-color: #E5412D; color: #fff;}
+    .btn-secondary i:hover{color: #fff; }
+    .tmp-filter-bar{background-color: #fff !important; border-color: #fff !important; margin-bottom: 0 !important;}
+    #content .tmp-heading-buttons{margin-top: 0 !important;}
+    .dd-1 .tooltip-inner{width: 100px !important;}
+    .top-setting .dd-1 a.lightbulb i {display:none !important;}
+    @media(max-width:992px){
+        .top-setting .dd-1 a.sm-hide span { display:none;}
+        .sm-hide i{mardgin-right: 0px !important;}
+    }
+    @media(max-width:767px){
+        html.top-full .navbar.main {height: auto;}
+        .menu-btn{display: inline-block !important; width: 50px !important; border: none !important;}
+        .xs-logo-block{display: inline-block !important;}
+        .sm-hide i{margin-right: 0px !important;}
+        .top-setting .dd-1 a.glyphicons i { margin-right: 0 !important; }
+        .top-setting .dd-1 a.sm-hide span { display:none;}
+        .top-setting .xs-show { display:inline-block !important;}
+    }
+    .traLanguage a .check-icon span, .academic-session-block a .check-icon span{display:none;}
+    /*.traLanguage a:hover .check-icon span{color:#000 !important;} */
+    .traLanguage a:hover .check-icon span,.traLanguage a.active .check-icon span, .academic-session-block a:hover .check-icon span,.academic-session-block a.active .check-icon span{display:block;}
+    .traLanguage a .check-icon, .academic-session-block a .check-icon{display:inline-block;width:15px;}
+    .clear-logo{width: auto !important;  height: 35px}
+    .top-menu-logo{width:65px;}
+    .picto-top:before {
+        position: absolute;
+        left: 0;
+        font-size: 18px;
+        top: 15px;
+        color: #e5412d;
+    }
+    #HW_badge_cont{width: auto !important;}
+    .active-acds{background: #F1F6FA !important;}
+</style>
+
+<div class="navbar main hidden-print">
+    <!-- // Menu Toggle Button END -->
+
+    <!-- Full Top Style -->
+    <ul class="topnav pull-left topnav-right-container">
+        <li class="xs-show">
+            <a href="/Core/Home" class="glyphicons">
+                <img src="/content/images/logo.png" class="top-menu-logo" alt="Logo">            </a>
+        </li>
+        <li class="hidden-xs">
+            <a href="/Core/Home" class="text-primary menu-inst-title"> Royalty Management System </a>
+        </li>
+        
+        
+
+        <li class="dropdown dd-2">
+            <a href="/Core/Home/CompanyIndex/0" class=""><i></i> Promoters</a>
+        </li>
+
+        <li class="dropdown dd-3">
+            <a href="/Core/Home/PlantIndex/0" class=""><i></i> Plants</a>
+        </li>
+
+        <li class="dropdown dd-4">
+            <a href="/Core/Home/RoyaltyReceivedDetailIndex/18" class=""><i></i> Royalty</a>
+        </li>
+
+        <li class="dropdown dd-5">
+            <a href="/Core/Home/EnergyDetailIndex?FiscalId=18" class=""><i></i> Energy</a>
+        </li>
+
+        
+         <li class="dropdown dd-5">
+            <a href="/Core/Home/Notices" class=""><i></i> Notices</a>
+        </li>
+
+         <li class="dropdown dd-5">
+            <a href="/Core/Home/Downloads" class=""><i></i> Downloads</a>
+        </li>
+
+        <li class="dropdown dd-6">
+            <a href="javascript:void(0);" data-toggle="dropdown">
+                <i class="margin-right-none"></i> Reports <span class="badge fix badge-primary"></span>
+            </a>
+            <ul class="dropdown-menu" >
+              
+            <li class="customSimpleSubMenuLink">
+                <a class="btn-xs" href="/Core/Report/PlantDistrict">List of Plants</a>
+            </li>
+          
+            <li class="customSimpleSubMenuLink">
+                <a class="btn-xs" href="/Core/Report/RoyaltyDetail">Royalty Detail of a Plant</a>
+            </li> 
+           <li class="customSimpleSubMenuLink">
+                <a class="btn-xs" href="/Core/Report/RoyaltySummary">Royalty Summary Sheet</a>
+            </li>
+             
+           <li class="customSimpleSubMenuLink">
+                <a class="btn-xs" href="/Core/Report/RoyaltySummaryExt">Royalty Summary - Extended Sheet</a>
+            </li>
+            <li class="customSimpleSubMenuLink">
+                <a class="btn-xs" href="/Core/Report/BalanceSheet">Balance Sheet of a Company</a>
+           </li>
+           
+           <li class="customSimpleSubMenuLink">
+                <a class="btn-xs" href="/Core/Report/RoyaltyReceivedList">Royalty Received Summary/Detail</a>
+           </li>
+
+
+            
+            <li class="divider"></li>
+            <li class="customSimpleSubMenuLink">
+                <a class="btn-xs" href="/Core/Report/RoyaltyDistributionSheet">Royalty Distribution Sheet</a>
+            </li>
+               
+            </ul>
+        </li>
+
+       
+             
+    </ul>
+
+    <ul class="topnav pull-right top-setting" style="">
+                
+                
+           
+                      <li class="dd-1 xs-show">
+                    <a href="/Core/Account/LogOn" class="glyphicons user single-icon"> &nbsp;&nbsp; Log In <i class="margin-right-none"></i> </a>
+                </li>
+
+                   
+                
+    
+    </ul>
+    <div class="clearfix"></div>
+</div>
+
+<script type="text/javascript" src="/js/app/topMenu.js?v=1.2"></script>
+                                                
+        <link rel="stylesheet" type="text/css" href="/css/app/dashboard.css">
+<style type="text/css">
+    .text-medium
+    {
+        font-size: 30px;
+        font-weight: 600;
+    }
+    li.innerTB
+    {
+        padding-top: 8px !important;
+        padding-bottom: 8px !important;
+        border-bottom: 1px solid #ccc;
+    }
+    li.innerTB strong
+    {
+        font-weight: 500;
+    }
+    .mt15
+    {
+        margin-top: 15px;
+    }
+</style>
+
+
+<div class="top-header-block">
+    <div class="col-md-12 hidden-print breadcrumb-block">
+        <ul class="breadcrumb" style="height: 39px;">
+            <li><a href="/Core/Home" class="glyphicons home blinking"><i></i> Home </a></li>
+            <li class="divider"><i class="fa fa-chevron-right"></i></li>
+           
+            <div class="pull-right">
+               
+            </div>
+        </ul>
+        <div class="clearfix">
+        </div>
+    </div>
+    <div class="page-title">
+        <div class="col-xs-7 padding-none">
+            <div class="heading-buttons tmp-heading-buttons">
+                <h3>
+                    Home - Dashboard</h3>
+                <div class="clearfix">
+                </div>
+            </div>
+            <div class="separator bottom">
+            </div>
+        </div>
+        <div class="col-xs-5">
+            <div class="menu-block pull-right hidden" style="line-height: 35px; margin-right: 15px;">
+                <div class="menu-item">
+                    <a class="glyphicons charts cus-tooltip-cont" href="#"><i class="cus-icon" data-toggle="tooltip"
+                        data-placement="bottom" data-title="Statistics"></i></a>
+                </div>
+                <div class="menu-item">
+                    <a class="glyphicons conversation cus-tooltip-cont" href="#"><i class="cus-icon"
+                        data-toggle="tooltip" data-placement="bottom" data-title="Social Learning"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="clearfix">
+        </div>
+    </div>
+</div>
+<div class="innerLR">
+    <div class="widget widget-heading-simple widget-body-simple">
+        <div class="widget-body">
+            <div class="col-md-2 mb10">
+                <div class="db-blk db-blk-admin box-shadow">
+                    <a href="/Core/Home/CompanyIndex">
+                        <div>
+                            <div class="db-blk-info" style="margin-top: -5px;">
+                                164
+                            </div>
+                            <div class="fa fa-users text-primary db-blk-info pull-right">
+                                <i></i>
+                            </div>
+                        </div>
+                        <div class="db-blk-label">
+                            Companies<br /><span style="font-size:12px">Promoters associated with Hydro</span></div>
+                        <div class="clearfix">
+                        </div>
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-2 mb10">
+                <div class="db-blk db-blk-teacher box-shadow">
+                    <a href="/Core/Home/PlantIndex">
+                        <div>
+                            <div class="count db-blk-info" style="margin-top: -5px;">
+                                198</div>
+                            <div class="fa fa-user db-blk-info pull-right">
+                                <i></i>
+                            </div>
+                        </div>
+                        <div class="db-blk-label">
+                          Power Plants <br /><span style="font-size:12px">Hydro Above 1MW</span></div>
+                        <div class="clearfix">
+                        </div>
+                    </a>
+                </div>
+            </div>
+              <div class="col-md-2 mb10">
+                <div class="db-blk db-blk-submissions box-shadow">
+                    <a href="#">
+                        <div>
+                            <div class="db-blk-info" style="margin-top: -5px;">
+                               <small>3,911.53</small><span style="font-size:12px">MW</span> </div>
+                            <div class="fa fa-star db-blk-info pull-right">
+                                <i></i>
+                            </div>
+                        </div>
+                        <div class="db-blk-label">
+                            Total Capacity
+                            <br /><span style="font-size:12px">Hydro plants above 1MW</span>
+                            </div>
+                        <div class="clearfix">
+                        </div>
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-3 mb10">
+                <div class="db-blk db-blk-events box-shadow">
+                    <a href="/Core/Home/RoyaltyReceivedDetailIndex/18">
+                        <div>
+                            <div class="count db-blk-info" style="margin-top: -5px;">
+                                Rs. <span style="font-size:20px"> 3,937,710,783.12	</span>
+                            </div>
+                            <div class="fa fa-money db-blk-info pull-right">
+                                <i></i>
+                            </div>
+                        </div>
+                        <div class="db-blk-label">
+                            Royalty Received <br /> <span style="font-size:12px">F.Y 081/82</span></div>
+                        <div class="clearfix">
+                        </div>
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-3 mb10">
+                <div class="db-blk db-blk-admin box-shadow">
+                    <a href="/Core/Home/RoyaltyReceivedPlantWise/18">
+                        <div>
+                            <div class="db-blk-info" style="margin-top: -5px;">
+                                Rs.  <span style="font-size:20px">  441,716,331.96</span>
+                                
+                            </div>
+                            <div class="fa fa-users text-primary db-blk-info pull-right">
+                                <i></i>
+                            </div>
+                        </div>
+                        <div class="db-blk-label">
+                            Dues Receivable <br /> <span style="font-size:12px">F.Y 081/82 </span>
+                        </div>
+                   </a>
+                </div>     
+             </div>      
+        </div>
+          
+            <div class="clearfix seperator bottom">
+            </div>
+        </div>
+   
+    <div class="separator bottom">
+    </div>
+    <div class="widget widget-heading-simple widget-body-simple">
+        <div class="widget-body">
+                
+                <div class="col-md-4">
+                    <div class="widget widget-body-white widget-heading-simple  box-shadow padding-none">
+                <div class="widget-body padding-none" style="min-height: 270px;">
+                    <h4 class="heading innerAll" style="padding-bottom: 5px;">
+                       <i class="fa fa-clipboard text-primary fa-fw"></i> Projects going to complete 15 years of Operation</h4>
+                    <div class="bg-gray innerAll" style="padding-top: 0px;">
+                        <div class="mt15">
+                            <ul class="list-unstyled innerAll" style="padding-top: 0px; padding-left: 0px;">
+                           <li><b>&nbsp;</b><span class="pull-right"><b>Years of Operation</b></span></li>
+                        </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+                
+                </div>
+                <div class="col-md-4">
+                    <div class="widget widget-body-white widget-heading-simple  box-shadow padding-none">
+                        <div class="widget-body padding-none" style="min-height: 270px;">
+                            <h4 class="heading innerL innerT" style="display: inline-block">
+                                <i class="fa fa-clipboard text-primary fa-fw"></i>Royalty Information
+                            </h4>
+                            
+                            <div class="bg-gray innerAll" style="padding-top: 0px;">
+                              
+                                <div class="mt0">
+                                  
+                                    <ul class="list-unstyled innerAll">
+                                        <li class="innerTB">
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <b>Receivables</b></div>
+                                                <div class="col-md-4">
+                                                    Prev F.Y 080/81</div>
+                                                <div class="col-md-4 text-right">
+                                                    <b>432,635,486.66</b></div>
+                                            </div>
+                                        </li>
+                                        <li class="innerTB">
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    &nbsp;</div>
+                                                <div class="col-md-4">
+                                                    Current F.Y 081/82</div>
+                                                <div class="col-md-4 text-right">
+                                                    <b> 3,946,791,628.42 </b>
+                                                </div>
+                                            </div>
+                                        </li>
+                                        <li class="innerTB">
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    &nbsp;</div>
+                                                <div class="col-md-4">
+                                                    <b>Receivable Total</b>
+                                                </div>
+                                                <div class="col-md-4 text-right">
+                                                    <b>4,379,427,115.08</b></div>
+                                            </div>
+                                        </li>
+                                        <li class="innerTB">
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    Royalty Received</div>
+                                                <div class="col-md-4">
+                                                    <b>Received Total</b></div>
+                                                <div class="col-md-4 text-right">
+                                                    <b>3,937,710,783.12</b></div>
+                                            </div>
+                                        </li>
+                                        <li class="innerTB">
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    &nbsp;</div>
+                                                <div class="col-md-4">
+                                                    Dues Receivable
+                                                </div>
+                                                <div class="col-md-4 text-right">
+                                                    <b>441,716,331.96</b></div>
+                                            </div>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+          
+                <div class="col-md-4">
+                    <div class="widget widget-body-white widget-heading-simple  box-shadow padding-none">
+                        <div class="widget-body padding-none" style="min-height: 270px;">
+                            <h4 class="heading innerT innerL" style="display: inline-block">
+                                <i class="fa fa-clipboard text-primary fa-fw"></i>Recent Roylty Received 
+                            </h4>
+                            
+                            <div class="bg-gray innerAll" style="padding-top: 0px;">
+                                <div class="mt15">
+                                    <ul class="list-unstyled innerAll" style="padding-top: 0px; padding-left: 0px;">
+                                            <li class="innerTB"><i>2083/04/18</i> <b>Upper Ingwa Khola</b> <span
+                                                class="pull-right"><strong>970,000.00</strong> </span></li>
+                                            <li class="innerTB"><i>2083/04/13</i> <b>Siddhi Khola HPP</b> <span
+                                                class="pull-right"><strong>1,000,000.00</strong> </span></li>
+                                            <li class="innerTB"><i>2083/03/32</i> <b>Rahughat Mangale</b> <span
+                                                class="pull-right"><strong>3,700,000.00</strong> </span></li>
+                                            <li class="innerTB"><i>2083/03/32</i> <b>Upper Rahughat</b> <span
+                                                class="pull-right"><strong>4,850,000.00</strong> </span></li>
+                                            <li class="innerTB"><i>2083/03/31</i> <b>Thulo Khola HPP</b> <span
+                                                class="pull-right"><strong>2,130,000.00</strong> </span></li>
+                                    </ul>
+                                    
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+        </div>
+    </div>
+    <div class="clearfix seperator bottom"></div>
+    <div class="widget widget-heading-simple widget-body-simple">
+     <div class="widget-body">
+        <div class="col-md-5">
+            <script type="text/javascript" src="/Scripts/morris.js"></script>
+            <script type="text/javascript" src="/Scripts/raphael-min.js"></script>
+            <div class="widget widget-body-white widget-heading-simple  box-shadow padding-none">
+                <div class="widget-body padding-none" style="min-height: 270px;">
+                    <h4 class="heading innerAll" style="padding-bottom: 5px;">
+                        <i class="fa fa-clipboard text-primary fa-fw"></i>Fiscal year wise Royalty Received</h4>
+                    <div id="graphSM">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="widget widget-body-white widget-heading-simple  box-shadow padding-none">
+                <div class="widget-body padding-none" style="min-height: 270px;">
+                    <h4 class="heading innerAll" style="padding-bottom: 5px;">
+                        Recent plants added</h4>
+                    <div class="bg-gray innerAll" style="padding-top: 0px;">
+                        <div class="mt15">
+                            <ul class="list-unstyled innerAll" style="padding-top: 0px; padding-left: 0px;">
+                             <li><b>&nbsp;</b><span class="pull-right"><b>Date of Operation</b></span></li>
+    <li class="innerTB">
+                                        <b> <a href="/Core/Home/PlantCreate/205"> Hidi Khola HEP</a></b>
+                                <span class="pull-right">
+                               <i>2083/03/12</i>
+                                </span>
+                            </li>
+    <li class="innerTB">
+                                        <b> <a href="/Core/Home/PlantCreate/210"> Mewa Khola HPP</a></b>
+                                <span class="pull-right">
+                               <i>2083/02/28</i>
+                                </span>
+                            </li>
+    <li class="innerTB">
+                                        <b> <a href="/Core/Home/PlantCreate/209"> Siddhi Khola HPP</a></b>
+                                <span class="pull-right">
+                               <i>2083/01/24</i>
+                                </span>
+                            </li>
+    <li class="innerTB">
+                                        <b> <a href="/Core/Home/PlantCreate/208"> Lower Irkhuwa Khola HPP</a></b>
+                                <span class="pull-right">
+                               <i>2082/12/27</i>
+                                </span>
+                            </li>
+    <li class="innerTB">
+                                        <b> <a href="/Core/Home/PlantCreate/207"> Buku Khola HPP</a></b>
+                                <span class="pull-right">
+                               <i>2082/12/18</i>
+                                </span>
+                            </li>
+                                </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="widget widget-body-white widget-heading-simple  box-shadow padding-none">
+                <div class="widget-body padding-none" style="min-height: 270px;">
+                    <h4 class="heading innerAll" style="padding-bottom: 5px;">
+                        Contact Person</h4>
+                    <div class="bg-gray innerAll" style="padding-top: 0px;">
+                        <div class="mt15">
+                            <ul class="list-unstyled innerAll" style="padding-top: 0px; padding-left: 0px;">
+                                <li style="text-align:center">
+                      
+                                    <img style="width:150px" src="/Content/UserImages/68a73.png" alt="Name of pers" />    
+                                    <p>
+                                       <b> Name of pers</b>
+                                    <br />Designation
+                                    <br />email@doed.gov.np<br />contact no
+                                    </p>
+                                </li>
+                               
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+    <div class="separator bottom">
+    </div>
+</div>
+
+<script type="text/javascript">
+    $.get('/Core/Home/RevenueMonthly', function (result) {
+        new Morris.Line({
+            element: 'graphSM',
+            data: result,
+            xkey: 'MonthName',
+            ykeys: ['Amount'],
+            labels: ['Amount'],
+            xLabelAngle: 30
+        });
+    });
+  
+</script>                                                      
+           </div>   
+    </div>
+        
+        </div>
+
+<div id="footer" class="hidden-print padding-none">
+    <div class="copy">
+                    <div class="footer-line"><hr class="separator" style="border-top-color: #4B4B4B;"></div>
+            <div class="copyright-text">
+                <span>We're</span> 
+                <img src="/content/images/powered-copy.png" id="avatar2" class="power-by-img" alt="">          
+                      <span style="padding-right:5px">by</span>
+                
+            </div>
+            <div class="footer-line"><hr class="separator" style="border-top-color: #4B4B4B;"></div>
+            <div class="clearfix"></div>
+            </div>
+</div>
+
+<!-- // Main Container Fluid END -->
+
+<!-- Add General Search Option -->
+<style type="text/css">
+    #general_search_modal .modal-dialog {width: calc(100% - 20px); margin-left: 20px;  min-height: 100vh; padding: 0; 
+        border: 0; opacity: 0.7; filter: alpha(opacity=70); /* For IE8 and earlier */}
+    #general_search_modal .modal-dialog .modal-content{border: 0; min-height: 100vh; box-shadow: none;}
+    
+   .searchModalBody{padding:25px 30px !important;}
+   .generalSearchTextVal{height: 50px; border-top: 0; border-right:0; border-left:0; padding-left: 0 !important; font-size:16px !important;}
+   @media screen and (max-width:767px) {
+       #general_search_modal .modal-dialog{opacity: 0.99;width: 100%; margin-left: 0px;}
+       .searchModalBody{padding:25px 20px !important;}
+   }    
+   @media screen and (min-width: 824px) {
+        .generalSearchTextVal {font-size:22px !important; }
+        #general_search_modal .modal-dialog {width: calc(100% - 80px); margin-left: 80px; }
+    } 
+   @media screen and (min-width: 1084px) {
+        .generalSearchTextVal {font-size:32px !important; }
+        
+    }
+   .genralSearchClose{padding:10px;height: 40px;}
+   /*.search-record-block{padding:10px 2em;/*border-top:1px solid #ededed;}*/
+   .search-title{margin-top:15px;}
+   .search-title .bg-info{padding: 5px 10px; border-radius: 3px; font-weight: bold; font-size: 12px;}
+   /*.search-list:first-child .search-title{padding:5px 10px 0;}
+   //.search-list{margin-top:5px;margin-bottom:5px;border-top:1px solid #ededed;}
+   /*.search-list:first-child{border-top:none;}*/
+   .search-list:first-child{margin-top:0;}
+   .count_record{text-align: center;}
+   
+   .general-search-loader{display:none; position: absolute; top:0; left:0; margin-top:80px; margin-left: 100px;}
+   .gensearchResult{min-height: 300px;}
+   /*.search-record-title{color:#4d4d4d !important; font-size: 13px; font-weight: 600; color: inherit; text-decoration: underline;}*/
+   .highlight-match{color: var(--color-secondary) !important; }
+   .searchFormBlock input[type="text"]{color:var(--color-secondary) !important;}
+   .search-result-label{font-size:12px; text-align: right; padding-right: 2px !important;}
+   .search-result-val{font-size:12px;/* font-weight: bold;*/}
+   .view-more-results-link-cont{padding: 0 26px 7px; text-align: left;}
+   /*.view-more-results-link{text-decoration: underline;} */
+   .blur-result{ opacity: 0.2;  filter: alpha(opacity=20); /* For IE8 and earlier */}
+   
+   .search-modal-close-link{position: absolute; right: 0; margin-right: 8px; margin-top: -15px;}
+</style>
+<!-- search option Modal -->
+
+<div id="general_search_modal" class="modal fade" style="background:none;" role="dialog">
+  <div class="modal-dialog modal-lg">
+    <!-- Modal content-->
+    <div class="modal-content">
+        <div class="modal-body searchModalBody">
+            <button type="button" class="close search-modal-close-link" data-dismiss="modal">×</button>
+            <!--<h3>Search</h3>-->
+            <div class="searchFormBlock">
+                <form id="searchForm" class="form-horizontal  margin-none" method="post" action="javascript:void(0);">
+                    <div class="input-group" style="display:flex;">
+                        <input type="text" data-view-in="modal" placeholder="Search for company, plants, receipts" class="form-control generalSearchTextVal " value="" id="modalgeneralSearchTextVal" autocomplete="off">
+                        <span class="loader text-primary general-search-loader">
+                            <i class="fa fa-spinner fa-spin" style="font-size: 25px; padding: 12px 0;"></i>
+                        </span>
+                        <!--
+                        <div class="input-group-btn" style="width: 40px;">
+                            <button style="margin:0px !important;height:50px;" class="btn btn-default generalSearchButton" data-btnclick="0" id="generalSearchButton" type="button">
+                                <i class="fa fa-search"></i>
+                            </button>
+                        </div>
+                        -->
+                    </div>
+                    <div class="clearfix"></div>
+                <input type="hidden" name="_custCSRFToken" value="UWMvRUcrcitMWWNBdFBqYnF6V1ZNSWJNZ09ZcXZKQ01Bd2MyZE5sNUNzaz0="></form>
+            </div>
+            <div class="gensearchResult">
+                <div class="search_data">
+                    <div class="" style="padding-top: 0px;">
+                        <div class="row searchResultBlock modalsearchResultBlock" style="padding: 0px 10px;"></div>
+                    </div>
+                </div>    
+            </div>    
+        </div>
+    </div>
+  </div>
+</div>
+<!-- Search option Modal-->
+<div id="searchUrlBlock" data-search-url="/search/searchData"></div>
+<script type="text/javascript">
+    var searchOption={
+        searchModalElm:null,
+        typingTime:500,
+        typingTimer:null,
+        resultBlock:null,
+        inputObj:null,
+        bindAction:function(){
+            $('#generalSearchOption').unbind();
+            $('#generalSearchOption').on('click',function(){
+                searchOption.searchModalElm.modal('show');
+                $('#modalgeneralSearchTextVal').val('');
+                $('.modalsearchResultBlock').html('');
+            });
+            
+            searchOption.searchModalElm.on('shown.bs.modal', function (e) {
+                $('#modalgeneralSearchTextVal').focus();
+            });
+            
+            searchOption.inputObj.unbind();
+            searchOption.inputObj.on('keyup',function(){
+                var viewin=$(this).data('viewIn');
+                clearTimeout(searchOption.typingTimer);
+                searchOption.typingTimer=setTimeout(function () {
+                        var searchVal='';
+                        if(viewin=='modal'){
+                          searchVal=$('#modalgeneralSearchTextVal').val();  
+                        }
+                        else{
+                            searchVal=$('#generalSearchTextVal').val();
+                        } 
+                        searchOption.loadData(searchVal,viewin);;
+                }, searchOption.typingTime);
+            });
+            $('.viewMoreResult').unbind();
+            $('.viewMoreResult').on('click',function(){
+               var viewFor=$(this).data('searchFor');
+                var searchStr=$('#modalgeneralSearchTextVal').val();
+                var searchhref=webroot+'search/moreSearchView?viewFor='+viewFor+'&searchStr='+searchStr;
+                window.location.href=searchhref;
+            });
+            $('.genSearchFor').unbind();
+            $('.genSearchFor').on('click',function(){
+                $('.searchTabli').removeClass('active');
+                $(this).parent('.searchTabli').addClass('active');
+                $('#searchrelatedData').data('reqsend',0);
+                $('#searchrelatedData').data('pageno',1);
+                var searchVal=searchOption.inputObj.val();
+                var viewin=searchOption.inputObj.data('viewIn');
+                searchOption.loadData(searchVal,viewin);
+            });
+        },
+        loadData:function(searchVal,viewin){
+            var viewfor='all';
+            var offset=0;
+            if(viewin!='modal'){
+                if($('.searchTabli').length){
+                   var searchElementOption=$('.searchTabli.active').find('.genSearchFor');
+                   viewfor=searchElementOption.data('searchFor');
+                }
+            }    
+            if(searchVal.trim()!=''){
+                $.ajax({
+                    url:$('#searchUrlBlock').data('searchUrl'),
+                    dataType : 'JSON' , 
+                    type : 'POST' ,
+                    data:{searchValue:searchVal,viewFor:viewfor,offset:offset,viewin:viewin},
+                    beforeSend:function(){
+                        alertMessage.display( 'info', ' Searching...' , false);
+                        //searchOption.displayLoader();
+                        if( viewin =='modal' ){
+                            $('.modalsearchResultBlock').addClass('blur-result');
+                        }
+                        else{
+                            $('.pagesearchResultBlock').addClass('blur-result');
+                        }
+                    },
+                    success: function(response){
+                            alertMessage.hideLoadingMsg();
+                            if(response.isError==0){
+                                if(viewin=='modal'){
+                                    $('.modalsearchResultBlock').html(response.htmlData);
+                                }
+                                else{
+                                    $('.pagesearchResultBlock').html(response.htmlData);
+                                    searchOption.reinitViewMoreLink();
+                                }
+                                 searchOption.bindAction();
+                            }
+                            else{
+                               alertMessage.display( 'danger', 'Error! while searching data.' , false); 
+                               $('.modalsearchResultBlock').html('');
+                            }
+                    },
+                    error:function(){
+                     alertMessage.display( 'danger', 'Error! while searching data.' , false);
+                     $('.modalsearchResultBlock').html('');
+                    },
+                    complete: function(){
+                        searchOption.hideLoader();
+                        if( viewin =='modal' ){
+                            $('.modalsearchResultBlock').removeClass('blur-result');
+                        }
+                        else{
+                            $('.pagesearchResultBlock').removeClass('blur-result');
+                        }
+                    }
+                });
+            }
+            else{
+                if(viewin=='modal'){
+                    $('.modalsearchResultBlock').html('');
+                }
+                else{
+                    $('.pagesearchResultBlock').html('');
+                }
+            }
+        },
+        displayLoader: function(){
+            $('.generalSearchTextVal').closest('div').find('.loader').show();
+        },
+        hideLoader: function(){
+            $('.generalSearchTextVal').closest('div').find('.loader').hide();
+        },
+        reinitViewMoreLink: function(){
+            $('.viewMoreResultForPage').unbind();
+            $('.viewMoreResultForPage').on('click', function(){
+                loadMoreSearchResults();
+            });
+        }
+    };
+    searchOption.searchModalElm=$('#general_search_modal');
+    searchOption.inputObj=$('.generalSearchTextVal')
+    searchOption.bindAction();
+    
+    function loadMoreSearchResults(){
+        var req=$('#searchrelatedData').data('reqsend');
+        var pageno=$('#searchrelatedData').data('pageno');
+        var viewfor=$('.searchTabli.active').find('.genSearchFor').data('searchFor');
+        var searchVal=$('#generalSearchTextVal').val();
+        var noMore=$('.count_record').data('noMore');
+        if(viewfor!='all' && (req == 0 || req=='0') && (noMore!=0 || noMore!='0') ){
+            var viewin='page';
+            $('#searchrelatedData').data('reqsend',1);
+            $.ajax({
+                url:$('#moresearchUrlBlock').data('searchUrl'),
+                dataType : 'JSON' , 
+                type : 'POST' ,
+                data:{searchValue:searchVal,viewFor:viewfor,offset:pageno,viewin:viewin},
+                beforeSend:function(){
+                    // alertMessage.display( 'info', ' Searching...' , false);
+                    $('.count_record').find('a').html('Loading more results ...');
+                },
+                success: function(response){
+                        alertMessage.hideLoadingMsg();
+                        $('#searchrelatedData').data('reqsend',0);
+                        if(response.isError==0){
+                            pageno=(pageno*1)+1;
+                            $('#searchrelatedData').data('pageno',pageno);
+                            $('.count_record').remove();
+                            $('.search-list').append(response.htmlData);
+                            searchOption.reinitViewMoreLink();
+                        }
+                        else{
+                           alertMessage.display( 'danger', 'Error! while searching data.' , false); 
+                        }
+                },
+                error:function(){
+                 alertMessage.display( 'danger', 'Error! while searching data.' , false);
+                },
+            });
+        }
+    }
+</script>    
+<!-- Add General Search Option -->
+  <script type="text/javascript" src="/js/app/alert-message.js?v=1.2"></script>
+  <span style="display: none;" id="jsParams" data-current_year_date="2019-01-01" data-fees_due_date="2020-05-26" data-faculty_bod_start_date="1963-01-01" data-student_bod_start_date="1950-01-01">&gt;</span>
+	<!-- Global -->
+<script>
+    var dateFormat = 'dd-mm-yyyy';
+    var sysDateFormat = 'Y-m-d';
+    if (sysDateFormat != '') {
+        dateFormat = 'yyyy-mm-dd';
+    }
+    var basePath = '',
+	commonPath = '../assets/',
+	rootPath = '../',
+	DEV = false,
+	componentsPath = '../assets/components/';
+
+    var primaryColor = '#e5412d',
+	dangerColor = '#b55151',
+	successColor = '#609450',
+	warningColor = '#ab7a4b',
+	inverseColor = '#45484d';
+
+    var themerPrimaryColor = primaryColor;
+
+    /// trim function 
+    String.prototype.trim = function () { return this.replace(/^\s+|\s+$/g, ''); };
+
+    function isValidNumeric(value) {
+        if (isNaN(value)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function isNumericGreaterThan(value, lowerLimit) {
+
+        if (value > lowerLimit) {
+            return true;
+        }
+        return false;
+    }
+
+    function isNumericLessThan(value, upperLimit) {
+
+        if (value < upperLimit) {
+            return true;
+        }
+        return false;
+    }
+
+    function haveComma(str) {
+        if (str.indexOf(',') >= 0) {
+            return true;
+        }
+        return false;
+    }
+
+    function haveColun(str) {
+        if (str.indexOf(':') >= 0) {
+            return true;
+        }
+        return false;
+    }
+    function dateConvertInYMD(date) {
+        /* date convert in YYYY-mm-dd format*/
+        if (dateFormat == 'dd-mm-yyyy') {
+            var dateArray = date.split("-");
+            date = dateArray[2] + '-' + dateArray[1] + '-' + dateArray[0];
+        }
+        else if (dateFormat == 'mm-dd-yyyy') {
+            var dateArray = date.split("-");
+            date = dateArray[2] + '-' + dateArray[0] + '-' + dateArray[1];
+        }
+        return date;
+    }
+    function dateConvertYMDTOSysFormat(date) {
+        /* date convert in YYYY-mm-dd format*/
+        if (dateFormat == 'dd-mm-yyyy') {
+            var dateArray = date.split("-");
+            date = dateArray[2] + '-' + dateArray[1] + '-' + dateArray[0];
+        }
+        else if (dateFormat == 'mm-dd-yyyy') {
+            var dateArray = date.split("-");
+            date = dateArray[1] + '-' + dateArray[2] + '-' + dateArray[0];
+        }
+        return date;
+    }    
+</script>
+	
+<script type="text/javascript" src="/js/nd/components/modules/admin/gallery/blueimp-gallery/assets/lib/js/jquery.blueimp-gallery.min.js"></script>
+<script type="text/javascript" src="/js/nd/components/library/bootstrap/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="/js/nd/components/library/modernizr/modernizr.js"></script>
+<script type="text/javascript" src="/js/nd/components/modules/admin/widgets/widget-collapsible/assets/widget-collapsible.init.js"></script>
+<script type="text/javascript" src="/js/nd/components/modules/admin/widgets/widget-progress/assets/js/widget-progress.init.js"></script>
+<script type="text/javascript" src="/js/nd/components/modules/admin/modals/assets/js/bootbox.min.js"></script>
+<script type="text/javascript" src="/js/nd/components/plugins/prettyprint/assets/js/prettify.js"></script>
+<script type="text/javascript" src="/js/nd/components/helpers/themer/assets/plugins/cookie/jquery.cookie.js"></script>
+<script type="text/javascript" src="/js/nd/components/helpers/themer/assets/plugins/minicolors/jquery.miniColors.js"></script>
+<script type="text/javascript" src="/js/nd/components/helpers/themer/assets/js/themer.js"></script>
+<script type="text/javascript" src="/js/nd/components/plugins/jquery.event.move/js/jquery.event.move.js"></script>
+<script type="text/javascript" src="/js/nd/components/plugins/jquery.event.swipe/js/jquery.event.swipe.js"></script>
+
+<script type="text/javascript" src="/js/nd/components/core/js/megamenu.js"></script>
+<script type="text/javascript" src="/js/nd/components/core/js/core.init.js"></script>		
+   
+<script type="text/javascript">
+    var is_mobile = "0";
+    if (is_mobile == 1) {
+        setPositionModal();
+    }
+    function setPositionModal() {
+        $('.modal').unbind('shown.bs.modal');
+        $('.modal').on('shown.bs.modal', function (e) {
+            var top = Math.max($(window).height() - $(this).outerHeight(), 0) / 2;
+            //var left = Math.max($(window).width() - $(this).outerWidth(), 0) / 2;
+            $(this).css('opacity', '0.98');
+            $(this).css('background', 'lightgrey');
+            $('.modal-backdrop').remove();
+            if ($(this).attr("id") == 'contentViewModal' || $(this).attr("id") == 'quizViewModal' || $(this).attr("id") == 'importQuestionModal' || $(this).attr("id") == 'quizSubmitConfirmationModal') {
+                $(this).css({ top: 0 });
+            } else {
+                $(this).css({ top: top + $(window).scrollTop() });
+            }
+        });
+    }
+</script>    
+<script type="text/javascript">
+    $(document).ready(function () {
+        if ($.browser.safari) {
+            $('#menu').css({ "overflow": "visible !important" });
+        }
+        else {
+            $('#menu').css({ "overflow": "visible" });
+        }
+
+        $('#menu').on('click', function () {
+            $('.slim-scroll').find('.btn-navbar').css({ 'display': 'block' });
+        });
+        $('.sidebarCusMenu').unbind();
+        $('.sidebarCusMenu').on('mouseenter', function () {
+            if ($('.container-fluid').hasClass('menu-hidden')) {
+                $(this).find('.moduledesc ').removeClass('hidden');
+            }
+        });
+        $('.sidebarCusMenu').on('mouseleave', function () {
+            // if($('.container-fluid').hasClass('menu-hidden')){ 
+            $(this).find('.moduledesc ').addClass('hidden');
+            //}
+        });
+        $('.sidebar-menu-nav').on('click', function () {
+            if ($('.container-fluid').hasClass('menu-hidden')) {
+                $('.sidebarCusMenu').find('.glyphicons').addClass('collapsed');
+                $('.sidebarCusMenu').find('ul').removeClass('in').addClass('collapse');
+            }
+            $('.sidebarCusMenu').removeClass('active');
+            $('.sidebarCusMenu').find('.moduledesc ').addClass('hidden');
+        });
+    });
+</script>
+<script type="text/javascript" src="/js/app/notifications.js?ver=1.1"></script>
+<div id="loginLinkBlock" data-login-url="/"></div>
+<!-- Google calendar Auto Sync --->
+<!-- google Calender Auto Sync ---><!-- Model view related issue in touch screen -->
+ 
+<script>
+    // dynamic form create for get method convert into post.
+    function dynamicPostFormHtml(formUrl, formId, inputName, inputValue, secondInputName, secondInputValue) {
+        $('.rec-del-form').remove();
+        var formHtml = '<form class="rec-del-form hidden" id="' + formId + '" action="' + formUrl + '" method="POST">';
+        formHtml += '<input type="hidden"  name="_custCSRFToken" value="UWMvRUcrcitMWWNBdFBqYnF6V1ZNSWJNZ09ZcXZKQ01Bd2MyZE5sNUNzaz0=">';
+        formHtml += '<input type="hidden" name="' + inputName + '" value="' + inputValue + '">';
+        if (secondInputName != null) {
+            formHtml += '<input type="hidden" name="' + secondInputName + '" value="' + secondInputValue + '">';
+        }
+        formHtml += '</form>';
+        return formHtml;
+    }
+ </script>
+  <script>
+      function getParamsFromUrl(pageURL) { // retrive parameter value from url.
+          var formParam = {};
+          var paramStr = pageURL.split('?')[1];
+          var paramSegs = paramStr.split('&');
+          for (var i = 0; i < paramSegs.length; i++) {
+              var paramSeg = paramSegs[i].split('=');
+              formParam['param' + i] = paramSeg[0];
+              formParam['param' + i + '_value'] = paramSeg[1];
+          }
+          return formParam;
+      };
+      $(document).on('click', '.post-form-link', function (e) {
+          e.preventDefault();
+          var confirmMsg = 'Are you sure?';
+          if ($(this).data('confirmMsg') !== undefined) {
+              confirmMsg = $(this).data('confirmMsg');
+          }
+          if (window.confirm(confirmMsg)) {
+              var pageURL = $(this).attr("href");
+              var formParam = getParamsFromUrl(pageURL);
+              var formUrl = $(this).attr("href").split('?')[0];
+              var formHtml = dynamicPostFormHtml(formUrl, 'dynamicPostForm', ('param0' in formParam) ? formParam['param0'] : null, ('param0_value' in formParam) ? formParam['param0_value'] : null, ('param1' in formParam) ? formParam['param1'] : null, ('param1_value' in formParam) ? formParam['param1_value'] : null);
+              $(this).append(formHtml);
+              $('#dynamicPostForm').submit();
+          }
+      });
+      $(document).ready(function () {
+          function isTouchDevice() {
+              return typeof window.ontouchstart !== 'undefined';
+          }
+          if (isTouchDevice() == false) {
+              $('html').addClass('animations');
+          }
+      });
+</script> 
+<!-- Model view related issue in touch screen -->
+<!-- add autocomplete attribute for form date input field -->
+<script type="text/javascript">
+    $(document).ready(function () {
+        if ($('form').length > 0) {
+            $(this).find('.date').attr('autocomplete', 'off');
+        }
+        $(document).ajaxSuccess(function (event, xhr, options) { //  every form which is created after page load or render from other view using ajax.
+            if ($('form').length > 0) {
+                $(this).find('.date').attr('autocomplete', 'off');
+            }
+        });
+    });
+</script>
+<!-- remove autocomplete attribute for form date input field -->
+
+</body></html>

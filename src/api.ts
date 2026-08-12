@@ -199,13 +199,15 @@ export type Candidate = {
   meanCms: number;
   uplandKm2?: number;
   strahler?: number;
-  source: 'hydrorivers';
+  /** Which network answered — the UI labels provenance differently for each. */
+  source: 'hydrorivers' | 'glofas';
 };
 
 export type ScanResult = {
   cells: Candidate[];
   /** True when only the strongest reaches fit the display budget. */
   limited: boolean;
+  source: 'hydrorivers' | 'glofas';
 };
 
 // ---------------------------------------------------------------------------
@@ -820,7 +822,7 @@ export async function scanNepalCandidates(
   bounds: { west: number; south: number; east: number; north: number }
 ): Promise<ScanResult> {
   const net = await loadNepalRivers();
-  if (!net) return { cells: [], limited: false };
+  if (!net) return { cells: [], limited: false, source: 'hydrorivers' };
   const MAX_VISIBLE = 240;
   const byMapCell = new Map<string, Candidate>();
   const inBounds = (lat: number, lon: number) =>
@@ -860,6 +862,7 @@ export async function scanNepalCandidates(
   return {
     cells: ranked.slice(0, MAX_VISIBLE),
     limited: ranked.length > MAX_VISIBLE,
+    source: 'hydrorivers',
   };
 }
 
@@ -929,6 +932,70 @@ let projectCache: Promise<Omit<NepalProject, 'distanceKm'>[]> | null = null;
  * 128 KB, `access-control-allow-origin: *`, so it is fetched live and cached for
  * the session rather than bundled.
  */
+/**
+ * Discovery outside Nepal, where there is no bundled river network.
+ *
+ * Samples the GloFAS grid across the view in ONE multi-location request. This is
+ * the fallback, not the default: the Nepal path reads the bundled HydroRIVERS
+ * network and costs nothing, whereas this hits a shared free API that rate-limits
+ * hard — so it stays at 100 points and widens the grid step rather than paging.
+ */
+export async function scanGlofasCandidates(
+  bounds: { west: number; south: number; east: number; north: number },
+  signal?: AbortSignal
+): Promise<ScanResult> {
+  const MAX_POINTS = 100;
+  const CELL = 0.05;
+  let step = CELL;
+  const spanX = Math.abs(bounds.east - bounds.west);
+  const spanY = Math.abs(bounds.north - bounds.south);
+  while ((spanX / step + 1) * (spanY / step + 1) > MAX_POINTS) step *= 2;
+
+  const lats: number[] = [];
+  const lons: number[] = [];
+  for (let y = bounds.south; y <= bounds.north && lats.length < MAX_POINTS; y += step) {
+    for (let x = bounds.west; x <= bounds.east && lats.length < MAX_POINTS; x += step) {
+      lats.push(y);
+      lons.push(x);
+    }
+  }
+  if (lats.length === 0) return { cells: [], limited: false, source: 'glofas' };
+
+  const end = new Date();
+  end.setDate(end.getDate() - 2);
+  const start = new Date(end);
+  start.setFullYear(start.getFullYear() - 1);
+  const url =
+    `https://flood-api.open-meteo.com/v1/flood?latitude=${lats.map((v) => v.toFixed(4)).join(',')}` +
+    `&longitude=${lons.map((v) => v.toFixed(4)).join(',')}&daily=river_discharge` +
+    `&start_date=${start.toISOString().slice(0, 10)}&end_date=${end.toISOString().slice(0, 10)}`;
+
+  const raw = await getJson<unknown>(url, signal);
+  const list = (Array.isArray(raw) ? raw : [raw]) as {
+    latitude: number;
+    longitude: number;
+    daily?: { river_discharge: (number | null)[] };
+  }[];
+  // Several sampled points snap to the same model cell; keep the strongest.
+  const byCell = new Map<string, Candidate>();
+  for (const e of list) {
+    const v = (e.daily?.river_discharge ?? []).filter((x): x is number => x !== null);
+    if (v.length === 0) continue;
+    const meanCms = v.reduce((a, b) => a + b, 0) / v.length;
+    if (!Number.isFinite(meanCms) || meanCms <= 0) continue;
+    const key = `${e.latitude.toFixed(3)},${e.longitude.toFixed(3)}`;
+    const prev = byCell.get(key);
+    if (!prev || meanCms > prev.meanCms) {
+      byCell.set(key, { lat: e.latitude, lon: e.longitude, meanCms, source: 'glofas' });
+    }
+  }
+  return {
+    cells: [...byCell.values()].sort((a, b) => b.meanCms - a.meanCms),
+    limited: step > CELL,
+    source: 'glofas',
+  };
+}
+
 export function fetchNepalProjects(signal?: AbortSignal) {
   if (projectCache) return projectCache;
   projectCache = (async () => {

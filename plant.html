@@ -1,0 +1,1380 @@
+<html class="fluid top-full menuh-top js no-touch csstransforms3d csstransitions content-transitions animations">
+<head>
+	<title>Royalty Management System</title>
+	<!-- Meta -->
+	<meta charset="UTF-8">
+	
+	<meta name="description" content="Royalty Management System">
+	<meta name="author" content="Department of Electricity Development">
+		
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0, minimum-scale=1.0, maximum-scale=1.0">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black">
+	<meta http-equiv="X-UA-Compatible" content="IE=9; IE=8; IE=7; IE=EDGE">
+    	
+	<link href="https://fonts.googleapis.com/css?family=Roboto:100,100i,300,300i,400,400i,500,500i,700,700i,900,900i" rel="stylesheet">
+    	<link href="https://fonts.googleapis.com/css?family=Roboto+Slab:100,300,400,700" rel="stylesheet">
+	
+	<link rel="stylesheet" type="text/css" href="/css/app/color-variable.css">
+    
+    	<link rel="stylesheet" type="text/css" href="/css/nd/pages/module.admin.page.index.min.css">
+   
+    	<link rel="stylesheet" type="text/css" href="/css/app/new-style.css?version=1.0.1">
+
+	<script type="text/javascript" src="/js/nd/components/library/jquery/jquery.min.js"></script>
+    	<script type="text/javascript" src="/js/nd/components/library/jquery/jquery-migrate.min.js"></script>
+    	<script type="text/javascript" src="/js/nd/components/plugins/less-js/less.min.js"></script>
+    	<script type="text/javascript" src="/js/nd/components/library/jquery-ui/js/jquery-ui.min.js"></script>
+    	<script type="text/javascript" src="/js/nd/components/plugins/jquery-ui-touch-punch/jquery.ui.touch-punch.min.js"></script>
+  
+	
+    <style type="text/css">
+         .tabli{width:100% !important;}
+        .tabspan{margin-left: 45px;margin-top: 5px;font-weight: 400;font-size: 14px;display: inline-block !important;}
+        .widget-head, .widget.widget-tabs{background: transparent !important;}
+        .widget.widget-tabs>.widget-head ul li.active{background: unset;}
+        .widget.widget-tabs>.widget-head ul li.active a, .widget.widget-tabs>.widget-head ul li.active a i:before{color: var(--color-primary);}
+        .widget.widget-tabs-vertical .widget-head ul li{border-bottom: none;font-family: 'Roboto Slab',sans-serif;height: auto; min-height: 35px;word-break: break-word;}
+        .setting-tab-ul{margin-right: 15px !important; border-radius: 5px; background: #fff; box-shadow: 0 2px 13px 0 rgba(0, 0, 0, 0.2);padding: 8px 10px;}
+        .widget.widget-tabs>.widget-head ul li a, .widget.widget-tabs>.widget-head ul li.active a,.widget.widget-tabs-double > .widget-head ul li, .widget.widget-tabs-double > .widget-head ul li.active{height: auto;}
+
+	    .top-alert-message {font-size: 12px; text-align: center; padding: 9px 15px; position: fixed; z-index: 10000; cursor: pointer; background: var(--third-color); color: var(--fourth-color); width:100%; border-radius: 1px;}
+        .top-alert-message .link{font-weight: bold; color: var(--fourth-color); text-decoration: underline;}
+        .top-alert-message .close-link{position: fixed; right: 10px; top: 8px; color: var(--fourth-color);}
+		html.sidebar-full #menu { width: 175px; }
+		html.sidebar-full.sidebar-collapsible #menu .slim-scroll>ul>li ul li a, html.sidebar-full.sidebar-collapsible #menu>ul>li ul li a{ font-size: 11px;}
+		.customBlockRightLink{	text-align: right;margin-top: 10px;}
+        .tootltiptitle{color:#000;border-bottom: 1px solid var(--color-border);padding: 10px 12px;font-weight:600;}
+        .tootltipcontent{font-size:11px;line-height: 19px;font-weight:normal;padding:10px 12px;}
+        .tooltiptable tr > td{line-height: 6px !important;}
+        .modal-backdrop{background: whitesmoke !important;}
+        .page-title{position: relative; z-index: 1;}
+        /* custime top menu & side bar */ 
+                .navbar.main.top-most-menu{ background-color: #d1d1d1 !important; border-bottom-color: #bbbbbb !important;}
+                .navbar.main.top-most-menu .topnav>li{border-right-color: #bbbbbb !important;}
+                html.top-full.no-touch .navbar.main.top-most-menu .topnav>li:hover:not(.active)>a{background-color: #bbbbbb !important;}
+                html.top-full.no-touch .navbar.main.top-most-menu .topnav>li:hover:not(.active)>a.glyphicons i:before{color: #34547f;}
+                .navbar.main.top-most-menu .goog-te-gadget-simple{background-color: inherit !important;}
+                .navbar.main.top-most-menu .text-primary, .top-most-menu .glyphicon-primary i:before{color: #34547f !important;}
+                .navbar.main.top-most-menu .topnav>li.mega-menu .mega-sub{background-color: #bbbbbb !important;}
+                .navbar.main.top-most-menu .topnav>li.mega-menu .mega-sub h4{color: #34547f !important;}
+                .navbar.main.top-most-menu .topnav>li.mega-menu .mega-sub-inner ul li a{color: #777 !important;}
+                html.sidebar-full #menu.right-most-sidebar {background-color: #d1d1d1 !important;}
+                html.sidebar-full #menu.right-most-sidebar .slim-scroll>ul>li, html.sidebar-full #menu>ul>li{border-bottom: 1px solid #bbbbbb !important;}
+                html.sidebar.sidebar-full body .menu-right #menu.right-most-sidebar .slim-scroll>ul, html.sidebar.sidebar-full body .menu-right #menu>ul{border-top-color: #bbbbbb !important; border-left-color: #bbbbbb !important; }
+                html.sidebar-full.no-touch #menu.right-most-sidebar .slim-scroll>ul li:hover:not(.active)>a, html.sidebar-full.no-touch #menu>ul li:hover:not(.active)>a{background-color: #bbbbbb !important;}
+                html.sidebar-full.no-touch #menu.right-most-sidebar .slim-scroll>ul li:hover:not(.active)>a.glyphicons i:before, html.sidebar-full.no-touch #menu>ul li:hover:not(.active)>a.glyphicons i:before{color: #34547f !important;}
+                .navbar .btn-navbar, #menu.right-most-sidebar .btn-navbar{background-color: inherit !important; border-bottom-color: #bbbbbb !important; border-top-color: #bbbbbb !important; }
+                #menu.right-most-sidebar .appbrand{border-bottom-color: #bbbbbb !important;}
+                #menu.right-most-sidebar .appbrand .text-primary{color: #34547f !important;}
+                html.sidebar-full.sidebar-collapsible #menu.right-most-sidebar .slim-scroll>ul>li ul li, html.sidebar-full.sidebar-collapsible #menu.right-most-sidebar>ul>li ul li{border-bottom: 1px solid #bbbbbb !important;}
+                /* **** */  
+                /* dashboard menu icone */
+                .menu-block .glyphicons{padding: 0 10px;}
+                .menu-block .menu-item{display: inline-block; border: 1px solid #efefef; float: left;}
+                .menu-item > .cus-tooltip-cont > .tooltip > .tooltip-inner{text-align: center !important;}
+                i.cus-icon:before{font-size: 14px; position: relative !important; color: #9d9d9d; vertical-align: middle;}
+                .modal .modal-header{padding: 15px 10px;}
+                .modal-dialog{left:0 !important;}
+                .modal-open{overflow:auto;}
+                .modal {background:none !important;}
+                @media print {
+                    @page {
+                        margin: 0;  /* this affects the margin in the printer settings */
+                    }
+                }
+                .picto-brdcmb:before{left: 1px;top: 11px;position: absolute;font-size: 17px;}
+                .picto-addon:before{position: absolute;left: 0;font-size: 30px;color: var(--fourth-color);}
+                .block-msg {letter-spacing: 1px;}
+                .block-msg a {color: white !important;text-decoration: underline;}
+                .field-validation-error{ background-color:Red; color:White;display:inline-block;}
+        </style>
+    
+<style type="text/css">
+    .select2-container{padding:2px !important;background:var(--fourth-color);border-color:none !important;border: 1px solid #ededed; margin: 0px 0px 5px 0px;}
+    .select2-container .select2-choice{background:none !important;height: auto;line-height:27px;}
+    .select2-container.select2-drop-above .select2-choice{border:none;}
+    .select2-container-active .select2-choice, .select2-container-active .select2-choices{box-shadow:none;}
+    .select2-drop-mask {z-index: 999990;} .select2-drop {z-index: 999992;} .select2-search {z-index: 999994;}
+</style>
+<style type="text/css">
+    .s_alert, .s_inform { margin-left: 10px; color:var(--color-danger);}
+    .block-student {color: #000 !important;}
+    .s_alert + div.tooltip > .tooltip-inner, .s_inform + div.tooltip > .tooltip-inner {
+        text-align: left;
+    }
+    .s_inform+ div.tooltip td{padding: 0px 3px !important; border: 0 !important; line-height: 20px;}
+    .pc_alert,.absent_alert{position: absolute;top: -7px;font-size: 8px;}
+    .student-name-head .pc_alert{top:-5px;left:15px;}
+    .student-name-head .absent_alert{top: -5px; left:24px !important;}
+    .token-input-dropdown{max-height: 200px;overflow: auto !important;}
+</style>
+<style id="holderjs-style" type="text/css">
+    .holderjs-fluid {font-size:16px;font-weight:bold;text-align:center;font-family:sans-serif;margin:0}
+    .holderjs-fluid {font-size:16px;font-weight:bold;text-align:center;font-family:sans-serif;margin:0}
+</style>
+    <style type="text/css">
+        .blinking{ animation:blinkingText 2.0s infinite;}
+       @keyframes blinkingText{ 0%{     color: #fff;    }49%{    color: #fff; }60%{    color: transparent; }99%{    color:transparent;  }100%{   color: #fff;    }}    
+    </style>
+ 
+</head>
+ 
+<body class="  pace-done" style="">
+    
+    <div class="pace pace-inactive">
+        <div class="pace-progress" data-progress-text="100%" data-progress="99" style="transform: translate3d(100%, 0px, 0px);">
+            <div class="pace-progress-inner"></div>
+        </div>
+        <div class="pace-activity"></div>
+    </div>
+
+<!-- add spinner element -->
+    <style type="text/css">
+    .spinner-block{z-index: 99999!important;position: fixed;margin: auto;width: 100%;height: 100%;background: rgba(97,97,97,0.5);top: 0px;} 
+    .spinner {margin: auto;width: 40px;height: 40px;position: relative;text-align: center;top:45%;-webkit-animation: sk-rotate 2.0s infinite linear;animation: sk-rotate 2.0s infinite linear;}
+    .dot1, .dot2 {width: 60%;height: 60%;display: inline-block;position: absolute;top: 0;background-color: #fff;border-radius: 100%;-webkit-animation: sk-bounce 2.0s infinite ease-in-out;animation: sk-bounce 2.0s infinite ease-in-out;}
+    .dot2 {top: auto;bottom: 0;-webkit-animation-delay: -1.0s;animation-delay: -1.0s;}
+
+    @-webkit-keyframes sk-rotate { 100% { -webkit-transform: rotate(360deg) }}
+    @keyframes sk-rotate { 100% { transform: rotate(360deg); -webkit-transform: rotate(360deg) }}
+    @-webkit-keyframes sk-bounce {0%, 100% { -webkit-transform: scale(0.0) } 50% { -webkit-transform: scale(1.0) }}
+    @keyframes sk-bounce {0%, 100% { transform: scale(0.0);-webkit-transform: scale(0.0);} 50% { transform: scale(1.0);-webkit-transform: scale(1.0);}}   
+</style>
+<!-- spinner block html-->
+<div class="spinner-block hidden" style="">
+    <div class="spinner">
+      <div class="dot1"></div>
+      <div class="dot2"></div>
+    </div>
+</div> 
+<!-- spinner block html-->    <!-- add spinner element -->
+
+    <!-- Main Container Fluid -->
+	<div class="">
+		
+		<!-- Sidebar menu & content wrapper -->
+		<div id="wrapper">
+			<!-- Content -->
+			<div id="content" style="min-height: 815px;">
+			
+				<link rel="stylesheet" type="text/css" href="/css/app/top-menu.css">
+                
+                <style type="text/css">
+    .goog-te-gadget-simple{ border : 0px !important;}
+    .goog-te-gadget-simple .goog-te-menu-value{color:#7e8c9a !important;font-weight: 600;}
+    .parentMenuLabel{ font-size:16px !important; font-weight: 700 !important ;  }
+    .cusMenuLabel{ font-size:14px !important ; font-weight: 700 !important ; padding: 15px 0 0 0 !important;  }
+    .cusChildMenuBlock{ padding-left: 5px; margin-top: -10px; }
+    .cusChildMenuBlock li { line-height:20px !important ; }
+    .cusChildMenuBlock a { font-size: 12px !important; }
+    .customSimpleSubMenuLink{ padding-top: 3px ; padding-bottom: 3px; }
+    .customSimpleSubMenuLink a,.traLanguage a{  font-size: 12px !important; }
+    .btn-secondary {background: #DBDBDB none repeat scroll 0% 0%; border-color: #DBDBDB; color: #393939;}
+    .btn-secondary:hover {background: #E5412D none repeat scroll 0% 0%; border-color: #E5412D; color: #fff;}
+    .btn-secondary i:hover{color: #fff; }
+    .tmp-filter-bar{background-color: #fff !important; border-color: #fff !important; margin-bottom: 0 !important;}
+    #content .tmp-heading-buttons{margin-top: 0 !important;}
+    .dd-1 .tooltip-inner{width: 100px !important;}
+    .top-setting .dd-1 a.lightbulb i {display:none !important;}
+    @media(max-width:992px){
+        .top-setting .dd-1 a.sm-hide span { display:none;}
+        .sm-hide i{mardgin-right: 0px !important;}
+    }
+    @media(max-width:767px){
+        html.top-full .navbar.main {height: auto;}
+        .menu-btn{display: inline-block !important; width: 50px !important; border: none !important;}
+        .xs-logo-block{display: inline-block !important;}
+        .sm-hide i{margin-right: 0px !important;}
+        .top-setting .dd-1 a.glyphicons i { margin-right: 0 !important; }
+        .top-setting .dd-1 a.sm-hide span { display:none;}
+        .top-setting .xs-show { display:inline-block !important;}
+    }
+    .traLanguage a .check-icon span, .academic-session-block a .check-icon span{display:none;}
+    /*.traLanguage a:hover .check-icon span{color:#000 !important;} */
+    .traLanguage a:hover .check-icon span,.traLanguage a.active .check-icon span, .academic-session-block a:hover .check-icon span,.academic-session-block a.active .check-icon span{display:block;}
+    .traLanguage a .check-icon, .academic-session-block a .check-icon{display:inline-block;width:15px;}
+    .clear-logo{width: auto !important;  height: 35px}
+    .top-menu-logo{width:65px;}
+    .picto-top:before {
+        position: absolute;
+        left: 0;
+        font-size: 18px;
+        top: 15px;
+        color: #e5412d;
+    }
+    #HW_badge_cont{width: auto !important;}
+    .active-acds{background: #F1F6FA !important;}
+</style>
+
+<div class="navbar main hidden-print">
+    <!-- // Menu Toggle Button END -->
+
+    <!-- Full Top Style -->
+    <ul class="topnav pull-left topnav-right-container">
+        <li class="xs-show">
+            <a href="/Core/Home" class="glyphicons">
+                <img src="/content/images/logo.png" class="top-menu-logo" alt="Logo">            </a>
+        </li>
+        <li class="hidden-xs">
+            <a href="/Core/Home" class="text-primary menu-inst-title"> Royalty Management System </a>
+        </li>
+        
+        
+
+        <li class="dropdown dd-2">
+            <a href="/Core/Home/CompanyIndex/0" class=""><i></i> Promoters</a>
+        </li>
+
+        <li class="dropdown dd-3">
+            <a href="/Core/Home/PlantIndex/0" class=""><i></i> Plants</a>
+        </li>
+
+        <li class="dropdown dd-4">
+            <a href="/Core/Home/RoyaltyReceivedDetailIndex/18" class=""><i></i> Royalty</a>
+        </li>
+
+        <li class="dropdown dd-5">
+            <a href="/Core/Home/EnergyDetailIndex?FiscalId=18" class=""><i></i> Energy</a>
+        </li>
+
+        
+         <li class="dropdown dd-5">
+            <a href="/Core/Home/Notices" class=""><i></i> Notices</a>
+        </li>
+
+         <li class="dropdown dd-5">
+            <a href="/Core/Home/Downloads" class=""><i></i> Downloads</a>
+        </li>
+
+        <li class="dropdown dd-6">
+            <a href="javascript:void(0);" data-toggle="dropdown">
+                <i class="margin-right-none"></i> Reports <span class="badge fix badge-primary"></span>
+            </a>
+            <ul class="dropdown-menu" >
+              
+            <li class="customSimpleSubMenuLink">
+                <a class="btn-xs" href="/Core/Report/PlantDistrict">List of Plants</a>
+            </li>
+          
+            <li class="customSimpleSubMenuLink">
+                <a class="btn-xs" href="/Core/Report/RoyaltyDetail">Royalty Detail of a Plant</a>
+            </li> 
+           <li class="customSimpleSubMenuLink">
+                <a class="btn-xs" href="/Core/Report/RoyaltySummary">Royalty Summary Sheet</a>
+            </li>
+             
+           <li class="customSimpleSubMenuLink">
+                <a class="btn-xs" href="/Core/Report/RoyaltySummaryExt">Royalty Summary - Extended Sheet</a>
+            </li>
+            <li class="customSimpleSubMenuLink">
+                <a class="btn-xs" href="/Core/Report/BalanceSheet">Balance Sheet of a Company</a>
+           </li>
+           
+           <li class="customSimpleSubMenuLink">
+                <a class="btn-xs" href="/Core/Report/RoyaltyReceivedList">Royalty Received Summary/Detail</a>
+           </li>
+
+
+            
+            <li class="divider"></li>
+            <li class="customSimpleSubMenuLink">
+                <a class="btn-xs" href="/Core/Report/RoyaltyDistributionSheet">Royalty Distribution Sheet</a>
+            </li>
+               
+            </ul>
+        </li>
+
+       
+             
+    </ul>
+
+    <ul class="topnav pull-right top-setting" style="">
+                
+                
+           
+                      <li class="dd-1 xs-show">
+                    <a href="/Core/Account/LogOn" class="glyphicons user single-icon"> &nbsp;&nbsp; Log In <i class="margin-right-none"></i> </a>
+                </li>
+
+                   
+                
+    
+    </ul>
+    <div class="clearfix"></div>
+</div>
+
+<script type="text/javascript" src="/js/app/topMenu.js?v=1.2"></script>
+                                                
+        
+
+
+
+
+
+           
+
+           
+<div class="top-header-block">
+    <div class="col-md-12 hidden-print breadcrumb-block">
+        <ul class="breadcrumb">
+            <li><a href="/Core/Home" class="glyphicons home"><i></i>Home</a></li><li
+                class="divider"><i class="fa fa-chevron-right"></i></li>
+            <li><a href="javascript:void(0);" class="glyphicons nameplate_alt"><i></i>Plants</a></li><li
+                class="divider"><i class="fa fa-chevron-right"></i></li>
+            
+        </ul>
+        <div class="clearfix">
+        </div>
+    </div>
+    <div class="sub-top-menu-block page-title">
+        <div class="hidden-print " style="display: inline-block;">
+            <div class="heading-buttons tmp-heading-buttons">
+                <h3>List of Hydro-power Plants</h3>
+            <div class="clearfix">
+            </div>
+            </div>
+        <div class="separator bottom">
+        </div>
+        </div>
+        
+        <div class="hidden-print pull-right" style="padding-right:15px;display: inline-block;">
+                </div>   
+        
+    </div>
+
+</div>
+<div class="innerLR">
+
+        <section class="panel panel-default">
+                <div class="panel-body">    
+    
+        <div class="row">
+            <div class="col-sm-6">
+                        <ul class="pagination" style="margin:0px 0px 10px 0px">
+        <li class="active"><a href="/Core/Home/PlantIndex?page=1&amp;pageSize=25">1</a>      
+        </li> 
+        <li class=""><a href="/Core/Home/PlantIndex?page=2&amp;pageSize=25">2</a>      
+        </li> 
+        <li class=""><a href="/Core/Home/PlantIndex?page=3&amp;pageSize=25">3</a>      
+        </li> 
+        <li class=""><a href="/Core/Home/PlantIndex?page=4&amp;pageSize=25">4</a>      
+        </li> 
+        <li class=""><a href="/Core/Home/PlantIndex?page=5&amp;pageSize=25">5</a>      
+        </li> 
+        <li class=""><a href="/Core/Home/PlantIndex?page=6&amp;pageSize=25">6</a>      
+        </li> 
+        <li class=""><a href="/Core/Home/PlantIndex?page=7&amp;pageSize=25">7</a>      
+        </li> 
+        <li class=""><a href="/Core/Home/PlantIndex?page=8&amp;pageSize=25">8</a>      
+        </li> 
+    </ul>
+
+                Showing <select id="pageSize" name="pageSize">
+                    <option selected value="25">25</option>
+                    <option false value="50">50</option>
+                    <option  value="75">75</option>
+                    <option  value="100">100</option>
+                </select>
+                Entries
+            </div>
+            <div class="col-sm-6">
+                <form class="form-horizontal" action="/Core/Home/PlantIndex" method="get">
+                <div class="form-group">
+                    <label class="control-label col-sm-2">
+                        Search</label>
+                    <div class="col-sm-6">
+                        <input id="search" name="search" type="text" class="form-control" placeholder="Search By License No,Plant Name or Promoter Name" value="" /></div>
+                    <input type="submit" class="btn btn-info" value="Search" /></div>
+             
+                </form>
+            </div>
+        </div>
+      <table class="table table-striped table-bordered table-condensed datatable">
+        <thead>
+            <tr style="background-color:khaki">
+                <th>S.N</th>             
+<th>License No.</th>
+                <th>Name</th>               
+                <th>Address</th>
+                <th>River</th>
+                <th align="center">Capacity (KW)</th>
+                <th>Issue Date</th>
+                <th>COD </th>
+                <th>Validity</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+           
+                <tr>
+                    <td>1</td>
+               <td>6</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/1">Chilime Plant </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/1"> Chilime Hydropower Company Ltd. </a></label> </td>
+                    
+                    <td> <small>  Shyafrubesi  <br /> Province 1</small> </td>                    
+                    <td>Chilime</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  22100 </span> </td>
+                    <td>2054/04/26</td>
+                    <td>2060/05/07<br />&nbsp;
+                    <span class="label label-info">  22 years, 12 months, 12 days</span>
+                    </td>
+                    <td>2104/11/30</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>2</td>
+               <td>23</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/37">Mai Khola Small HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/3"> Himal Dolkha Hydropower Company Limited </a></label> </td>
+                    
+                    <td> <small>   Ilam <br /> Province 1</small> </td>                    
+                    <td>Mai Khola</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  4500 </span> </td>
+                    <td>2064/08/20</td>
+                    <td>2067/11/01<br />&nbsp;
+                    <span class="label label-info">  15 years, 6 months, 1 days</span>
+                    </td>
+                    <td>2099/08/19</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>3</td>
+               <td>101</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/84">Mai Sana Cascade HPP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/3"> Himal Dolkha Hydropower Company Limited </a></label> </td>
+                    
+                    <td> <small> Chisapani, Ilam   <br /> Province 1</small> </td>                    
+                    <td>Mai Khola</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  8000 </span> </td>
+                    <td>2070/04/15</td>
+                    <td>2074/12/26<br />&nbsp;
+                    <span class="label label-info">  8 years, 4 months, 3 days</span>
+                    </td>
+                    <td>2105/04/14</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>4</td>
+               <td>277</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/123">Kabeli B-1 Cascade </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/5"> Arun Valley HP Dev.  Ltd </a></label> </td>
+                    
+                    <td> <small>   Panchthar <br /> Province 1</small> </td>                    
+                    <td></td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  9940 </span> </td>
+                    <td>2076/07/26</td>
+                    <td>2078/12/12<br />&nbsp;
+                    <span class="label label-info">  4 years, 5 months, 14 days</span>
+                    </td>
+                    <td>2112/07/25</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>5</td>
+               <td>9</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/5">Piluwa Khola HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/5"> Arun Valley HP Dev.  Ltd </a></label> </td>
+                    
+                    <td> <small>   Sankhuwasabha <br /> Province 1</small> </td>                    
+                    <td>Piluwa khola</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  3200 </span> </td>
+                    <td>2060/06/01</td>
+                    <td>2060/06/01<br />&nbsp;
+                    <span class="label label-info">  22 years, 11 months, 6 days</span>
+                    </td>
+                    <td>2091/09/03</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>6</td>
+               <td>22</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/6">Ridi Khola HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/6"> Ridi Hydro Power Development Company Limited </a></label> </td>
+                    
+                    <td> <small>   Palpa <br /> Lumbini</small> </td>                    
+                    <td>Ridi</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  2400 </span> </td>
+                    <td>2064/02/17</td>
+                    <td>2066/07/10<br />&nbsp;
+                    <span class="label label-info">  16 years, 10 months, 15 days</span>
+                    </td>
+                    <td>2099/02/16</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>7</td>
+               <td>2_gtd</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/8">Aandikhola HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/9"> Butwal Power Company </a></label> </td>
+                    
+                    <td> <small> Aandhikhola, Syangja   <br /> Province 1</small> </td>                    
+                    <td>Andhi Khola</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  9400 </span> </td>
+                    <td>2045/02/14</td>
+                    <td>2048/02/18<br />&nbsp;
+                    <span class="label label-info">  35 years, 2 months, 11 days</span>
+                    </td>
+                    <td>2075/02/13</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>8</td>
+               <td>3_gtd</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/33">Jhimruk </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/9"> Butwal Power Company </a></label> </td>
+                    
+                    <td> <small>  Darimchaur Pyuthan <br /> Lumbini</small> </td>                    
+                    <td>Jhimruk Khola</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  12000 </span> </td>
+                    <td>2052/01/25</td>
+                    <td>2051/05/01<br />&nbsp;
+                    <span class="label label-info">  31 years, 12 months, 5 days</span>
+                    </td>
+                    <td>2101/12/30</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>9</td>
+               <td>5</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/7">Upper Bhotekoshi </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/10"> Bhotekoshi Power Company Pvt. Ltd </a></label> </td>
+                    
+                    <td> <small> Sindhupalchowk  Sindhupalchok <br /> Bagmati</small> </td>                    
+                    <td>Bhote Koshi</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  45000 </span> </td>
+                    <td>2050/02/05</td>
+                    <td>2057/10/11<br />&nbsp;
+                    <span class="label label-info">  25 years, 7 months, 12 days</span>
+                    </td>
+                    <td>2098/12/15</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>10</td>
+               <td>7</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/10">Indrawati 3 </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/11"> National Hydropower Company Limited </a></label> </td>
+                    
+                    <td> <small> Sindhupalchok  Sindhupalchok <br /> Province 1</small> </td>                    
+                    <td>Indrawati Khola</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  7500 </span> </td>
+                    <td>2054/11/14</td>
+                    <td>2059/06/21<br />&nbsp;
+                    <span class="label label-info">  23 years, 10 months, 5 days</span>
+                    </td>
+                    <td>2094/06/21</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>11</td>
+               <td>89</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/66">Daram Khola-A </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/12"> Sayapatri Hydropower Pvt. Ltd. </a></label> </td>
+                    
+                    <td> <small> Baglung   <br /> Province 1</small> </td>                    
+                    <td>Daram</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  2500 </span> </td>
+                    <td>2070/02/02</td>
+                    <td>2073/03/12<br />&nbsp;
+                    <span class="label label-info">  10 years, 2 months, 14 days</span>
+                    </td>
+                    <td>2105/02/01</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>12</td>
+               <td>12</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/13">Sunkoshi Small HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/14"> Sanima Hydropower Company Limited </a></label> </td>
+                    
+                    <td> <small> Sindhupalchok 3137 Laguna Street  <br /> Province 1</small> </td>                    
+                    <td>Sun Koshi</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  2600 </span> </td>
+                    <td>2059/06/22</td>
+                    <td>2061/12/11<br />&nbsp;
+                    <span class="label label-info">  21 years, 5 months, 12 days</span>
+                    </td>
+                    <td>2094/03/31</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>13</td>
+               <td>16</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/14">Khudi HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/15"> Khudi Hydro Power Company LTD </a></label> </td>
+                    
+                    <td> <small>  Ghanpokhara, Khudi, Simpani   <br /> Province 1</small> </td>                    
+                    <td>Khudi</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  4000 </span> </td>
+                    <td>2061/11/13</td>
+                    <td>2063/09/15<br />&nbsp;
+                    <span class="label label-info">  19 years, 8 months, 18 days</span>
+                    </td>
+                    <td>2096/11/12</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>14</td>
+               <td>19</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/16">Thoppal Khola HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/17"> Thoppal Khola Hydropower Co. Pvt. Ltd. </a></label> </td>
+                    
+                    <td> <small>  3137 Laguna Street  <br /> Province 1</small> </td>                    
+                    <td>Thoppal</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  1650 </span> </td>
+                    <td>2063/03/25</td>
+                    <td>2064/07/13<br />&nbsp;
+                    <span class="label label-info">  18 years, 10 months, 18 days</span>
+                    </td>
+                    <td>2098/03/24</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>15</td>
+               <td>2</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/17">Ilam Puwa Khola HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/18"> Nepal Electricity Authority </a></label> </td>
+                    
+                    <td> <small> Ilam 3137 Laguna Street  <br /> Province 1</small> </td>                    
+                    <td>Puwa</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  6200 </span> </td>
+                    <td>2052/05/27</td>
+                    <td>2056/12/22<br />&nbsp;
+                    <span class="label label-info">  26 years, 4 months, 8 days</span>
+                    </td>
+                    <td>2101/11/30</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>16</td>
+               <td>3</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/18">Modi  HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/18"> Nepal Electricity Authority </a></label> </td>
+                    
+                    <td> <small> Parbat  Parbat <br /> Province 1</small> </td>                    
+                    <td>Modi Khola</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  14800 </span> </td>
+                    <td>2052/10/24</td>
+                    <td>2057/08/24<br />&nbsp;
+                    <span class="label label-info">  25 years, 8 months, 3 days</span>
+                    </td>
+                    <td>2101/11/30</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>17</td>
+               <td>4</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/19">Kaligandaki &#39;A&#39; HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/18"> Nepal Electricity Authority </a></label> </td>
+                    
+                    <td> <small> Syangja   <br /> Province 1</small> </td>                    
+                    <td>Kali Gandaki</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  144000 </span> </td>
+                    <td>2053/07/21</td>
+                    <td>2059/04/31<br />&nbsp;
+                    <span class="label label-info">  23 years, 12 months, 4 days</span>
+                    </td>
+                    <td>2101/11/30</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>18</td>
+               <td>8</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/20">Middle Marsyangdi HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/18"> Nepal Electricity Authority </a></label> </td>
+                    
+                    <td> <small> Lamjung  Lamjung <br /> Province 1</small> </td>                    
+                    <td>Marsyangdi</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  70200 </span> </td>
+                    <td>2057/03/12</td>
+                    <td>2065/10/01<br />&nbsp;
+                    <span class="label label-info">  17 years, 7 months, 2 days</span>
+                    </td>
+                    <td>2106/01/31</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>19</td>
+               <td>1_gtd</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/21">Tatopani HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/18"> Nepal Electricity Authority </a></label> </td>
+                    
+                    <td> <small> Myagdi  Myagdi <br /> Province 1</small> </td>                    
+                    <td>Tatopani</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  2000 </span> </td>
+                    <td>2051/12/06</td>
+                    <td>2051/12/30<br />&nbsp;
+                    <span class="label label-info">  31 years, 4 months, 1 days</span>
+                    </td>
+                    <td>2101/11/30</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>20</td>
+               <td>1_gtd</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/22">Marsyangdi HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/18"> Nepal Electricity Authority </a></label> </td>
+                    
+                    <td> <small> Tanahu   <br /> Province 1</small> </td>                    
+                    <td>Marsyangdi</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  69000 </span> </td>
+                    <td>2041/12/07</td>
+                    <td>2046/06/15<br />&nbsp;
+                    <span class="label label-info">  36 years, 10 months, 11 days</span>
+                    </td>
+                    <td>2071/12/06</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>21</td>
+               <td>1_gtd</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/23">Panauti HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/18"> Nepal Electricity Authority </a></label> </td>
+                    
+                    <td> <small> Kavreplanchok  Kavrepalanchok <br /> Province 1</small> </td>                    
+                    <td>Roshi</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  2400 </span> </td>
+                    <td>2018/12/07</td>
+                    <td>2023/12/07<br />&nbsp;
+                    <span class="label label-info">  59 years, 5 months, 8 days</span>
+                    </td>
+                    <td>2048/12/07</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>22</td>
+               <td>1_gtd</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/24">Trisuli  HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/18"> Nepal Electricity Authority </a></label> </td>
+                    
+                    <td> <small> Nuwakot  Nuwakot <br /> Province 1</small> </td>                    
+                    <td>Trishuli</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  24000 </span> </td>
+                    <td>2018/12/07</td>
+                    <td>2023/12/07<br />&nbsp;
+                    <span class="label label-info">  59 years, 5 months, 8 days</span>
+                    </td>
+                    <td>2048/12/07</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>23</td>
+               <td>1_gtd</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/25">Gandak  HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/18"> Nepal Electricity Authority </a></label> </td>
+                    
+                    <td> <small> Nawalparasi  Nawalparasi <br /> Province 1</small> </td>                    
+                    <td>Narayani</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  15000 </span> </td>
+                    <td>2034/12/07</td>
+                    <td>2038/12/07<br />&nbsp;
+                    <span class="label label-info">  44 years, 5 months, 8 days</span>
+                    </td>
+                    <td>2064/12/07</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>24</td>
+               <td>1_gtd</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/26">Sunkoshi  HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/18"> Nepal Electricity Authority </a></label> </td>
+                    
+                    <td> <small> Sindhupalchok  Sindhupalchok <br /> Bagmati</small> </td>                    
+                    <td></td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  10050 </span> </td>
+                    <td>2024/12/07</td>
+                    <td>2028/12/07<br />&nbsp;
+                    <span class="label label-info">  54 years, 5 months, 8 days</span>
+                    </td>
+                    <td>2054/12/07</td>
+                    <td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>25</td>
+               <td>1_gtd</td>
+                    <td>
+                    <a href="/Core/Home/PlantCreate/27">Kulekhani-I  HP </a>
+                    <br /> &nbsp;<label class="label label-info"> <a href="/Core/Home/CompanyCreate/18"> Nepal Electricity Authority </a></label> </td>
+                    
+                    <td> <small> Makwanpur  Makawanpur <br /> Province 1</small> </td>                    
+                    <td>Kulekhani</td>
+                    <td align="center"> &nbsp; <span class="label label-warning">  60000 </span> </td>
+                    <td>2035/12/07</td>
+                    <td>2039/12/07<br />&nbsp;
+                    <span class="label label-info">  43 years, 5 months, 9 days</span>
+                    </td>
+                    <td>2065/12/07</td>
+                    <td>
+                    </td>
+                </tr>
+        </tbody>
+    </table>
+</div> 
+</div> 
+
+<script type="text/javascript">
+    $('#pageSize').bind('change', function () {
+        document.location = '/Core/Home/PlantIndex?pageSize=' + $(this).val();
+        
+    });
+</script>                                                      
+           </div>   
+    </div>
+        
+        </div>
+
+<div id="footer" class="hidden-print padding-none">
+    <div class="copy">
+                    <div class="footer-line"><hr class="separator" style="border-top-color: #4B4B4B;"></div>
+            <div class="copyright-text">
+                <span>We're</span> 
+                <img src="/content/images/powered-copy.png" id="avatar2" class="power-by-img" alt="">          
+                      <span style="padding-right:5px">by</span>
+                
+            </div>
+            <div class="footer-line"><hr class="separator" style="border-top-color: #4B4B4B;"></div>
+            <div class="clearfix"></div>
+            </div>
+</div>
+
+<!-- // Main Container Fluid END -->
+
+<!-- Add General Search Option -->
+<style type="text/css">
+    #general_search_modal .modal-dialog {width: calc(100% - 20px); margin-left: 20px;  min-height: 100vh; padding: 0; 
+        border: 0; opacity: 0.7; filter: alpha(opacity=70); /* For IE8 and earlier */}
+    #general_search_modal .modal-dialog .modal-content{border: 0; min-height: 100vh; box-shadow: none;}
+    
+   .searchModalBody{padding:25px 30px !important;}
+   .generalSearchTextVal{height: 50px; border-top: 0; border-right:0; border-left:0; padding-left: 0 !important; font-size:16px !important;}
+   @media screen and (max-width:767px) {
+       #general_search_modal .modal-dialog{opacity: 0.99;width: 100%; margin-left: 0px;}
+       .searchModalBody{padding:25px 20px !important;}
+   }    
+   @media screen and (min-width: 824px) {
+        .generalSearchTextVal {font-size:22px !important; }
+        #general_search_modal .modal-dialog {width: calc(100% - 80px); margin-left: 80px; }
+    } 
+   @media screen and (min-width: 1084px) {
+        .generalSearchTextVal {font-size:32px !important; }
+        
+    }
+   .genralSearchClose{padding:10px;height: 40px;}
+   /*.search-record-block{padding:10px 2em;/*border-top:1px solid #ededed;}*/
+   .search-title{margin-top:15px;}
+   .search-title .bg-info{padding: 5px 10px; border-radius: 3px; font-weight: bold; font-size: 12px;}
+   /*.search-list:first-child .search-title{padding:5px 10px 0;}
+   //.search-list{margin-top:5px;margin-bottom:5px;border-top:1px solid #ededed;}
+   /*.search-list:first-child{border-top:none;}*/
+   .search-list:first-child{margin-top:0;}
+   .count_record{text-align: center;}
+   
+   .general-search-loader{display:none; position: absolute; top:0; left:0; margin-top:80px; margin-left: 100px;}
+   .gensearchResult{min-height: 300px;}
+   /*.search-record-title{color:#4d4d4d !important; font-size: 13px; font-weight: 600; color: inherit; text-decoration: underline;}*/
+   .highlight-match{color: var(--color-secondary) !important; }
+   .searchFormBlock input[type="text"]{color:var(--color-secondary) !important;}
+   .search-result-label{font-size:12px; text-align: right; padding-right: 2px !important;}
+   .search-result-val{font-size:12px;/* font-weight: bold;*/}
+   .view-more-results-link-cont{padding: 0 26px 7px; text-align: left;}
+   /*.view-more-results-link{text-decoration: underline;} */
+   .blur-result{ opacity: 0.2;  filter: alpha(opacity=20); /* For IE8 and earlier */}
+   
+   .search-modal-close-link{position: absolute; right: 0; margin-right: 8px; margin-top: -15px;}
+</style>
+<!-- search option Modal -->
+
+<div id="general_search_modal" class="modal fade" style="background:none;" role="dialog">
+  <div class="modal-dialog modal-lg">
+    <!-- Modal content-->
+    <div class="modal-content">
+        <div class="modal-body searchModalBody">
+            <button type="button" class="close search-modal-close-link" data-dismiss="modal">×</button>
+            <!--<h3>Search</h3>-->
+            <div class="searchFormBlock">
+                <form id="searchForm" class="form-horizontal  margin-none" method="post" action="javascript:void(0);">
+                    <div class="input-group" style="display:flex;">
+                        <input type="text" data-view-in="modal" placeholder="Search for company, plants, receipts" class="form-control generalSearchTextVal " value="" id="modalgeneralSearchTextVal" autocomplete="off">
+                        <span class="loader text-primary general-search-loader">
+                            <i class="fa fa-spinner fa-spin" style="font-size: 25px; padding: 12px 0;"></i>
+                        </span>
+                        <!--
+                        <div class="input-group-btn" style="width: 40px;">
+                            <button style="margin:0px !important;height:50px;" class="btn btn-default generalSearchButton" data-btnclick="0" id="generalSearchButton" type="button">
+                                <i class="fa fa-search"></i>
+                            </button>
+                        </div>
+                        -->
+                    </div>
+                    <div class="clearfix"></div>
+                <input type="hidden" name="_custCSRFToken" value="UWMvRUcrcitMWWNBdFBqYnF6V1ZNSWJNZ09ZcXZKQ01Bd2MyZE5sNUNzaz0="></form>
+            </div>
+            <div class="gensearchResult">
+                <div class="search_data">
+                    <div class="" style="padding-top: 0px;">
+                        <div class="row searchResultBlock modalsearchResultBlock" style="padding: 0px 10px;"></div>
+                    </div>
+                </div>    
+            </div>    
+        </div>
+    </div>
+  </div>
+</div>
+<!-- Search option Modal-->
+<div id="searchUrlBlock" data-search-url="/search/searchData"></div>
+<script type="text/javascript">
+    var searchOption={
+        searchModalElm:null,
+        typingTime:500,
+        typingTimer:null,
+        resultBlock:null,
+        inputObj:null,
+        bindAction:function(){
+            $('#generalSearchOption').unbind();
+            $('#generalSearchOption').on('click',function(){
+                searchOption.searchModalElm.modal('show');
+                $('#modalgeneralSearchTextVal').val('');
+                $('.modalsearchResultBlock').html('');
+            });
+            
+            searchOption.searchModalElm.on('shown.bs.modal', function (e) {
+                $('#modalgeneralSearchTextVal').focus();
+            });
+            
+            searchOption.inputObj.unbind();
+            searchOption.inputObj.on('keyup',function(){
+                var viewin=$(this).data('viewIn');
+                clearTimeout(searchOption.typingTimer);
+                searchOption.typingTimer=setTimeout(function () {
+                        var searchVal='';
+                        if(viewin=='modal'){
+                          searchVal=$('#modalgeneralSearchTextVal').val();  
+                        }
+                        else{
+                            searchVal=$('#generalSearchTextVal').val();
+                        } 
+                        searchOption.loadData(searchVal,viewin);;
+                }, searchOption.typingTime);
+            });
+            $('.viewMoreResult').unbind();
+            $('.viewMoreResult').on('click',function(){
+               var viewFor=$(this).data('searchFor');
+                var searchStr=$('#modalgeneralSearchTextVal').val();
+                var searchhref=webroot+'search/moreSearchView?viewFor='+viewFor+'&searchStr='+searchStr;
+                window.location.href=searchhref;
+            });
+            $('.genSearchFor').unbind();
+            $('.genSearchFor').on('click',function(){
+                $('.searchTabli').removeClass('active');
+                $(this).parent('.searchTabli').addClass('active');
+                $('#searchrelatedData').data('reqsend',0);
+                $('#searchrelatedData').data('pageno',1);
+                var searchVal=searchOption.inputObj.val();
+                var viewin=searchOption.inputObj.data('viewIn');
+                searchOption.loadData(searchVal,viewin);
+            });
+        },
+        loadData:function(searchVal,viewin){
+            var viewfor='all';
+            var offset=0;
+            if(viewin!='modal'){
+                if($('.searchTabli').length){
+                   var searchElementOption=$('.searchTabli.active').find('.genSearchFor');
+                   viewfor=searchElementOption.data('searchFor');
+                }
+            }    
+            if(searchVal.trim()!=''){
+                $.ajax({
+                    url:$('#searchUrlBlock').data('searchUrl'),
+                    dataType : 'JSON' , 
+                    type : 'POST' ,
+                    data:{searchValue:searchVal,viewFor:viewfor,offset:offset,viewin:viewin},
+                    beforeSend:function(){
+                        alertMessage.display( 'info', ' Searching...' , false);
+                        //searchOption.displayLoader();
+                        if( viewin =='modal' ){
+                            $('.modalsearchResultBlock').addClass('blur-result');
+                        }
+                        else{
+                            $('.pagesearchResultBlock').addClass('blur-result');
+                        }
+                    },
+                    success: function(response){
+                            alertMessage.hideLoadingMsg();
+                            if(response.isError==0){
+                                if(viewin=='modal'){
+                                    $('.modalsearchResultBlock').html(response.htmlData);
+                                }
+                                else{
+                                    $('.pagesearchResultBlock').html(response.htmlData);
+                                    searchOption.reinitViewMoreLink();
+                                }
+                                 searchOption.bindAction();
+                            }
+                            else{
+                               alertMessage.display( 'danger', 'Error! while searching data.' , false); 
+                               $('.modalsearchResultBlock').html('');
+                            }
+                    },
+                    error:function(){
+                     alertMessage.display( 'danger', 'Error! while searching data.' , false);
+                     $('.modalsearchResultBlock').html('');
+                    },
+                    complete: function(){
+                        searchOption.hideLoader();
+                        if( viewin =='modal' ){
+                            $('.modalsearchResultBlock').removeClass('blur-result');
+                        }
+                        else{
+                            $('.pagesearchResultBlock').removeClass('blur-result');
+                        }
+                    }
+                });
+            }
+            else{
+                if(viewin=='modal'){
+                    $('.modalsearchResultBlock').html('');
+                }
+                else{
+                    $('.pagesearchResultBlock').html('');
+                }
+            }
+        },
+        displayLoader: function(){
+            $('.generalSearchTextVal').closest('div').find('.loader').show();
+        },
+        hideLoader: function(){
+            $('.generalSearchTextVal').closest('div').find('.loader').hide();
+        },
+        reinitViewMoreLink: function(){
+            $('.viewMoreResultForPage').unbind();
+            $('.viewMoreResultForPage').on('click', function(){
+                loadMoreSearchResults();
+            });
+        }
+    };
+    searchOption.searchModalElm=$('#general_search_modal');
+    searchOption.inputObj=$('.generalSearchTextVal')
+    searchOption.bindAction();
+    
+    function loadMoreSearchResults(){
+        var req=$('#searchrelatedData').data('reqsend');
+        var pageno=$('#searchrelatedData').data('pageno');
+        var viewfor=$('.searchTabli.active').find('.genSearchFor').data('searchFor');
+        var searchVal=$('#generalSearchTextVal').val();
+        var noMore=$('.count_record').data('noMore');
+        if(viewfor!='all' && (req == 0 || req=='0') && (noMore!=0 || noMore!='0') ){
+            var viewin='page';
+            $('#searchrelatedData').data('reqsend',1);
+            $.ajax({
+                url:$('#moresearchUrlBlock').data('searchUrl'),
+                dataType : 'JSON' , 
+                type : 'POST' ,
+                data:{searchValue:searchVal,viewFor:viewfor,offset:pageno,viewin:viewin},
+                beforeSend:function(){
+                    // alertMessage.display( 'info', ' Searching...' , false);
+                    $('.count_record').find('a').html('Loading more results ...');
+                },
+                success: function(response){
+                        alertMessage.hideLoadingMsg();
+                        $('#searchrelatedData').data('reqsend',0);
+                        if(response.isError==0){
+                            pageno=(pageno*1)+1;
+                            $('#searchrelatedData').data('pageno',pageno);
+                            $('.count_record').remove();
+                            $('.search-list').append(response.htmlData);
+                            searchOption.reinitViewMoreLink();
+                        }
+                        else{
+                           alertMessage.display( 'danger', 'Error! while searching data.' , false); 
+                        }
+                },
+                error:function(){
+                 alertMessage.display( 'danger', 'Error! while searching data.' , false);
+                },
+            });
+        }
+    }
+</script>    
+<!-- Add General Search Option -->
+  <script type="text/javascript" src="/js/app/alert-message.js?v=1.2"></script>
+  <span style="display: none;" id="jsParams" data-current_year_date="2019-01-01" data-fees_due_date="2020-05-26" data-faculty_bod_start_date="1963-01-01" data-student_bod_start_date="1950-01-01">&gt;</span>
+	<!-- Global -->
+<script>
+    var dateFormat = 'dd-mm-yyyy';
+    var sysDateFormat = 'Y-m-d';
+    if (sysDateFormat != '') {
+        dateFormat = 'yyyy-mm-dd';
+    }
+    var basePath = '',
+	commonPath = '../assets/',
+	rootPath = '../',
+	DEV = false,
+	componentsPath = '../assets/components/';
+
+    var primaryColor = '#e5412d',
+	dangerColor = '#b55151',
+	successColor = '#609450',
+	warningColor = '#ab7a4b',
+	inverseColor = '#45484d';
+
+    var themerPrimaryColor = primaryColor;
+
+    /// trim function 
+    String.prototype.trim = function () { return this.replace(/^\s+|\s+$/g, ''); };
+
+    function isValidNumeric(value) {
+        if (isNaN(value)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function isNumericGreaterThan(value, lowerLimit) {
+
+        if (value > lowerLimit) {
+            return true;
+        }
+        return false;
+    }
+
+    function isNumericLessThan(value, upperLimit) {
+
+        if (value < upperLimit) {
+            return true;
+        }
+        return false;
+    }
+
+    function haveComma(str) {
+        if (str.indexOf(',') >= 0) {
+            return true;
+        }
+        return false;
+    }
+
+    function haveColun(str) {
+        if (str.indexOf(':') >= 0) {
+            return true;
+        }
+        return false;
+    }
+    function dateConvertInYMD(date) {
+        /* date convert in YYYY-mm-dd format*/
+        if (dateFormat == 'dd-mm-yyyy') {
+            var dateArray = date.split("-");
+            date = dateArray[2] + '-' + dateArray[1] + '-' + dateArray[0];
+        }
+        else if (dateFormat == 'mm-dd-yyyy') {
+            var dateArray = date.split("-");
+            date = dateArray[2] + '-' + dateArray[0] + '-' + dateArray[1];
+        }
+        return date;
+    }
+    function dateConvertYMDTOSysFormat(date) {
+        /* date convert in YYYY-mm-dd format*/
+        if (dateFormat == 'dd-mm-yyyy') {
+            var dateArray = date.split("-");
+            date = dateArray[2] + '-' + dateArray[1] + '-' + dateArray[0];
+        }
+        else if (dateFormat == 'mm-dd-yyyy') {
+            var dateArray = date.split("-");
+            date = dateArray[1] + '-' + dateArray[2] + '-' + dateArray[0];
+        }
+        return date;
+    }    
+</script>
+	
+<script type="text/javascript" src="/js/nd/components/modules/admin/gallery/blueimp-gallery/assets/lib/js/jquery.blueimp-gallery.min.js"></script>
+<script type="text/javascript" src="/js/nd/components/library/bootstrap/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="/js/nd/components/library/modernizr/modernizr.js"></script>
+<script type="text/javascript" src="/js/nd/components/modules/admin/widgets/widget-collapsible/assets/widget-collapsible.init.js"></script>
+<script type="text/javascript" src="/js/nd/components/modules/admin/widgets/widget-progress/assets/js/widget-progress.init.js"></script>
+<script type="text/javascript" src="/js/nd/components/modules/admin/modals/assets/js/bootbox.min.js"></script>
+<script type="text/javascript" src="/js/nd/components/plugins/prettyprint/assets/js/prettify.js"></script>
+<script type="text/javascript" src="/js/nd/components/helpers/themer/assets/plugins/cookie/jquery.cookie.js"></script>
+<script type="text/javascript" src="/js/nd/components/helpers/themer/assets/plugins/minicolors/jquery.miniColors.js"></script>
+<script type="text/javascript" src="/js/nd/components/helpers/themer/assets/js/themer.js"></script>
+<script type="text/javascript" src="/js/nd/components/plugins/jquery.event.move/js/jquery.event.move.js"></script>
+<script type="text/javascript" src="/js/nd/components/plugins/jquery.event.swipe/js/jquery.event.swipe.js"></script>
+
+<script type="text/javascript" src="/js/nd/components/core/js/megamenu.js"></script>
+<script type="text/javascript" src="/js/nd/components/core/js/core.init.js"></script>		
+   
+<script type="text/javascript">
+    var is_mobile = "0";
+    if (is_mobile == 1) {
+        setPositionModal();
+    }
+    function setPositionModal() {
+        $('.modal').unbind('shown.bs.modal');
+        $('.modal').on('shown.bs.modal', function (e) {
+            var top = Math.max($(window).height() - $(this).outerHeight(), 0) / 2;
+            //var left = Math.max($(window).width() - $(this).outerWidth(), 0) / 2;
+            $(this).css('opacity', '0.98');
+            $(this).css('background', 'lightgrey');
+            $('.modal-backdrop').remove();
+            if ($(this).attr("id") == 'contentViewModal' || $(this).attr("id") == 'quizViewModal' || $(this).attr("id") == 'importQuestionModal' || $(this).attr("id") == 'quizSubmitConfirmationModal') {
+                $(this).css({ top: 0 });
+            } else {
+                $(this).css({ top: top + $(window).scrollTop() });
+            }
+        });
+    }
+</script>    
+<script type="text/javascript">
+    $(document).ready(function () {
+        if ($.browser.safari) {
+            $('#menu').css({ "overflow": "visible !important" });
+        }
+        else {
+            $('#menu').css({ "overflow": "visible" });
+        }
+
+        $('#menu').on('click', function () {
+            $('.slim-scroll').find('.btn-navbar').css({ 'display': 'block' });
+        });
+        $('.sidebarCusMenu').unbind();
+        $('.sidebarCusMenu').on('mouseenter', function () {
+            if ($('.container-fluid').hasClass('menu-hidden')) {
+                $(this).find('.moduledesc ').removeClass('hidden');
+            }
+        });
+        $('.sidebarCusMenu').on('mouseleave', function () {
+            // if($('.container-fluid').hasClass('menu-hidden')){ 
+            $(this).find('.moduledesc ').addClass('hidden');
+            //}
+        });
+        $('.sidebar-menu-nav').on('click', function () {
+            if ($('.container-fluid').hasClass('menu-hidden')) {
+                $('.sidebarCusMenu').find('.glyphicons').addClass('collapsed');
+                $('.sidebarCusMenu').find('ul').removeClass('in').addClass('collapse');
+            }
+            $('.sidebarCusMenu').removeClass('active');
+            $('.sidebarCusMenu').find('.moduledesc ').addClass('hidden');
+        });
+    });
+</script>
+<script type="text/javascript" src="/js/app/notifications.js?ver=1.1"></script>
+<div id="loginLinkBlock" data-login-url="/"></div>
+<!-- Google calendar Auto Sync --->
+<!-- google Calender Auto Sync ---><!-- Model view related issue in touch screen -->
+ 
+<script>
+    // dynamic form create for get method convert into post.
+    function dynamicPostFormHtml(formUrl, formId, inputName, inputValue, secondInputName, secondInputValue) {
+        $('.rec-del-form').remove();
+        var formHtml = '<form class="rec-del-form hidden" id="' + formId + '" action="' + formUrl + '" method="POST">';
+        formHtml += '<input type="hidden"  name="_custCSRFToken" value="UWMvRUcrcitMWWNBdFBqYnF6V1ZNSWJNZ09ZcXZKQ01Bd2MyZE5sNUNzaz0=">';
+        formHtml += '<input type="hidden" name="' + inputName + '" value="' + inputValue + '">';
+        if (secondInputName != null) {
+            formHtml += '<input type="hidden" name="' + secondInputName + '" value="' + secondInputValue + '">';
+        }
+        formHtml += '</form>';
+        return formHtml;
+    }
+ </script>
+  <script>
+      function getParamsFromUrl(pageURL) { // retrive parameter value from url.
+          var formParam = {};
+          var paramStr = pageURL.split('?')[1];
+          var paramSegs = paramStr.split('&');
+          for (var i = 0; i < paramSegs.length; i++) {
+              var paramSeg = paramSegs[i].split('=');
+              formParam['param' + i] = paramSeg[0];
+              formParam['param' + i + '_value'] = paramSeg[1];
+          }
+          return formParam;
+      };
+      $(document).on('click', '.post-form-link', function (e) {
+          e.preventDefault();
+          var confirmMsg = 'Are you sure?';
+          if ($(this).data('confirmMsg') !== undefined) {
+              confirmMsg = $(this).data('confirmMsg');
+          }
+          if (window.confirm(confirmMsg)) {
+              var pageURL = $(this).attr("href");
+              var formParam = getParamsFromUrl(pageURL);
+              var formUrl = $(this).attr("href").split('?')[0];
+              var formHtml = dynamicPostFormHtml(formUrl, 'dynamicPostForm', ('param0' in formParam) ? formParam['param0'] : null, ('param0_value' in formParam) ? formParam['param0_value'] : null, ('param1' in formParam) ? formParam['param1'] : null, ('param1_value' in formParam) ? formParam['param1_value'] : null);
+              $(this).append(formHtml);
+              $('#dynamicPostForm').submit();
+          }
+      });
+      $(document).ready(function () {
+          function isTouchDevice() {
+              return typeof window.ontouchstart !== 'undefined';
+          }
+          if (isTouchDevice() == false) {
+              $('html').addClass('animations');
+          }
+      });
+</script> 
+<!-- Model view related issue in touch screen -->
+<!-- add autocomplete attribute for form date input field -->
+<script type="text/javascript">
+    $(document).ready(function () {
+        if ($('form').length > 0) {
+            $(this).find('.date').attr('autocomplete', 'off');
+        }
+        $(document).ajaxSuccess(function (event, xhr, options) { //  every form which is created after page load or render from other view using ajax.
+            if ($('form').length > 0) {
+                $(this).find('.date').attr('autocomplete', 'off');
+            }
+        });
+    });
+</script>
+<!-- remove autocomplete attribute for form date input field -->
+
+</body></html>

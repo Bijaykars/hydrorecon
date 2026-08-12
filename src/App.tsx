@@ -35,6 +35,7 @@ import {
   fetchNepalProjects,
   nearestReach,
   scanNepalCandidates,
+  scanGlofasCandidates,
   type ReachHit,
   type SeismicSummary,
   fetchUsgsDaily,
@@ -597,15 +598,15 @@ export default function App() {
     setErrs((x) => ({ ...x, scan: '' }));
     try {
       const center = map.getCenter();
-      if (!isInNepal(center.lat, center.lng)) {
-        throw new Error('Flow-ranked river discovery is currently available in Nepal. Elsewhere, zoom in and click a mapped river directly.');
-      }
-      setScan(await scanNepalCandidates({
-        west: b.getWest(),
-        south: b.getSouth(),
-        east: b.getEast(),
-        north: b.getNorth(),
-      }));
+      const box = { west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() };
+      // Nepal has the bundled river network: free, instant, on real centrelines.
+      // Everywhere else falls back to sampling the GloFAS grid, which costs one
+      // shared-API request and is coarser — but keeps discovery global.
+      setScan(
+        isInNepal(center.lat, center.lng)
+          ? await scanNepalCandidates(box)
+          : await scanGlofasCandidates(box)
+      );
     } catch (e) {
       fail('scan', e);
       setScan(null);
@@ -859,11 +860,11 @@ export default function App() {
         <div className="bar-inner">
           <div className="brand">
             <span className="brand-mark" aria-hidden="true">↘</span>
-            <span>RiverPower<small>Hydropower site intelligence</small></span>
+            <span>RiverPower<small>Run-of-river prefeasibility screening</small></span>
           </div>
           <div className="bar-status">
-            <span className="status-dot">Open-data workflow</span>
-            <span className="screening-pill">Prefeasibility only</span>
+            {/* Not a badge — the brief requires this caveat to sit next to the numbers. */}
+            <span className="screening-pill">Screening only · not a feasibility study</span>
           </div>
         </div>
       </header>
@@ -908,10 +909,11 @@ export default function App() {
           </div>
 
           <aside className="site-panel">
-            <div className="panel-kicker">Site finder · Nepal-first</div>
-            <h1>Find a river worth studying.</h1>
+            <div className="panel-kicker">Site finder</div>
+            <h1>Find a site</h1>
             <p className="panel-lede">
-              Screen mapped flow, place an intake precisely, then measure a downstream reach.
+              Screen mapped flow, place an intake on a river, then place a powerhouse downstream to
+              measure head from terrain.
             </p>
 
             <ol className="workflow-steps" aria-label="Analysis progress">
@@ -941,7 +943,7 @@ export default function App() {
             <div className="threshold-row">
               <div>
                 <label htmlFor="minflow">Minimum mapped flow</label>
-                <small>HydroRIVERS long-term mean</small>
+                <small>{viewInNepal ? 'HydroRIVERS long-term mean' : 'GloFAS long-term mean'}</small>
               </div>
               <div className="flow-input-wrap">
                 <input
@@ -956,10 +958,15 @@ export default function App() {
               </div>
             </div>
 
-            <button className="primary scan-button" onClick={runScan} disabled={busy.scan || !viewInNepal}>
+            <button className="primary scan-button" onClick={runScan} disabled={busy.scan}>
               {busy.scan ? <><span className="spinner" /> Mapping rivers…</> : 'Show flowing rivers in this view'}
             </button>
-            {!viewInNepal && <p className="panel-note">Flow-ranked discovery is available in Nepal. In other regions, zoom in and click a river directly.</p>}
+            {!viewInNepal && (
+              <p className="panel-note">
+                Outside Nepal this samples the GloFAS grid instead of a mapped river network, so
+                results are coarser and cost one request to a shared free API.
+              </p>
+            )}
             {errs.scan && <div className="notice service compact">{errs.scan}</div>}
 
             {scan && (
@@ -993,7 +1000,7 @@ export default function App() {
 
             <div className="rate-note">
               <span className="rate-icon" aria-hidden="true">✓</span>
-              <p><b>No flood-API call for river discovery.</b> This map uses the bundled Nepal HydroRIVERS network; Open-Meteo is requested only once for a selected site, then cached on this device.</p>
+              <p><b>No flood-API call for river discovery.</b> In Nepal this reads the bundled HydroRIVERS network; Open-Meteo is requested only once for a selected site, then cached on this device.</p>
             </div>
           </aside>
         </section>
