@@ -1,12 +1,13 @@
 # Ghatta — run-of-river screening
 
-![MIT](https://img.shields.io/badge/license-MIT-blue) ![no backend](https://img.shields.io/badge/backend-none-success) ![no API keys](https://img.shields.io/badge/API%20keys-none-success) ![checks](https://img.shields.io/badge/math%20checks-36%20passing-brightgreen)
+![MIT](https://img.shields.io/badge/license-MIT-blue) ![no backend](https://img.shields.io/badge/backend-none-success) ![no API keys](https://img.shields.io/badge/API%20keys-none-success) ![checks](https://img.shields.io/badge/checks-86%20passing-brightgreen)
 
-**Click a river. Click downstream. Get the power.**
+**Click a river. Get the schemes worth studying.**
 
-Place an intake and a powerhouse on any river in the world and Ghatta reads the flow from a
-20-year reanalysis and the head straight off terrain tiles, then shows you capacity, annual
-energy, and exactly where every number came from.
+One click on any river in the world. Ghatta walks 22 km downstream along the real channel, reads
+the terrain and a 20-year flow reanalysis, and searches roughly a thousand intake and powerhouse
+positions — then hands back the handful that represent genuine trade-offs, each with a turbine
+selected for its duty point and every number traceable to its source.
 
 No backend, no account, no API key. Every request goes from your browser to a public API, so it
 deploys free to any static host and works the same running locally.
@@ -15,16 +16,19 @@ deploys free to any static host and works the same running locally.
 
 ## How it works
 
-1. **Click a river** → the intake. Flow at that point comes from the GloFAS v4 reanalysis
-   (20 years of daily discharge, m³/s, global).
-2. **Click downstream** → the powerhouse. Head comes from Terrarium DEM tiles sampled along the
-   line between the two, bilinearly interpolated.
-3. **Read the answer.** `ρ · g · Q · H · η` is printed as a visible chain, not hidden. Annual
-   energy dispatches every day of the 20-year record through the same equation, honouring
-   residual flow, turbine capacity and the minimum-flow shutdown.
-4. **Drag either marker** to tune it. Everything recomputes.
+1. **One click** places the study point. Where a mapped river network exists the course is
+   followed along its centreline; everywhere else it is traced downhill through the terrain
+   tiles, so the same search works worldwide.
+2. **The search runs.** Every intake × powerhouse pair along that course is evaluated — head from
+   the DEM, flow from GloFAS v4 rescaled onto the network's magnitude, a turbine chosen for the
+   duty point and its part-load curve applied to every day of the record.
+3. **Only the non-dominated survive.** An alternative is kept when nothing else beats it outright
+   on energy, waterway length and head together. Each says what it is best at.
+4. **`ρ · g · Q · H · η` is printed as a visible chain**, not hidden, and the river's long profile
+   shows the diverted reach drawn on the real bed.
+5. **Drag either marker** to slide it along the river. Everything recomputes with no refetch.
 
-The URL holds the whole session, so a link reproduces the exact reading.
+The URL holds the whole session, so a link reproduces the exact study.
 
 ## Taking the work away
 
@@ -83,7 +87,7 @@ npm run desktop:dist   # installers into release/ (.exe, .dmg, AppImage, .deb)
 There is one codebase. The desktop shell loads the identical build the website
 serves, over a custom `app://` scheme rather than `file://` so `fetch` and
 workers behave exactly as they do on the web. Verified: the same click produces
-the same 32.7 MW in both.
+the same result in both.
 
 ## Is the arithmetic right?
 
@@ -129,8 +133,9 @@ Every runtime endpoint had its `access-control-allow-origin` verified with a rea
 ## What this is not
 
 Screening, not a feasibility study. It is enough to rank ideas and decide what to survey next; it
-is not a basis for investment, licensing or design. The profile is a straight line between two
-points, not a routed waterway. Costs are not modelled at all.
+is not a basis for investment, licensing or design. The waterway is measured along the river, not
+routed as a canal or tunnel — no alignment, cover or portal has been designed. Nothing is costed.
+Geology, sediment and hazard exposure are not yet in the model.
 
 ## Built on other people's work
 
