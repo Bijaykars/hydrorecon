@@ -22,6 +22,8 @@ export type ExportContext = {
   flowYears: number;
   flowMeanCms: number;
   networkMeanCms: number | null;
+  /** Plausible range on the selected scheme, if one could be computed. */
+  band: { capLow: number; capHigh: number; energyLow: number; energyHigh: number } | null;
   tracedFromTerrain: boolean;
   evaluated: number;
   licences: Licence[];
@@ -79,6 +81,17 @@ function provenance(c: ExportContext): string[] {
     '',
     `${c.evaluated} intake/powerhouse pairs evaluated; ${c.schemes.length} kept as non-dominated`
   );
+  if (c.band && c.selected) {
+    lines.push(
+      '',
+      'PLAUSIBLE RANGE on the selected scheme, from the uncertainty its inputs carry:',
+      `  capacity: ${c.band.capLow.toFixed(1)} - ${c.band.capHigh.toFixed(1)} MW ` +
+        `(reported ${c.selected.capacityMW.toFixed(1)})`,
+      `  energy:   ${c.band.energyLow.toFixed(0)} - ${c.band.energyHigh.toFixed(0)} GWh/yr ` +
+        `(reported ${c.selected.energyGwh.toFixed(0)})`,
+      '  the single figures in the table below are midpoints, not measurements'
+    );
+  }
   if (c.licences.length > 0) {
     lines.push(
       '',

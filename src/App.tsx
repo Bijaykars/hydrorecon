@@ -19,6 +19,7 @@ import {
   type Reach,
 } from './rivers.ts';
 import { discover, evaluate, type Scheme, type SchemeInput } from './engine/discover.ts';
+import { uncertaintyFor } from './engine/uncertainty.ts';
 import { haversineKm, minMonthlyMean, wetDryEnergy, type PlantParams } from './engine/hydro.ts';
 import { licencesAlong, loadLicences, type Licence } from './context.ts';
 import {
@@ -493,6 +494,17 @@ export default function App() {
     [input, pick]
   );
 
+  // How much to trust it, computed by rerunning the engine on perturbed inputs.
+  const uncertainty = useMemo(() => {
+    if (!input || !scheme || !study) return null;
+    return uncertaintyFor(
+      input,
+      scheme,
+      meanOf(study.flow.values),
+      study.reach?.meanDischargeCms ?? null
+    );
+  }, [input, scheme, study]);
+
   const seasons = useMemo(() => {
     if (!study || !scheme) return null;
     const gm = meanOf(study.flow.values);
@@ -634,6 +646,14 @@ export default function App() {
       flowYears: study.flow.dates.length / 365.25,
       flowMeanCms: meanOf(study.flow.values),
       networkMeanCms: study.reach?.meanDischargeCms ?? null,
+      band: uncertainty
+        ? {
+            capLow: uncertainty.capacityMW.low,
+            capHigh: uncertainty.capacityMW.high,
+            energyLow: uncertainty.energyGwh.low,
+            energyHigh: uncertainty.energyGwh.high,
+          }
+        : null,
       tracedFromTerrain: Boolean(study.tracedFromTerrain),
       evaluated: found.evaluated,
       licences: licences ?? [],
@@ -644,7 +664,7 @@ export default function App() {
         residualFrac: assume.residualFrac,
       },
     };
-  }, [at, study, found, scheme, licences, assume]);
+  }, [at, study, found, scheme, licences, assume, uncertainty]);
 
   const onExport = useCallback(
     (kind: 'csv' | 'geojson') => {
@@ -688,6 +708,7 @@ export default function App() {
         found={found}
         scheme={scheme}
         seasons={seasons}
+        uncertainty={uncertainty}
         pick={pick}
         onPick={(s) => {
           setTweaked(false);

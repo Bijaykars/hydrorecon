@@ -1,6 +1,7 @@
 import type { DischargeSeries } from './api.ts';
 import type { Assumptions, Pt, Study } from './App.tsx';
 import type { DiscoverResult, Scheme } from './engine/discover.ts';
+import type { Uncertainty } from './engine/uncertainty.ts';
 import type { Licence } from './context.ts';
 import { Fdc, RiverProfile } from './charts.tsx';
 import { buildFdc } from './engine/hydro.ts';
@@ -86,6 +87,7 @@ export function Reading(props: {
   found: DiscoverResult | null;
   scheme: Scheme | null;
   seasons: { wetGwh: number; dryGwh: number } | null;
+  uncertainty: Uncertainty | null;
   pick: { i: number; j: number } | null;
   onPick: (s: Scheme) => void;
   assume: Assumptions;
@@ -109,6 +111,7 @@ export function Reading(props: {
     found,
     scheme,
     seasons,
+    uncertainty,
     pick,
     onPick,
     assume,
@@ -224,6 +227,33 @@ export function Reading(props: {
                 </span>
                 <span className="text-[12px] text-muted">GWh per year</span>
               </div>
+              {uncertainty && (
+                <div className="mt-2 rounded-md border border-amber/30 bg-[color-mix(in_srgb,var(--color-amber)_6%,transparent)] px-2.5 py-2">
+                  <div className="text-[11.5px] leading-snug text-ink">
+                    Realistically{' '}
+                    <b className="num text-amber">
+                      {n(uncertainty.capacityMW.low, 1)}–{n(uncertainty.capacityMW.high, 1)} MW
+                    </b>{' '}
+                    and{' '}
+                    <b className="num text-amber">
+                      {n(uncertainty.energyGwh.low, 0)}–{n(uncertainty.energyGwh.high, 0)} GWh/yr
+                    </b>
+                    .
+                  </div>
+                  <div className="mt-1 space-y-0.5">
+                    {uncertainty.drivers.map((d) => (
+                      <div key={d.name} className="text-[9.5px] leading-snug text-faint">
+                        <b className="text-muted">{d.name}</b> moves it ±
+                        {n(d.swingPct / 2, 0)}% — {d.note}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-1 text-[9.5px] leading-snug text-faint">
+                    The single figure above is the midpoint, not a measurement. Narrowing this needs
+                    a gauge record and a survey, which is what screening is for deciding.
+                  </div>
+                </div>
+              )}
               <p className="mt-2 text-[11.5px] leading-relaxed text-muted">
                 A <b className="text-ink">{n(scheme.waterwayKm, 1)} km</b> waterway taking{' '}
                 <b className="text-ink">{n(scheme.grossHeadM, 0)} m</b> of drop — about{' '}

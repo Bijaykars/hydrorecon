@@ -6,6 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import { discover, evaluate } from '../src/engine/discover.ts';
+import { uncertaintyFor } from '../src/engine/uncertainty.ts';
 import { selectTurbine, turbineCurve } from '../src/engine/turbine.ts';
 import {
   RHO,
@@ -563,6 +564,53 @@ ok('a part-load curve yields less energy than a flat best-point efficiency', () 
   });
   assert.ok(curved.gwhPerYear < flat.gwhPerYear, 'curve must cost energy at part load');
   assert.ok(curved.gwhPerYear > 0.5 * flat.gwhPerYear, 'but not collapse it');
+});
+
+
+console.log('\nuncertainty');
+
+ok('the band always contains the reported figure', () => {
+  const inp = steady(ramp(200));
+  const s = evaluate(inp, 0, 50)!;
+  const u = uncertaintyFor(inp, s, 12, 12)!;
+  assert.ok(u, 'expected a band');
+  assert.ok(u.capacityMW.low <= s.capacityMW && s.capacityMW <= u.capacityMW.high,
+    `${s.capacityMW} outside ${u.capacityMW.low}..${u.capacityMW.high}`);
+  assert.ok(u.capacityMW.low >= 0, 'a band may not go negative');
+});
+
+ok('a corroborated flow gives a narrower band than an uncorroborated one', () => {
+  const inp = steady(ramp(200));
+  const s = evaluate(inp, 0, 50)!;
+  const agree = uncertaintyFor(inp, s, 12, 12.5)!;      // two models within 2x
+  const disagree = uncertaintyFor(inp, s, 12, 400)!;    // cell clearly off-channel
+  const width = (u: typeof agree) => u.capacityMW.high - u.capacityMW.low;
+  assert.ok(width(disagree) > width(agree),
+    'losing corroboration must widen the band');
+});
+
+ok('a wild disagreement does not blow the band up without limit', () => {
+  // The bug this guards: propagating the raw disagreement produced "0-341 MW"
+  // on a reach where the two models spanned 3.4 and 130.9 m3/s. The off-channel
+  // cell has already been identified and discarded; quoting it as a plausible
+  // outcome double-counts an error the app corrected.
+  const inp = steady(ramp(200));
+  const s = evaluate(inp, 0, 50)!;
+  const mild = uncertaintyFor(inp, s, 12, 30)!;
+  const wild = uncertaintyFor(inp, s, 12, 12000)!;
+  const width = (u: typeof mild) => u.capacityMW.high - u.capacityMW.low;
+  near(width(wild), width(mild), 1e-9, 'band width must not track the disagreement size');
+  assert.ok(wild.capacityMW.low > 0, 'the low end must stay above zero');
+  assert.ok(wild.capacityMW.high < 3 * s.capacityMW, 'the high end must stay sane');
+});
+
+ok('flow is named as the dominant driver, ahead of terrain', () => {
+  const inp = steady(ramp(200));
+  const s = evaluate(inp, 0, 50)!;
+  const u = uncertaintyFor(inp, s, 12, 12)!;
+  assert.equal(u.drivers[0].name, 'River flow', 'drivers must be sorted by influence');
+  assert.ok(u.drivers[0].swingPct > u.drivers[1].swingPct);
+  for (const d of u.drivers) assert.ok(d.note.length > 10, 'each driver must explain itself');
 });
 
 console.log(`\n${passed} checks passed\n`);
