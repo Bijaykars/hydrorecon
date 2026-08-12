@@ -24,12 +24,28 @@ export type Uncertainty = {
 };
 
 /**
- * Vertical error of a global DEM in steep ground, metres.
+ * Vertical error carried by a HEAD — a difference of two DEM samples — in metres.
  *
- * Copernicus GLO-30 and SRTM are both quoted around 10 m RMSE overall but
- * degrade to worse in mountains. Head is a difference of two samples, so two
- * errors combine; they are partly correlated over a few kilometres, which is
- * why this is not the full sqrt(2) inflation.
+ * This started as a literature figure: Copernicus GLO-30 and SRTM are both quoted
+ * around 10 m RMSE overall and degrade in mountains, and head combines two such
+ * errors that are partly correlated over a few kilometres.
+ *
+ * `npm run probe:dem` now measures it instead of assuming it. Sampling the two
+ * independent terrain products the app ships with — Re:Earth's Mapterhorn build
+ * and AWS Terrain Tiles — at both ends of 141 real HydroRIVERS reaches, through
+ * the app's own decode path:
+ *
+ *   median disagreement   -0.1 m   (no systematic bias, which the symmetric
+ *                                   +/- treatment below had been assuming)
+ *   robust sigma           6.6 m
+ *   5-95%                 -13 to +15 m
+ *   beyond 50 m              2% of reaches — voids and gorge artifacts
+ *
+ * The value stays at 15 rather than dropping to the measured 6.6, because
+ * inter-product agreement is a FLOOR on the error and not the error itself: both
+ * products are radar-derived and can share a bias, agreeing with each other while
+ * both are wrong. What the measurement establishes is that 15 m is not too small,
+ * and that the error has no direction — not that it is the whole story.
  */
 const DEM_HEAD_ERROR_M = 15;
 

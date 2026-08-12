@@ -93,9 +93,31 @@ export type PlantParams = {
   minFlowFrac: number;
 };
 
-/** Net head after hydraulic losses. */
+/** Net head at DESIGN flow — the head the plant is rated on. */
 export function netHead(p: Pick<PlantParams, 'grossHeadM' | 'headLossFrac'>): number {
   return p.grossHeadM * (1 - p.headLossFrac);
+}
+
+/**
+ * Net head at an arbitrary turbine flow.
+ *
+ * Every hydraulic loss between intake and runner — trash rack, entrance, bends,
+ * valve, and the friction that dominates them all — is a velocity-head term, and
+ * velocity in a fixed conduit is proportional to discharge. So loss goes as Q²:
+ * Darcy-Weisbach with a near-constant friction factor and Manning both give that
+ * exponent. `headLossFrac` is therefore the loss AT DESIGN FLOW, not at every flow.
+ *
+ * Treating it as a flat fraction — which this engine used to do — charges a plant
+ * running at 40% of design the full design-point loss, when it is really paying
+ * 0.4² = 16% of it. That understates net head on exactly the days a run-of-river
+ * plant spends most of its year, so it understates annual energy. The bias is
+ * small (a couple of percent at a 5% loss assumption) but it is one-directional,
+ * which is the kind worth removing.
+ */
+export function netHeadAt(p: PlantParams, qCms: number): number {
+  if (!(p.designFlowCms > 0)) return netHead(p);
+  const ratio = qCms / p.designFlowCms;
+  return p.grossHeadM * (1 - p.headLossFrac * ratio * ratio);
 }
 
 /**
@@ -208,7 +230,7 @@ export function annualEnergy(seriesCms: readonly number[], p: PlantParams): Ener
   for (const q of clean) {
     const qt = turbineFlow(q, p);
     if (qt > 0) running++;
-    sumW += powerW(qt, h, p.efficiencyAt ? p.efficiencyAt(qt) : p.efficiency);
+    sumW += powerW(qt, netHeadAt(p, qt), p.efficiencyAt ? p.efficiencyAt(qt) : p.efficiency);
   }
   const meanPowerW = sumW / clean.length;
   return {
@@ -228,8 +250,10 @@ export function annualEnergy(seriesCms: readonly number[], p: PlantParams): Ener
  */
 export function energyFromFdcTrapezoid(fdc: readonly FdcPoint[], p: PlantParams): number {
   if (fdc.length === 0) return 0;
-  const h = netHead(p);
-  const pw = (pt: FdcPoint) => powerW(turbineFlow(pt.q, p), h, p.efficiency);
+  const pw = (pt: FdcPoint) => {
+    const qt = turbineFlow(pt.q, p);
+    return powerW(qt, netHeadAt(p, qt), p.efficiencyAt ? p.efficiencyAt(qt) : p.efficiency);
+  };
   let integral = 0;
   // [0, p_1] flat at the first point.
   integral += fdc[0].p * pw(fdc[0]);
@@ -253,7 +277,6 @@ export function wetDryEnergy(
   valuesCms: readonly number[],
   p: PlantParams
 ): { wetGwh: number; dryGwh: number; wetDays: number; dryDays: number } {
-  const h = netHead(p);
   let wetW = 0;
   let dryW = 0;
   let wetDays = 0;
@@ -266,7 +289,8 @@ export function wetDryEnergy(
     const day = Number(d.slice(8, 10));
     if (!m) continue;
     const isWet = (m > 4 || (m === 4 && day >= 15)) && (m < 12 || (m === 12 && day < 15));
-    const w = powerW(turbineFlow(v, p), h, p.efficiency);
+    const qt = turbineFlow(v, p);
+    const w = powerW(qt, netHeadAt(p, qt), p.efficiencyAt ? p.efficiencyAt(qt) : p.efficiency);
     if (isWet) {
       wetW += w;
       wetDays++;

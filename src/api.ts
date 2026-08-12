@@ -221,6 +221,7 @@ const DEM_SOURCES = [
       `https://terrain.reearth.land/terrarium/elevation/${z}/${x}/${y}.png`,
     tilePx: 512,
     maxZoom: 17,
+    nativeM: 30,
   },
   {
     id: 'AWS Terrain Tiles',
@@ -228,6 +229,7 @@ const DEM_SOURCES = [
       `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`,
     tilePx: 256,
     maxZoom: 15,
+    nativeM: 30,
   },
 ] as const;
 
@@ -433,8 +435,26 @@ function pickZoom(
   return 8;
 }
 
-const groundResolution = (z: number, tilePx: number, lat: number) =>
+/** Ground distance covered by one tile PIXEL. Not the same as knowing that much. */
+const pixelSpacingM = (z: number, tilePx: number, lat: number) =>
   (40075016.686 * Math.cos((lat * Math.PI) / 180)) / (2 ** z * tilePx);
+
+/**
+ * How finely the terrain is actually known, metres.
+ *
+ * Serving a 30 m DEM as 512 px tiles at z17 puts a sample every ~1 m, and this
+ * used to report that number — so the app claimed a "~2 m grid" for terrain whose
+ * real posting is 30 m, overstating it by more than an order of magnitude.
+ * Oversampling interpolates; it does not measure. Resolution can never be finer
+ * than the source, so the effective figure is whichever is coarser.
+ *
+ * 30 m is the global posting of the datasets behind both sources (SRTM,
+ * Copernicus GLO-30). A few countries fold in finer national data, so in those
+ * places this understates the terrain — the safe direction for an engineering
+ * number to be wrong in.
+ */
+const groundResolution = (z: number, tilePx: number, lat: number, nativeM: number) =>
+  Math.max(pixelSpacingM(z, tilePx, lat), nativeM);
 
 /** Terrarium decode of one pixel: elev_m = (R*256 + G + B/256) - 32768. */
 function decodePixel(img: ImageData, px: number, py: number): number {
@@ -536,7 +556,7 @@ async function sampleAlong(
       points,
       source: src.id,
       zoom,
-      resolutionM: groundResolution(zoom, src.tilePx, pts[0].lat),
+      resolutionM: groundResolution(zoom, src.tilePx, pts[0].lat, src.nativeM),
       tilesFetched: needed.size,
     };
   }

@@ -19,6 +19,7 @@ import {
   powerW,
   minMonthlyMean,
   netHead,
+  netHeadAt,
   residualForBasis,
   turbineFlow,
   annualEnergy,
@@ -194,6 +195,42 @@ const base: PlantParams = {
 
 ok('net head applies the loss fraction', () => {
   near(netHead(base), 95, 1e-12);
+});
+
+ok('head loss follows Q^2, so it is only fully charged at design flow', () => {
+  // At design flow the two laws must agree, or rated power would move.
+  near(netHeadAt(base, base.designFlowCms), netHead(base), 1e-12, 'at design flow');
+  // At half design flow the plant pays a quarter of the design-point loss.
+  near(netHeadAt(base, 5), 100 * (1 - 0.05 * 0.25), 1e-12, 'at half design flow');
+  // Shut down, the conduit carries nothing and loses nothing.
+  near(netHeadAt(base, 0), 100, 1e-12, 'at zero flow');
+  // Monotonic: more flow can never mean more head.
+  for (let q = 0; q <= 10; q += 0.5) {
+    assert.ok(
+      netHeadAt(base, q) <= netHeadAt(base, Math.max(0, q - 0.5)) + 1e-12,
+      `head rose with flow at ${q}`
+    );
+  }
+});
+
+ok('the Q^2 law raises annual energy, and only on the low-flow days', () => {
+  // A monsoon-shaped year: most days sit well below design flow.
+  const record = Array.from({ length: 3650 }, (_, d) => {
+    const doy = d % 365;
+    return 3 + 60 * Math.exp(-((doy - 200) ** 2) / (2 * 45 ** 2));
+  });
+  // The old flat-fraction behaviour, reproduced by folding the design-point
+  // loss into gross head and zeroing the loss term.
+  const flat: PlantParams = { ...base, grossHeadM: 100 * 0.95, headLossFrac: 0 };
+  const now = annualEnergy(record, base);
+  const old = annualEnergy(record, flat);
+  assert.ok(now.gwhPerYear > old.gwhPerYear, 'expected the correction to recover energy');
+  // Small and one-directional. If this ever exceeds the loss assumption itself
+  // the law has been applied to something other than the loss.
+  const gain = (now.gwhPerYear - old.gwhPerYear) / old.gwhPerYear;
+  assert.ok(gain < base.headLossFrac, `gain ${(gain * 100).toFixed(2)}% exceeds the loss assumption`);
+  // Rated power is defined at design flow, where nothing changed.
+  near(now.ratedPowerW, old.ratedPowerW, 1e-12, 'rated power moved');
 });
 
 ok('residual flow is subtracted before the turbine cap', () => {

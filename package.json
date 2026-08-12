@@ -15,7 +15,8 @@
     "desktop:pack": "npm run build && electron-builder --dir",
     "desktop:dist": "npm run build && electron-builder",
     "build:dhm": "node pipeline/build-dhm-stations.mjs",
-    "build:rivers": "node pipeline/build-hydrorivers.mjs"
+    "build:rivers": "node pipeline/build-hydrorivers.mjs",
+    "probe:dem": "node checks/dem-vs-survey.probe.mjs"
   },
   "dependencies": {
     "maplibre-gl": "^5.6.0",
@@ -26,11 +27,28 @@
   "build": {
     "appId": "org.ghatta.workbench",
     "productName": "Ghatta",
-    "files": ["dist/**/*", "desktop/main.cjs", "package.json"],
-    "directories": { "output": "release" },
-    "win": { "target": "nsis" },
-    "mac": { "target": "dmg", "category": "public.app-category.productivity" },
-    "linux": { "target": ["AppImage", "deb"], "category": "Science" }
+    "files": [
+      "dist/**/*",
+      "desktop/main.cjs",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Science"
+    }
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
