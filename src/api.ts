@@ -202,6 +202,65 @@ export async function probeNeighbours(
   return out.sort((a, b) => b.meanCms - a.meanCms);
 }
 
+export const meanOf = (v: readonly number[]) => v.reduce((a, b) => a + b, 0) / v.length;
+
+/**
+ * Re-anchor the flow query onto the cell that actually holds this river.
+ *
+ * The flood model runs on a ~5 km grid, so the cell nearest a click can sit on
+ * a different channel entirely — measured here at 17x, which would have made
+ * every scheme on the page 17x too small. The mapped river network gives an
+ * independent long-term mean on the actual centreline, so it can referee which
+ * neighbouring cell is the right one. GloFAS still supplies all the daily
+ * dynamics; the network only decides *where* to ask.
+ *
+ * Only called when the two already disagree, because it costs 8 requests.
+ */
+export async function reanchorToRiver(
+  path: { lat: number; lon: number }[],
+  targetMeanCms: number,
+  current: DischargeSeries,
+  maxProbes = 6
+): Promise<{ series: DischargeSeries; movedKm: number } | null> {
+  if (!(targetMeanCms > 0) || path.length < 2) return null;
+  // Compare in log space: being 10x under is as wrong as 10x over.
+  const err = (m: number) => (m > 0 ? Math.abs(Math.log(m / targetMeanCms)) : Infinity);
+  let best = current;
+  let bestErr = err(meanOf(current.values));
+
+  // Sample points spread along the channel itself, deduped to distinct model
+  // cells. Every one is guaranteed to be on the river, which a blind grid
+  // sweep around the click is not.
+  const seen = new Set<string>();
+  const probes: { lat: number; lon: number }[] = [];
+  for (let k = 0; k < maxProbes; k++) {
+    const p = path[Math.floor(((path.length - 1) * k) / Math.max(1, maxProbes - 1))];
+    const c = quantize(p.lat, p.lon);
+    const key = `${c.lat.toFixed(2)},${c.lon.toFixed(2)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    probes.push(p);
+  }
+
+  for (const p of probes) {
+    try {
+      const s = await fetchDischarge(p.lat, p.lon);
+      const e = err(meanOf(s.values));
+      if (e < bestErr) {
+        bestErr = e;
+        best = s;
+      }
+    } catch {
+      // Rate-limited or dry; the current cell stays.
+    }
+  }
+  if (best === current) return null;
+  return {
+    series: best,
+    movedKm: haversineKm([current.cell.lat, current.cell.lon], [best.cell.lat, best.cell.lon]),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Terrain — Terrarium DEM tiles decoded in the browser.
 // O(tiles), not O(points): once tiles are cached, sampling more points is free.
@@ -284,18 +343,23 @@ export type ElevationProfile = {
   tilesFetched: number;
 };
 
-/** Highest zoom whose tile count still fits the budget for this line. */
+/**
+ * Highest zoom whose tile count still fits the budget for these points.
+ * Counts the tiles the path actually touches rather than its bounding box — a
+ * river meanders, so a bbox count would drop the zoom far more than necessary.
+ */
 function pickZoom(
   src: (typeof DEM_SOURCES)[number],
-  from: [number, number],
-  to: [number, number]
+  pts: { lat: number; lon: number }[],
+  budget: number
 ): number {
   for (let z = src.maxZoom; z >= 8; z--) {
-    const xs = [lonToTileX(from[1], z), lonToTileX(to[1], z)];
-    const ys = [latToTileY(from[0], z), latToTileY(to[0], z)];
-    const nx = Math.floor(Math.max(...xs)) - Math.floor(Math.min(...xs)) + 1;
-    const ny = Math.floor(Math.max(...ys)) - Math.floor(Math.min(...ys)) + 1;
-    if (nx * ny <= TILE_BUDGET) return z;
+    const need = new Set<string>();
+    for (const p of pts) {
+      need.add(`${Math.floor(lonToTileX(p.lon, z))}/${Math.floor(latToTileY(p.lat, z))}`);
+      if (need.size > budget) break;
+    }
+    if (need.size <= budget) return z;
   }
   return 8;
 }
@@ -342,17 +406,42 @@ export async function fetchProfile(
   samples = 140
 ): Promise<ElevationProfile> {
   const total = haversineKm(from, to);
-  const pts = Array.from({ length: samples }, (_, i) => {
-    const t = i / (samples - 1);
-    return {
-      lat: from[0] + t * (to[0] - from[0]),
-      lon: from[1] + t * (to[1] - from[1]),
-      distanceKm: t * total,
-    };
-  });
+  return sampleAlong(
+    Array.from({ length: samples }, (_, i) => {
+      const t = i / (samples - 1);
+      return {
+        lat: from[0] + t * (to[0] - from[0]),
+        lon: from[1] + t * (to[1] - from[1]),
+        distanceKm: t * total,
+      };
+    }),
+    TILE_BUDGET
+  );
+}
 
+/**
+ * Elevation along an arbitrary path — a real river course rather than a straight
+ * line. A longer path needs more tiles, so it gets a larger budget and, where
+ * that is still not enough, a coarser zoom. The chosen resolution is reported.
+ */
+export function fetchPathProfile(
+  path: { lat: number; lon: number; km: number }[]
+): Promise<ElevationProfile> {
+  return sampleAlong(
+    path.map((p) => ({ lat: p.lat, lon: p.lon, distanceKm: p.km })),
+    PATH_TILE_BUDGET
+  );
+}
+
+/** A river walk covers far more ground than a penstock line. */
+const PATH_TILE_BUDGET = 40;
+
+async function sampleAlong(
+  pts: { lat: number; lon: number; distanceKm: number }[],
+  budget: number
+): Promise<ElevationProfile> {
   for (const src of DEM_SOURCES) {
-    const zoom = pickZoom(src, from, to);
+    const zoom = pickZoom(src, pts, budget);
     const needed = new Set<string>();
     for (const p of pts) {
       needed.add(`${Math.floor(lonToTileX(p.lon, zoom))}/${Math.floor(latToTileY(p.lat, zoom))}`);
@@ -378,7 +467,7 @@ export async function fetchProfile(
       points,
       source: src.id,
       zoom,
-      resolutionM: groundResolution(zoom, src.tilePx, from[0]),
+      resolutionM: groundResolution(zoom, src.tilePx, pts[0].lat),
       tilesFetched: needed.size,
     };
   }

@@ -3,55 +3,74 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   fetchDischarge,
+  fetchPathProfile,
   fetchProfile,
+  meanOf,
   probeNeighbours,
+  reanchorToRiver,
   type DischargeSeries,
   type ElevationProfile,
 } from './api.ts';
-import { hasReachData, nearestReach, riversGeoJson, SNAP_KM, type Reach } from './rivers.ts';
 import {
-  annualEnergy,
-  buildFdc,
-  flowAtExceedance,
-  haversineKm,
-  minMonthlyMean,
-  netHead,
-  wetDryEnergy,
-  type PlantParams,
-} from './engine/hydro.ts';
+  downstreamPath,
+  hasReachData,
+  nearestReach,
+  riversGeoJson,
+  SNAP_KM,
+  type Reach,
+} from './rivers.ts';
+import { discover, evaluate, type Scheme, type SchemeInput } from './engine/discover.ts';
+import { haversineKm, minMonthlyMean, wetDryEnergy, type PlantParams } from './engine/hydro.ts';
 import { Reading } from './Reading.tsx';
 
 export type Pt = { lat: number; lon: number };
 
 export type Assumptions = {
-  /** Design flow taken at this exceedance on the FDC. */
   exceedance: number;
-  /** Turbine × generator × transformer. */
   efficiency: number;
-  /** Hydraulic losses as a fraction of gross head. */
   headLossFrac: number;
-  /** Residual flow as a fraction of the lowest monthly mean. */
   residualFrac: number;
-  /** Annual household consumption used for the plain-language comparison. */
   householdKwh: number;
 };
 
 const DEFAULTS: Assumptions = {
   exceedance: 0.4,
-  efficiency: 0.85,
+  // Generator + transformer only. The turbine's own efficiency now comes from
+  // its part-load curve (engine/turbine.ts).
+  efficiency: 0.96,
   headLossFrac: 0.05,
   residualFrac: 0.1,
   householdKwh: 900,
 };
 
-/** Turbine stops below this share of design flow. Not worth a control. */
 const MIN_FLOW_FRAC = 0.2;
+/** How far downstream to look for schemes. */
+const SEARCH_KM = 22;
+
+/** A point on the studied river with everything the engine needs. */
+export type StudyPoint = {
+  km: number;
+  lat: number;
+  lon: number;
+  elevationM: number;
+  meanCms: number;
+};
+
+export type Study = {
+  path: StudyPoint[];
+  flow: DischargeSeries;
+  clickMeanCms: number;
+  dem: ElevationProfile;
+  /** False when the river had to be approximated by a straight line. */
+  followsRiver: boolean;
+  reach: Reach | null;
+  /** Set when the flow query had to be moved onto the right channel. */
+  movedKm?: number;
+};
 
 // ---------------------------------------------------------------------------
-// URL state — the whole session is one shareable link.
-// ---------------------------------------------------------------------------
 
-type UrlState = { view: { lat: number; lon: number; zoom: number }; intake: Pt | null; power: Pt | null };
+type UrlState = { view: { lat: number; lon: number; zoom: number }; at: Pt | null; to: Pt | null };
 
 function readUrl(): UrlState {
   const p = new URLSearchParams(location.hash.slice(1));
@@ -65,16 +84,16 @@ function readUrl(): UrlState {
       v && v.length === 3 && v.every(Number.isFinite)
         ? { zoom: v[0], lat: v[1], lon: v[2] }
         : { zoom: 3.2, lat: 22, lon: 20 },
-    intake: pt(p.get('i')),
-    power: pt(p.get('p')),
+    at: pt(p.get('at')),
+    to: pt(p.get('to')),
   };
 }
 
-function writeUrl(view: { lat: number; lon: number; zoom: number }, intake: Pt | null, power: Pt | null) {
+function writeUrl(view: { lat: number; lon: number; zoom: number }, at: Pt | null, to: Pt | null) {
   const p = new URLSearchParams();
   p.set('map', `${view.zoom.toFixed(2)}/${view.lat.toFixed(4)}/${view.lon.toFixed(4)}`);
-  if (intake) p.set('i', `${intake.lat.toFixed(5)},${intake.lon.toFixed(5)}`);
-  if (power) p.set('p', `${power.lat.toFixed(5)},${power.lon.toFixed(5)}`);
+  if (at) p.set('at', `${at.lat.toFixed(5)},${at.lon.toFixed(5)}`);
+  if (to) p.set('to', `${to.lat.toFixed(5)},${to.lon.toFixed(5)}`);
   history.replaceState(null, '', `#${p}`);
 }
 
@@ -84,19 +103,26 @@ export default function App() {
   const initial = useMemo(readUrl, []);
   const mapEl = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
-  const markers = useRef<{ intake?: maplibregl.Marker; power?: maplibregl.Marker }>({});
+  const markers = useRef<{ a?: maplibregl.Marker; b?: maplibregl.Marker }>({});
 
-  const [intake, setIntake] = useState<Pt | null>(initial.intake);
-  const [power, setPower] = useState<Pt | null>(initial.power);
-  const [reach, setReach] = useState<Reach | null>(null);
-  const [bigger, setBigger] = useState<Reach | null>(null);
-  const [flow, setFlow] = useState<DischargeSeries | null>(null);
-  const [profile, setProfile] = useState<ElevationProfile | null>(null);
+  /** Where the user clicked on the river. The only required input. */
+  const [at, setAt] = useState<Pt | null>(initial.at);
+  /** Manual second point, only used where no river geometry is available. */
+  const [manualTo, setManualTo] = useState<Pt | null>(initial.to);
+
+  const [study, setStudy] = useState<Study | null>(null);
   const [assume, setAssume] = useState<Assumptions>(DEFAULTS);
-  const [busy, setBusy] = useState<'flow' | 'terrain' | 'probe' | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [neighbours, setNeighbours] = useState<{ lat: number; lon: number; meanCms: number }[] | null>(null);
-  const [swapped, setSwapped] = useState(false);
+  /** Chosen intake/powerhouse indices into study.path. */
+  const [pick, setPick] = useState<{ i: number; j: number } | null>(null);
+  const [tweaked, setTweaked] = useState(false);
+
+  const atRef = useRef(at);
+  const manualRef = useRef(manualTo);
+  atRef.current = at;
+  manualRef.current = manualTo;
 
   // ---------------- map ----------------
   useEffect(() => {
@@ -107,32 +133,28 @@ export default function App() {
       center: [initial.view.lon, initial.view.lat],
       zoom: initial.view.zoom,
       attributionControl: { compact: true },
-      refreshExpiredTiles: false, // terrain tiles ship no Cache-Control but are static
+      refreshExpiredTiles: false,
       fadeDuration: 0,
       maxTileCacheZoomLevels: 10,
     });
     map.current = m;
-    // Handy for verification scripts and for debugging in the console.
     (window as unknown as { __map: maplibregl.Map }).__map = m;
     m.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'bottom-right');
     m.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
 
-    // The panel library and flex both settle a frame after mount; MapLibre's own
-    // observer can measure mid-layout and pin the canvas at its 400 px fallback.
     const ro = new ResizeObserver(() => m.resize());
     ro.observe(mapEl.current);
     requestAnimationFrame(() => m.resize());
 
     m.on('styleimagemissing', (e) => {
       if (m.hasImage(e.id)) return;
-      const size = 8;
       const c = document.createElement('canvas');
-      c.width = c.height = size;
+      c.width = c.height = 8;
       const ctx = c.getContext('2d');
       if (!ctx) return;
       ctx.fillStyle = '#26352f';
-      ctx.fillRect(0, 0, size, size);
-      m.addImage(e.id, ctx.getImageData(0, 0, size, size));
+      ctx.fillRect(0, 0, 8, 8);
+      m.addImage(e.id, ctx.getImageData(0, 0, 8, 8));
     });
 
     m.on('load', () => {
@@ -142,7 +164,7 @@ export default function App() {
         tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
         encoding: 'terrarium',
         tileSize: 256,
-        maxzoom: 12, // measured: DEM was 84% of bytes on zoom; relief is a basin-scale cue
+        maxzoom: 12, // measured: DEM was 84% of bytes on zoom
         attribution: 'Terrain: AWS Terrain Tiles',
       });
       m.addLayer(
@@ -151,10 +173,8 @@ export default function App() {
           type: 'hillshade',
           source: 'dem',
           minzoom: 5,
-          // Deliberately higher than the source's maxzoom: MapLibre overzooms the
-          // z12 tiles instead of downloading finer ones, so relief keeps drawing
-          // at site scale without costing a single extra byte. Capping the LAYER
-          // at 12 instead leaves a dead black map the moment you zoom in.
+          // Above the source maxzoom on purpose: MapLibre overzooms the z12
+          // tiles, so relief keeps drawing at site scale for no extra bytes.
           maxzoom: 16,
           paint: {
             'hillshade-exaggeration': ['interpolate', ['linear'], ['zoom'], 5, 0.3, 11, 0.5, 14, 0.22],
@@ -165,55 +185,70 @@ export default function App() {
         },
         firstWater
       );
-      // The stock dark style paints water almost invisibly. Here rivers are the subject.
       if (m.getLayer('water')) m.setPaintProperty('water', 'fill-color', '#12456b');
       if (m.getLayer('waterway')) {
         m.setPaintProperty('waterway', 'line-color', '#4db8ff');
         m.setPaintProperty('waterway', 'line-opacity', 0.85);
       }
-      // Detailed centrelines exist for part of the world; add them when in view.
+
+      // The diverted reach of the selected scheme.
+      m.addSource('scheme', { type: 'geojson', data: empty() });
+      m.addLayer({
+        id: 'scheme-glow',
+        type: 'line',
+        source: 'scheme',
+        layout: { 'line-cap': 'round' },
+        paint: { 'line-color': '#ffb454', 'line-width': 9, 'line-opacity': 0.22, 'line-blur': 3 },
+      });
+      m.addLayer({
+        id: 'scheme-line',
+        type: 'line',
+        source: 'scheme',
+        layout: { 'line-cap': 'round' },
+        paint: { 'line-color': '#ffb454', 'line-width': 3 },
+      });
+
       const maybeAddReaches = () => {
         if (m.getSource('reaches')) return;
-        const b = m.getBounds();
-        if (!hasReachData(b.getCenter().lat, b.getCenter().lng)) return;
+        const c = m.getBounds().getCenter();
+        if (!hasReachData(c.lat, c.lng)) return;
         riversGeoJson()
           .then((data) => {
             if (m.getSource('reaches')) return;
             m.addSource('reaches', { type: 'geojson', data });
-            m.addLayer({
-              id: 'reaches',
-              type: 'line',
-              source: 'reaches',
-              layout: { 'line-cap': 'round', 'line-join': 'round' },
-              paint: {
-                // Bright and thick enough to aim at: the flow figure is only as
-                // good as how close the click lands to the actual channel.
-                'line-color': '#4db8ff',
-                'line-opacity': 0.8,
-                'line-width': [
-                  'interpolate',
-                  ['exponential', 1.6],
-                  ['zoom'],
-                  6,
-                  ['interpolate', ['linear'], ['get', 'd'], 1, 0.5, 1000, 2.4],
-                  13,
-                  ['interpolate', ['linear'], ['get', 'd'], 1, 2, 1000, 6],
-                ],
+            m.addLayer(
+              {
+                id: 'reaches',
+                type: 'line',
+                source: 'reaches',
+                layout: { 'line-cap': 'round', 'line-join': 'round' },
+                paint: {
+                  'line-color': '#4db8ff',
+                  'line-opacity': 0.8,
+                  'line-width': [
+                    'interpolate',
+                    ['exponential', 1.6],
+                    ['zoom'],
+                    6,
+                    ['interpolate', ['linear'], ['get', 'd'], 1, 0.5, 1000, 2.4],
+                    13,
+                    ['interpolate', ['linear'], ['get', 'd'], 1, 2, 1000, 6],
+                  ],
+                },
               },
-            });
+              'scheme-glow'
+            );
           })
-          .catch(() => {
-            /* the app works without the overlay */
-          });
+          .catch(() => {});
       };
       maybeAddReaches();
       m.on('moveend', maybeAddReaches);
     });
 
-    m.on('click', (e) => void place(e.lngLat.lat, e.lngLat.lng));
+    m.on('click', (e) => void onClick(e.lngLat.lat, e.lngLat.lng));
     m.on('moveend', () => {
       const c = m.getCenter();
-      writeUrl({ lat: c.lat, lon: c.lng, zoom: m.getZoom() }, intakeRef.current, powerRef.current);
+      writeUrl({ lat: c.lat, lon: c.lng, zoom: m.getZoom() }, atRef.current, manualRef.current);
     });
 
     return () => {
@@ -224,51 +259,176 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Refs so the map's long-lived listeners see current values.
-  const intakeRef = useRef(intake);
-  const powerRef = useRef(power);
-  intakeRef.current = intake;
-  powerRef.current = power;
-
-  /** Snap onto a mapped centreline, but only if the click was plausibly aimed at one. */
-  const snap = useCallback(async (lat: number, lon: number) => {
+  const onClick = useCallback(async (lat: number, lon: number) => {
+    // Outside river coverage a second click supplies the powerhouse by hand.
+    if (atRef.current && !hasReachData(atRef.current.lat, atRef.current.lon) && !manualRef.current) {
+      setManualTo({ lat, lon });
+      return;
+    }
     const hit = await nearestReach(lat, lon).catch(() => null);
-    if (!hit || hit.nearest.distanceKm > SNAP_KM) return { pt: { lat, lon }, hit: null };
-    return { pt: hit.nearest.point, hit };
+    setManualTo(null);
+    setPick(null);
+    setTweaked(false);
+    setNeighbours(null);
+    setAt(hit && hit.nearest.distanceKm <= SNAP_KM ? hit.nearest.point : { lat, lon });
   }, []);
 
-  const place = useCallback(
-    async (lat: number, lon: number) => {
-      if (!intakeRef.current || powerRef.current) {
-        // First click, or a third click that starts over.
-        setPower(null);
-        setProfile(null);
-        setNeighbours(null);
-        setSwapped(false);
-        setIntake((await snap(lat, lon)).pt);
+  // ---------------- the study ----------------
+  useEffect(() => {
+    if (!at) {
+      setStudy(null);
+      return;
+    }
+    let dead = false;
+    setError(null);
+    setBusy('Reading the river…');
+
+    (async () => {
+      const flowP = fetchDischarge(at.lat, at.lon);
+      const river = await downstreamPath(at.lat, at.lon, SEARCH_KM).catch(() => null);
+      const reach = await nearestReach(at.lat, at.lon)
+        .then((h) => h?.nearest ?? null)
+        .catch(() => null);
+
+      if (river && river.length > 8) {
+        if (!dead) setBusy('Reading the terrain along it…');
+        const dem = await fetchPathProfile(river);
+        let flow = await flowP;
+        let movedKm: number | undefined;
+
+        // The flood model's grid cell can miss the channel. Where the mapped
+        // network gives an independent mean, use it to referee — but only when
+        // the two already disagree, since the check costs 8 requests.
+        const target = reach?.meanDischargeCms ?? 0;
+        const mean = meanOf(flow.values);
+        if (target > 0 && mean > 0 && Math.max(target / mean, mean / target) > 2) {
+          if (!dead) setBusy('Flow looks off-channel — finding the right cell…');
+          const fixed = await reanchorToRiver(river, target, flow).catch(() => null);
+          if (fixed) {
+            flow = fixed.series;
+            movedKm = fixed.movedKm;
+          }
+        }
+        if (dead) return;
+        setStudy({
+          path: river.map((p, k) => ({ ...p, elevationM: dem.points[k]?.elevationM ?? NaN })),
+          flow,
+          clickMeanCms: river[0].meanCms,
+          dem,
+          followsRiver: true,
+          reach,
+          movedKm,
+        });
       } else {
-        setPower((await snap(lat, lon)).pt);
+        // No mapped geometry here: fall back to a straight line to a second click.
+        if (!manualTo) {
+          const flow = await flowP;
+          if (dead) return;
+          setStudy(null);
+          setFlowOnly(flow);
+          setBusy(null);
+          return;
+        }
+        const dem = await fetchProfile([at.lat, at.lon], [manualTo.lat, manualTo.lon]);
+        const flow = await flowP;
+        if (dead) return;
+        setStudy({
+          path: dem.points.map((p) => ({
+            km: p.distanceKm,
+            lat: p.lat,
+            lon: p.lon,
+            elevationM: p.elevationM,
+            meanCms: 1, // constant: a straight line has no catchment information
+          })),
+          flow,
+          clickMeanCms: 1,
+          dem,
+          followsRiver: false,
+          reach,
+        });
       }
-    },
-    [snap]
+    })()
+      .catch((e: unknown) => !dead && setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => !dead && setBusy(null));
+
+    return () => {
+      dead = true;
+    };
+  }, [at, manualTo]);
+
+  /** Flow known but no scheme yet (outside river coverage, before the 2nd click). */
+  const [flowOnly, setFlowOnly] = useState<DischargeSeries | null>(null);
+  useEffect(() => {
+    if (study || !at) setFlowOnly(null);
+  }, [study, at]);
+
+  // ---------------- discovery ----------------
+  const input: SchemeInput | null = useMemo(() => {
+    if (!study) return null;
+    const minMonth = minMonthlyMean(study.flow.dates, study.flow.values);
+    return {
+      path: study.path,
+      series: study.flow.values,
+      clickMeanCms: study.clickMeanCms,
+      residualCms: Number.isFinite(minMonth) ? minMonth * assume.residualFrac : 0,
+      exceedance: assume.exceedance,
+      efficiency: assume.efficiency,
+      headLossFrac: assume.headLossFrac,
+      minFlowFrac: MIN_FLOW_FRAC,
+    };
+  }, [study, assume]);
+
+  const found = useMemo(() => {
+    if (!input || !study?.followsRiver) return null;
+    return discover(input);
+  }, [input, study?.followsRiver]);
+
+  // Show the strongest alternative straight away — one click, an answer.
+  useEffect(() => {
+    if (tweaked) return;
+    if (found && found.schemes.length > 0) {
+      setPick({ i: found.schemes[0].i, j: found.schemes[0].j });
+    } else if (study && !study.followsRiver && study.path.length > 1) {
+      setPick({ i: 0, j: study.path.length - 1 });
+    } else {
+      setPick(null);
+    }
+  }, [found, study, tweaked]);
+
+  const scheme: Scheme | null = useMemo(
+    () => (input && pick ? evaluate(input, pick.i, pick.j) : null),
+    [input, pick]
   );
 
-  const useBigger = useCallback(() => {
-    if (!bigger) return;
-    setReach(bigger);
-    setBigger(null);
-    setIntake(bigger.point);
-  }, [bigger]);
+  const seasons = useMemo(() => {
+    if (!study || !scheme) return null;
+    const ratio = study.clickMeanCms > 0 ? study.path[scheme.i].meanCms / study.clickMeanCms : 1;
+    const p: PlantParams = {
+      grossHeadM: Math.max(0, scheme.grossHeadM),
+      headLossFrac: assume.headLossFrac,
+      efficiency: assume.efficiency,
+      designFlowCms: scheme.designFlowCms,
+      residualFlowCms: scheme.residualCms,
+      minFlowFrac: MIN_FLOW_FRAC,
+    };
+    return wetDryEnergy(study.flow.dates, study.flow.values.map((v) => v * ratio), p);
+  }, [study, scheme, assume]);
 
-  // ---------------- markers ----------------
+  // ---------------- markers + highlight ----------------
   useEffect(() => {
     const m = map.current;
     if (!m) return;
-    const sync = (kind: 'intake' | 'power', pt: Pt | null, color: string, set: (p: Pt) => void) => {
-      const existing = markers.current[kind];
+    const place = (
+      key: 'a' | 'b',
+      pt: Pt | null,
+      color: string,
+      title: string,
+      onDrop: (p: Pt) => void
+    ) => {
+      const existing = markers.current[key];
       if (!pt) {
         existing?.remove();
-        delete markers.current[kind];
+        delete markers.current[key];
         return;
       }
       if (existing) {
@@ -278,161 +438,87 @@ export default function App() {
       const el = document.createElement('div');
       el.className = 'marker';
       el.style.setProperty('--c', color);
-      el.title = kind === 'intake' ? 'Intake — drag to move' : 'Powerhouse — drag to move';
+      el.title = title;
       const mk = new maplibregl.Marker({ element: el, draggable: true })
         .setLngLat([pt.lon, pt.lat])
         .addTo(m);
       mk.on('dragend', () => {
         const l = mk.getLngLat();
-        set({ lat: l.lat, lon: l.lng });
+        onDrop({ lat: l.lat, lon: l.lng });
       });
-      markers.current[kind] = mk;
+      markers.current[key] = mk;
     };
-    sync('intake', intake, '#4db8ff', setIntake);
-    sync('power', power, '#3fb950', setPower);
-  }, [intake, power]);
 
-  // ---------------- data ----------------
-  // Derived from the intake rather than captured on click, so dragging the
-  // marker and the automatic swap both keep the catchment figures truthful.
-  useEffect(() => {
-    if (!intake) {
-      setReach(null);
-      setBigger(null);
-      return;
-    }
-    let dead = false;
-    nearestReach(intake.lat, intake.lon)
-      .then((hit) => {
-        if (dead) return;
-        // Reported whatever the distance — the catchment is useful context even
-        // when the click was too far off the centreline to justify moving the
-        // marker. The panel states how far away that centreline is.
-        setReach(hit?.nearest ?? null);
-        setBigger(hit?.mainStem ?? null);
-      })
-      .catch(() => {
-        /* the app works without it */
-      });
-    return () => {
-      dead = true;
-    };
-  }, [intake]);
-
-  useEffect(() => {
-    if (!intake) {
-      setFlow(null);
-      return;
-    }
-    const ac = new AbortController();
-    setBusy('flow');
-    setError(null);
-    fetchDischarge(intake.lat, intake.lon, ac.signal)
-      .then(setFlow)
-      .catch((e: unknown) => {
-        if (ac.signal.aborted) return;
-        setFlow(null);
-        setError(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => !ac.signal.aborted && setBusy(null));
-    return () => ac.abort();
-  }, [intake]);
-
-  useEffect(() => {
-    if (!intake || !power) {
-      setProfile(null);
-      return;
-    }
-    let dead = false;
-    setBusy('terrain');
-    fetchProfile([intake.lat, intake.lon], [power.lat, power.lon])
-      .then((p) => {
-        if (dead) return;
-        // Water runs downhill, so which point was clicked first carries no
-        // engineering meaning. If the terrain says the powerhouse is the higher
-        // of the two, the roles are simply the other way round — swap them
-        // instead of stranding the user in an error they have to fix by hand.
-        const a = p.points[0].elevationM;
-        const b = p.points[p.points.length - 1].elevationM;
-        if (Number.isFinite(a) && Number.isFinite(b) && b > a) {
-          setSwapped(true);
-          setIntake(power);
-          setPower(intake);
-          return; // the effect reruns with the corrected order
+    // Dragging slides the end along the studied river — no refetch needed.
+    const slide = (which: 'i' | 'j') => (p: Pt) => {
+      if (!study || !pick) return;
+      let best = 0;
+      let bd = Infinity;
+      for (let k = 0; k < study.path.length; k++) {
+        const d = haversineKm([p.lat, p.lon], [study.path[k].lat, study.path[k].lon]);
+        if (d < bd) {
+          bd = d;
+          best = k;
         }
-        setProfile(p);
-      })
-      .catch((e: unknown) => !dead && setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => !dead && setBusy(null));
-    return () => {
-      dead = true;
+      }
+      setTweaked(true);
+      setPick(
+        which === 'i'
+          ? { i: Math.min(best, pick.j - 1), j: pick.j }
+          : { i: pick.i, j: Math.max(best, pick.i + 1) }
+      );
     };
-  }, [intake, power]);
+
+    place('a', scheme?.intake ?? at, '#4db8ff', 'Intake — drag along the river', slide('i'));
+    place('b', scheme?.power ?? manualTo, '#3fb950', 'Powerhouse — drag along the river', slide('j'));
+
+    const src = m.getSource('scheme') as maplibregl.GeoJSONSource | undefined;
+    if (src) {
+      src.setData(
+        study && scheme
+          ? {
+              type: 'FeatureCollection',
+              features: [
+                {
+                  type: 'Feature',
+                  properties: {},
+                  geometry: {
+                    type: 'LineString',
+                    coordinates: study.path
+                      .slice(scheme.i, scheme.j + 1)
+                      .map((p) => [p.lon, p.lat]),
+                  },
+                },
+              ],
+            }
+          : empty()
+      );
+    }
+  }, [scheme, at, manualTo, study, pick]);
 
   useEffect(() => {
     const m = map.current;
     if (!m) return;
     const c = m.getCenter();
-    writeUrl({ lat: c.lat, lon: c.lng, zoom: m.getZoom() }, intake, power);
-  }, [intake, power]);
+    writeUrl({ lat: c.lat, lon: c.lng, zoom: m.getZoom() }, at, manualTo);
+  }, [at, manualTo]);
 
   const runProbe = useCallback(async () => {
-    if (!intake) return;
-    setBusy('probe');
-    setNeighbours(await probeNeighbours(intake.lat, intake.lon));
+    if (!at) return;
+    setBusy('Checking neighbouring cells…');
+    setNeighbours(await probeNeighbours(at.lat, at.lon));
     setBusy(null);
-  }, [intake]);
-
-  // ---------------- the computation ----------------
-  const result = useMemo(() => {
-    if (!flow) return null;
-    const fdc = buildFdc(flow.values);
-    const minMonth = minMonthlyMean(flow.dates, flow.values);
-    const residualCms = Number.isFinite(minMonth) ? minMonth * assume.residualFrac : 0;
-    const atExceedance = flowAtExceedance(fdc, assume.exceedance);
-    const designFlowCms = Math.max(0, atExceedance - residualCms);
-
-    const grossHeadM = profile
-      ? profile.points[0].elevationM - profile.points[profile.points.length - 1].elevationM
-      : 0;
-
-    const params: PlantParams = {
-      grossHeadM: Math.max(0, grossHeadM),
-      headLossFrac: assume.headLossFrac,
-      efficiency: assume.efficiency,
-      designFlowCms,
-      residualFlowCms: residualCms,
-      minFlowFrac: MIN_FLOW_FRAC,
-    };
-    const energy = annualEnergy(flow.values, params);
-    const seasons = wetDryEnergy(flow.dates, flow.values, params);
-    const meanCms = flow.values.reduce((a, b) => a + b, 0) / flow.values.length;
-
-    return {
-      fdc,
-      minMonth,
-      residualCms,
-      designFlowCms,
-      grossHeadM,
-      netHeadM: netHead(params),
-      energy,
-      seasons,
-      meanCms,
-      years: flow.dates.length / 365.25,
-      cellKm: intake ? haversineKm([intake.lat, intake.lon], [flow.cell.lat, flow.cell.lon]) : 0,
-    };
-  }, [flow, profile, assume, intake]);
+  }, [at]);
 
   const reset = useCallback(() => {
-    setIntake(null);
-    setPower(null);
-    setReach(null);
-    setBigger(null);
-    setFlow(null);
-    setProfile(null);
+    setAt(null);
+    setManualTo(null);
+    setStudy(null);
+    setPick(null);
+    setTweaked(false);
     setNeighbours(null);
     setError(null);
-    setSwapped(false);
+    setFlowOnly(null);
   }, []);
 
   return (
@@ -442,30 +528,35 @@ export default function App() {
       <header className="pointer-events-none absolute left-0 right-0 top-0 z-10 hidden items-center gap-2 px-4 py-3 lg:flex">
         <Mark />
         <span className="text-[13px] font-semibold tracking-tight">Ghatta</span>
-        <span className="text-[11px] text-muted">run-of-river screening</span>
+        <span className="text-[11px] text-muted">hydropower scheme finder</span>
       </header>
 
       <Reading
-        intake={intake}
-        power={power}
-        reach={reach}
-        bigger={bigger}
-        onUseBigger={useBigger}
-        flow={flow}
-        profile={profile}
-        result={result}
+        at={at}
+        study={study}
+        flowOnly={flowOnly}
+        found={found}
+        scheme={scheme}
+        seasons={seasons}
+        pick={pick}
+        onPick={(s) => {
+          setTweaked(false);
+          setPick({ i: s.i, j: s.j });
+        }}
         assume={assume}
         setAssume={setAssume}
         busy={busy}
         error={error}
-        swapped={swapped}
         neighbours={neighbours}
         onProbe={runProbe}
         onReset={reset}
+        tweaked={tweaked}
       />
     </div>
   );
 }
+
+const empty = (): GeoJSON.FeatureCollection => ({ type: 'FeatureCollection', features: [] });
 
 function Mark() {
   return (

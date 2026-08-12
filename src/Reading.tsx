@@ -1,22 +1,8 @@
-import type { DischargeSeries, ElevationProfile } from './api.ts';
-import type { Reach } from './rivers.ts';
-import type { Assumptions, Pt } from './App.tsx';
-import { Fdc, Profile } from './charts.tsx';
-import type { EnergyResult, FdcPoint } from './engine/hydro.ts';
-
-export type Result = {
-  fdc: FdcPoint[];
-  minMonth: number;
-  residualCms: number;
-  designFlowCms: number;
-  grossHeadM: number;
-  netHeadM: number;
-  energy: EnergyResult;
-  seasons: { wetGwh: number; dryGwh: number; wetDays: number; dryDays: number };
-  meanCms: number;
-  years: number;
-  cellKm: number;
-};
+import type { DischargeSeries } from './api.ts';
+import type { Assumptions, Pt, Study } from './App.tsx';
+import type { DiscoverResult, Scheme } from './engine/discover.ts';
+import { Fdc, RiverProfile } from './charts.tsx';
+import { buildFdc } from './engine/hydro.ts';
 
 const n = (v: number, d = 1) =>
   !Number.isFinite(v)
@@ -25,7 +11,7 @@ const n = (v: number, d = 1) =>
       ? Math.round(v).toLocaleString('en-US')
       : v.toLocaleString('en-US', { maximumFractionDigits: d });
 
-/** A value with its provenance stated underneath, always visible — no hunting. */
+/** A value with its provenance stated underneath, always visible. */
 function Fact({
   label,
   value,
@@ -93,72 +79,66 @@ function Slider({
 }
 
 export function Reading(props: {
-  intake: Pt | null;
-  power: Pt | null;
-  reach: Reach | null;
-  bigger: Reach | null;
-  onUseBigger: () => void;
-  flow: DischargeSeries | null;
-  profile: ElevationProfile | null;
-  result: Result | null;
+  at: Pt | null;
+  study: Study | null;
+  flowOnly: DischargeSeries | null;
+  found: DiscoverResult | null;
+  scheme: Scheme | null;
+  seasons: { wetGwh: number; dryGwh: number } | null;
+  pick: { i: number; j: number } | null;
+  onPick: (s: Scheme) => void;
   assume: Assumptions;
   setAssume: (a: Assumptions) => void;
-  busy: 'flow' | 'terrain' | 'probe' | null;
+  busy: string | null;
   error: string | null;
-  swapped: boolean;
   neighbours: { lat: number; lon: number; meanCms: number }[] | null;
   onProbe: () => void;
   onReset: () => void;
+  tweaked: boolean;
 }) {
   const {
-    intake,
-    power,
-    reach,
-    bigger,
-    onUseBigger,
-    flow,
-    profile,
-    result,
+    at,
+    study,
+    flowOnly,
+    found,
+    scheme,
+    seasons,
+    pick,
+    onPick,
     assume,
     setAssume,
     busy,
     error,
-    swapped,
     neighbours,
     onProbe,
     onReset,
+    tweaked,
   } = props;
-
-  // A second, independent estimate of the same quantity. HydroRIVERS models
-  // long-term mean flow per reach; GloFAS models it on a ~5 km grid. When they
-  // disagree by a lot, the grid cell is almost certainly on a different channel.
-  const rivalCms = reach?.meanDischargeCms;
-  const disagreement =
-    result && rivalCms && rivalCms > 0 && result.meanCms > 0
-      ? Math.max(rivalCms / result.meanCms, result.meanCms / rivalCms)
-      : null;
 
   const set = <K extends keyof Assumptions>(k: K, v: Assumptions[K]) =>
     setAssume({ ...assume, [k]: v });
 
-  const complete = Boolean(intake && power && result && profile);
-  const headBad = complete && result!.grossHeadM <= 0;
+  const flow = study?.flow ?? flowOnly;
+  const fdc = study ? buildFdc(study.flow.values) : flowOnly ? buildFdc(flowOnly.values) : [];
+  const meanCms = flow ? flow.values.reduce((a, b) => a + b, 0) / flow.values.length : 0;
+  const years = flow ? flow.dates.length / 365.25 : 0;
+
+  // Two independent models of the same quantity. When they diverge, the ~5 km
+  // grid cell is probably not even on this channel.
+  const rival = study?.reach?.meanDischargeCms;
+  const disagreement =
+    rival && rival > 0 && meanCms > 0 ? Math.max(rival / meanCms, meanCms / rival) : null;
+
+  const alternatives = found?.schemes ?? [];
 
   return (
-    <aside
-      className="z-10 flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-line bg-panel lg:absolute lg:right-3 lg:top-3 lg:max-h-[calc(100%-1.5rem)] lg:w-[352px] lg:flex-none lg:rounded-xl lg:border lg:shadow-[0_16px_50px_rgba(0,0,0,0.5)]"
-    >
-      {/* ---- step / status ---- */}
+    <aside className="z-10 flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-line bg-panel lg:absolute lg:right-3 lg:top-3 lg:max-h-[calc(100%-1.5rem)] lg:w-[356px] lg:flex-none lg:rounded-xl lg:border lg:shadow-[0_16px_50px_rgba(0,0,0,0.5)]">
       <div className="flex items-center gap-2 border-b border-line px-3.5 py-2">
         <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">
-          {!intake ? 'Place an intake' : !power ? 'Place a powerhouse' : 'Result'}
+          {!at ? 'Pick a river' : scheme ? 'Best scheme found' : 'Studying'}
         </span>
-        {busy && (
-          <span className="text-[10.5px] text-river">
-            {busy === 'flow' ? 'reading flow…' : busy === 'terrain' ? 'reading terrain…' : 'probing…'}
-          </span>
-        )}
-        {intake && (
+        {busy && <span className="text-[10.5px] text-river">{busy}</span>}
+        {at && (
           <button
             type="button"
             onClick={onReset}
@@ -169,35 +149,15 @@ export function Reading(props: {
         )}
       </div>
 
-      {/* ---- guidance ---- */}
-      {!intake && (
+      {!at && (
         <div className="px-3.5 py-3 text-[12px] leading-relaxed text-muted">
-          Click a river anywhere in the world to place the <b className="text-river">intake</b>, then
-          click downstream to place the <b className="text-green">powerhouse</b>.
+          <b className="text-ink">Click once on a river.</b> Ghatta walks {22} km downstream along
+          the real channel, reads the terrain and the flow, and searches hundreds of intake and
+          powerhouse positions for the schemes worth studying.
           <div className="mt-2 text-[11px] text-faint">
-            Flow comes from the GloFAS reanalysis, head from terrain tiles. Both markers drag.
+            You get alternatives to compare, not one number. Drag either marker to slide it along
+            the river.
           </div>
-        </div>
-      )}
-      {intake && !power && !error && (
-        <div className="border-b border-line px-3.5 py-2 text-[11.5px] leading-snug text-muted">
-          Now click <b className="text-green">downstream</b> — the further and steeper, the more head.
-        </div>
-      )}
-
-      {swapped && (
-        <div className="border-b border-line px-3.5 py-2 text-[11px] leading-snug text-muted">
-          Swapped the two points — the terrain says the other one is higher, and the intake is
-          always the upper end.
-        </div>
-      )}
-
-      {disagreement && disagreement > 2 && (
-        <div className="border-b border-line bg-[color-mix(in_srgb,var(--color-amber)_7%,transparent)] px-3.5 py-2 text-[11px] leading-snug text-muted">
-          <b className="text-amber">Two models disagree {n(disagreement, 1)}×</b> about the flow
-          here: GloFAS says {n(result!.meanCms, 1)} m³/s, HydroRIVERS says {n(rivalCms!, 1)} m³/s for
-          this reach. The grid cell is likely on a different channel — move the intake, or check the
-          neighbouring cells below.
         </div>
       )}
 
@@ -207,139 +167,228 @@ export function Reading(props: {
         </div>
       )}
 
-      {bigger && (
-        <button
-          type="button"
-          onClick={onUseBigger}
-          className="mx-3.5 mt-2.5 rounded-md border border-amber/40 bg-[color-mix(in_srgb,var(--color-amber)_8%,transparent)] px-2.5 py-2 text-left text-[11px] leading-snug text-ink hover:border-amber"
-        >
-          <b className="text-amber">Bigger channel {n(bigger.distanceKm, 1)} km away</b> —{' '}
-          {n(bigger.uplandKm2, 0)} km² against {n(reach?.uplandKm2 ?? 0, 0)} km² here. Use it?
-        </button>
+      {at && !study && !busy && flowOnly && (
+        <div className="border-b border-line px-3.5 py-2 text-[11.5px] leading-snug text-muted">
+          No mapped river geometry is bundled for this area, so the schemes cannot be searched
+          automatically here. <b className="text-ink">Click once more downstream</b> to place a
+          powerhouse yourself.
+        </div>
+      )}
+
+      {study && !study.followsRiver && (
+        <div className="border-b border-line px-3.5 py-2 text-[10.5px] leading-snug text-faint">
+          Straight line between your two points, not a routed waterway.
+        </div>
+      )}
+
+      {study?.movedKm !== undefined && (
+        <div className="border-b border-line px-3.5 py-2 text-[11px] leading-snug text-muted">
+          The flood model&apos;s nearest cell was not on this river, so the flow was re-read{' '}
+          {n(study.movedKm, 1)} km away, on the cell that matches the mapped channel
+          ({n(rival ?? 0, 1)} m³/s). GloFAS still supplies the daily record.
+        </div>
+      )}
+
+      {disagreement && disagreement > 2 && (
+        <div className="border-b border-line bg-[color-mix(in_srgb,var(--color-amber)_7%,transparent)] px-3.5 py-2 text-[11px] leading-snug text-muted">
+          <b className="text-amber">Two models still disagree {n(disagreement, 1)}×</b> about the
+          flow here: GloFAS {n(meanCms, 1)} m³/s, HydroRIVERS {n(rival!, 1)} m³/s. Treat the
+          capacity below as an order of magnitude, not a number, and move the intake a little.
+        </div>
       )}
 
       {/* ---- the answer ---- */}
-      {complete && !headBad && (
+      {scheme && (
         <div className="border-b border-line px-3.5 py-3">
-          <div className="flex items-baseline gap-2">
-            <span className="num text-[34px] font-semibold leading-none tracking-tight">
-              {n(result!.energy.ratedPowerW / 1e6, result!.energy.ratedPowerW < 1e7 ? 2 : 1)}
-            </span>
-            <span className="text-[15px] text-muted">MW</span>
-          </div>
-          <div className="mt-1.5 flex items-baseline gap-2">
-            <span className="num text-[19px] font-semibold leading-none">
-              {n(result!.energy.gwhPerYear, 1)}
-            </span>
-            <span className="text-[12px] text-muted">GWh per year</span>
-          </div>
-          <p className="mt-2 text-[11.5px] leading-relaxed text-muted">
-            About{' '}
-            <b className="text-ink">
-              {n((result!.energy.gwhPerYear * 1e6) / assume.householdKwh, 0)}
-            </b>{' '}
-            households, and it would run at{' '}
-            <b className="text-ink">{n(result!.energy.grossPlantFactor * 100, 0)}%</b> of nameplate
-            on hydrology alone — before any outage.
-          </p>
-
-          {/* the physics, visible */}
-          <div className="mt-2.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-md bg-panel-2 px-2.5 py-2 text-[11px]">
-            <span className="num text-river">{n(result!.designFlowCms, 2)} m³/s</span>
-            <span className="text-faint">×</span>
-            <span className="num text-river">{n(result!.netHeadM, 0)} m</span>
-            <span className="text-faint">×</span>
-            <span className="num text-river">{n(assume.efficiency * 100, 0)}%</span>
-            <span className="text-faint">× ρg →</span>
-            <span className="num font-semibold text-ink">
-              {n(result!.energy.ratedPowerW / 1e6, 2)} MW
-            </span>
-          </div>
-          <div className="mt-1 text-[9.5px] text-faint">
-            Rated power at design flow. Annual energy dispatches every day of the record through the
-            same equation.
-          </div>
+          {scheme.grossHeadM <= 0 ? (
+            <div className="text-[11.5px] leading-snug text-red">
+              This pair has no drop between it — slide the powerhouse further downstream.
+            </div>
+          ) : (
+            <>
+              <div className="flex items-baseline gap-2">
+                <span className="num text-[34px] font-semibold leading-none tracking-tight">
+                  {n(scheme.capacityMW, scheme.capacityMW < 10 ? 2 : 1)}
+                </span>
+                <span className="text-[15px] text-muted">MW</span>
+                {tweaked && <span className="ml-auto text-[10px] text-amber">hand-adjusted</span>}
+              </div>
+              <div className="mt-1.5 flex items-baseline gap-2">
+                <span className="num text-[19px] font-semibold leading-none">
+                  {n(scheme.energyGwh, 1)}
+                </span>
+                <span className="text-[12px] text-muted">GWh per year</span>
+              </div>
+              <p className="mt-2 text-[11.5px] leading-relaxed text-muted">
+                A <b className="text-ink">{n(scheme.waterwayKm, 1)} km</b> waterway taking{' '}
+                <b className="text-ink">{n(scheme.grossHeadM, 0)} m</b> of drop — about{' '}
+                <b className="text-ink">
+                  {n((scheme.energyGwh * 1e6) / assume.householdKwh, 0)}
+                </b>{' '}
+                households, running at {n(scheme.plantFactor * 100, 0)}% of nameplate on hydrology
+                alone.
+              </p>
+              <div className="mt-2.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-md bg-panel-2 px-2.5 py-2 text-[11px]">
+                <span className="num text-river">{n(scheme.designFlowCms, 2)} m³/s</span>
+                <span className="text-faint">×</span>
+                <span className="num text-river">{n(scheme.netHeadM, 0)} m</span>
+                <span className="text-faint">×</span>
+                <span className="num text-river">{n(scheme.turbinePeak * assume.efficiency * 100, 0)}%</span>
+                <span className="text-faint">× ρg →</span>
+                <span className="num font-semibold text-ink">{n(scheme.capacityMW, 2)} MW</span>
+              </div>
+              {scheme.turbine ? (
+                <div className="mt-1 text-[10px] leading-snug text-faint">
+                  <b className="text-muted">{scheme.turbine}</b> selected for this duty point —
+                  best point {n(scheme.turbinePeak * 100, 1)}%, times {n(assume.efficiency * 100, 0)}%
+                  generator. Every day of the record is dispatched on its part-load curve, so low
+                  flows are not credited with best-point efficiency.
+                </div>
+              ) : (
+                <div className="mt-1 text-[10px] leading-snug text-amber">
+                  This duty point falls outside every standard turbine envelope — the flat
+                  efficiency is a placeholder.
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 
-      {headBad && (
-        <div className="border-b border-line bg-[color-mix(in_srgb,var(--color-red)_8%,transparent)] px-3.5 py-2.5 text-[11.5px] leading-snug text-muted">
-          <b className="text-red">The powerhouse is uphill of the intake</b> — terrain says{' '}
-          {n(result!.grossHeadM, 0)} m. Drag it downstream, to lower ground.
-        </div>
-      )}
-
-      {/* ---- terrain ---- */}
-      {complete && profile && (
+      {/* ---- river long profile with the scheme marked ---- */}
+      {study && pick && (
         <div className="border-b border-line px-2 pb-1.5 pt-2.5">
-          <Profile points={profile.points} />
-          <div className="grid grid-cols-3 gap-2 px-1.5 pt-1">
-            <Fact
-              label="Gross head"
-              value={n(result!.grossHeadM, 0)}
-              unit="m"
-              from={`${profile.source}, ~${n(profile.resolutionM, 0)} m grid`}
-            />
-            <Fact
-              label="Net head"
-              value={n(result!.netHeadM, 0)}
-              unit="m"
-              from={`less ${n(assume.headLossFrac * 100, 0)}% losses`}
-            />
-            <Fact
-              label="Distance"
-              value={n(profile.points[profile.points.length - 1].distanceKm, 2)}
-              unit="km"
-              from="straight line intake→powerhouse"
-            />
+          <div className="px-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
+            {study.followsRiver ? 'The river, downstream from your click' : 'Terrain between the two points'}
           </div>
+          <RiverProfile path={study.path} i={pick.i} j={pick.j} />
+          {scheme && (
+            <div className="grid grid-cols-3 gap-2 px-1.5 pt-1">
+              <Fact
+                label="Gross head"
+                value={n(scheme.grossHeadM, 0)}
+                unit="m"
+                from={`${study.dem.source}, ~${n(study.dem.resolutionM, 0)} m grid`}
+              />
+              <Fact
+                label="Waterway"
+                value={n(scheme.waterwayKm, 2)}
+                unit="km"
+                from={study.followsRiver ? 'along the channel' : 'straight line'}
+              />
+              <Fact
+                label="Drop rate"
+                value={n(scheme.slopeMPerKm, 0)}
+                unit="m/km"
+                from="how concentrated the head is"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ---- alternatives ---- */}
+      {alternatives.length > 1 && (
+        <div className="border-b border-line px-3.5 py-3">
+          <div className="mb-1.5 flex items-baseline justify-between">
+            <span className="text-[10px] uppercase tracking-[0.08em] text-faint">
+              {alternatives.length} alternatives worth keeping
+            </span>
+            <span className="text-[9.5px] text-faint">of {n(found!.evaluated, 0)} tried</span>
+          </div>
+          <div className="space-y-1">
+            {alternatives.map((s) => {
+              const active = pick?.i === s.i && pick?.j === s.j;
+              return (
+                <button
+                  key={`${s.i}-${s.j}`}
+                  type="button"
+                  onClick={() => onPick(s)}
+                  className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left ${
+                    active
+                      ? 'border-river bg-[color-mix(in_srgb,var(--color-river)_10%,transparent)]'
+                      : 'border-line hover:border-line-strong'
+                  }`}
+                >
+                  <span className="num w-[46px] shrink-0 text-[13px] font-semibold">
+                    {n(s.capacityMW, s.capacityMW < 10 ? 1 : 0)}
+                    <span className="text-[9px] text-muted"> MW</span>
+                  </span>
+                  <span className="num w-[52px] shrink-0 text-[10.5px] text-muted">
+                    {n(s.grossHeadM, 0)} m / {n(s.waterwayKm, 1)} km
+                  </span>
+                  <span className="flex-1 text-[10px] leading-tight text-faint">
+                    {s.turbine ? `${s.turbine} · ` : ''}
+                    {s.reasons.join(' · ')}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
+            Every one of these beats all the others on at least one of energy, waterway length or
+            head — none is simply worse than another. Which matters is your call.
+          </p>
+        </div>
+      )}
+
+      {alternatives.length === 1 && (
+        <div className="border-b border-line px-3.5 py-2 text-[10.5px] leading-snug text-faint">
+          Only one scheme here survived screening out of {n(found!.evaluated, 0)} pairs tried.
+        </div>
+      )}
+      {found && alternatives.length === 0 && !busy && (
+        <div className="border-b border-line px-3.5 py-2.5 text-[11.5px] leading-snug text-muted">
+          Nothing here clears the screening thresholds — {n(found.evaluated, 0)} intake and
+          powerhouse pairs were tried and none reached 15 m of head with usable flow. This stretch
+          is probably too flat or too small.
         </div>
       )}
 
       {/* ---- flow ---- */}
-      {result && flow && (
+      {flow && fdc.length > 0 && (
         <div className="border-b border-line px-2 pb-2 pt-2.5">
           <div className="px-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
-            Flow at the intake — m³/s vs % of time exceeded
+            Flow at your click — m³/s vs % of time exceeded
           </div>
           <Fdc
-            fdc={result.fdc}
-            designCms={result.designFlowCms}
-            residualCms={result.residualCms}
+            fdc={fdc}
+            designCms={scheme?.designFlowCms ?? 0}
+            residualCms={scheme?.residualCms ?? 0}
           />
           <div className="grid grid-cols-3 gap-2 px-1.5">
             <Fact
               label="Mean"
-              value={n(result.meanCms, 2)}
+              value={n(meanCms, 2)}
               unit="m³/s"
-              from={`${n(result.years, 0)} yr GloFAS record`}
+              from={`${n(years, 0)} yr GloFAS record`}
             />
             <Fact
               label={`Design Q${Math.round(assume.exceedance * 100)}`}
-              value={n(result.designFlowCms, 2)}
+              value={scheme ? n(scheme.designFlowCms, 2) : '—'}
               unit="m³/s"
-              from="after residual flow"
+              from="at the intake, after residual"
               tone="good"
             />
             <Fact
               label="Residual"
-              value={n(result.residualCms, 2)}
+              value={scheme ? n(scheme.residualCms, 2) : '—'}
               unit="m³/s"
               from={`${n(assume.residualFrac * 100, 0)}% of driest month`}
               tone="warn"
             />
           </div>
-          {complete && (
+          {seasons && (
             <div className="mt-2 grid grid-cols-2 gap-2 px-1.5">
               <Fact
                 label="Wet half-year"
-                value={n(result.seasons.wetGwh, 1)}
+                value={n(seasons.wetGwh, 1)}
                 unit="GWh"
                 from="mid-Apr → mid-Dec"
               />
               <Fact
                 label="Dry half-year"
-                value={n(result.seasons.dryGwh, 1)}
+                value={n(seasons.dryGwh, 1)}
                 unit="GWh"
                 from="mid-Dec → mid-Apr, the hard months"
               />
@@ -349,7 +398,7 @@ export function Reading(props: {
       )}
 
       {/* ---- assumptions ---- */}
-      {result && (
+      {flow && (
         <div className="space-y-2.5 border-b border-line px-3.5 py-3">
           <div className="text-[10px] uppercase tracking-[0.08em] text-faint">Assumptions</div>
           <Slider
@@ -363,13 +412,14 @@ export function Reading(props: {
             note="Lower Q = bigger turbine, more spill."
           />
           <Slider
-            label="Overall efficiency"
+            label="Generator & transformer"
             value={assume.efficiency}
-            min={0.6}
-            max={0.93}
+            min={0.8}
+            max={0.99}
             step={0.01}
             display={`${Math.round(assume.efficiency * 100)}%`}
             onChange={(v) => set('efficiency', v)}
+            note="Turbine efficiency comes from the machine's own curve, not this."
           />
           <Slider
             label="Head loss"
@@ -405,58 +455,58 @@ export function Reading(props: {
       )}
 
       {/* ---- evidence ---- */}
-      {result && flow && (
+      {flow && (
         <div className="border-b border-line px-3.5 py-2.5 text-[10.5px] leading-relaxed text-faint">
           <div className="mb-1 text-[10px] uppercase tracking-[0.08em]">Where this comes from</div>
           <div>
-            <b className="text-muted">Flow</b> — GloFAS v4 reanalysis, {n(result.years, 0)} years,{' '}
-            {flow.from === 'network' ? 'fetched now' : flow.from === 'cache' ? 'from cache' : 'stale cache (rate-limited)'}. Modelled, not gauged.
+            <b className="text-muted">Flow</b> — GloFAS v4 reanalysis, {n(years, 0)} years,{' '}
+            {flow.from === 'network' ? 'fetched now' : flow.from === 'cache' ? 'from cache' : 'stale cache'}
+            . Modelled, not gauged. Rescaled along the river by catchment.
           </div>
           <div className="mt-0.5">
-            <b className="text-muted">Model cell</b> — {n(result.cellKm, 1)} km from your intake.
-            {result.cellKm > 2 && ' That is far enough to be a different channel.'}{' '}
+            <b className="text-muted">Model cell</b> — {n(
+              at ? Math.hypot((flow.cell.lat - at.lat) * 111.32, (flow.cell.lon - at.lon) * 111.32 * Math.cos((at.lat * Math.PI) / 180)) : 0,
+              1
+            )}{' '}
+            km from your click.{' '}
             {neighbours ? (
               <span className="text-muted">
-                Neighbours: {neighbours.slice(0, 3).map((x) => `${n(x.meanCms, 1)}`).join(' · ')} m³/s
-                mean{' '}
-                {neighbours[0] && neighbours[0].meanCms > result.meanCms * 3
-                  ? '— a much larger channel sits next door; move the intake onto it.'
-                  : '— this cell is the local maximum.'}
+                Neighbours: {neighbours.slice(0, 3).map((x) => n(x.meanCms, 1)).join(' · ')} m³/s
+                {neighbours[0] && neighbours[0].meanCms > meanCms * 3
+                  ? ' — a much larger channel sits next door.'
+                  : ' — this cell is the local maximum.'}
               </span>
             ) : (
               <button
                 type="button"
                 onClick={onProbe}
-                disabled={busy === 'probe'}
-                className="text-river underline underline-offset-2 hover:text-ink disabled:opacity-50"
+                className="text-river underline underline-offset-2 hover:text-ink"
               >
                 check neighbouring cells
               </button>
             )}
           </div>
-          {profile && (
+          {study && (
             <div className="mt-0.5">
-              <b className="text-muted">Terrain</b> — {profile.source}, zoom {profile.zoom},{' '}
-              {n(profile.resolutionM, 0)} m sample spacing, {profile.tilesFetched} tiles. Global DEMs
-              carry roughly ±10–16 m vertical error in steep ground.
+              <b className="text-muted">Terrain</b> — {study.dem.source}, zoom {study.dem.zoom},{' '}
+              {n(study.dem.resolutionM, 0)} m sample spacing, {study.dem.tilesFetched} tiles. Global
+              DEMs carry roughly ±10–16 m of vertical error in steep ground.
             </div>
           )}
-          {reach && (
+          {study?.reach && (
             <div className="mt-0.5">
-              <b className="text-muted">Catchment</b> — {n(reach.uplandKm2, 0)} km² upstream
-              {reach.distanceKm < 0.05
-                ? ' right here'
-                : ` on the mapped centreline ${n(reach.distanceKm, 2)} km away`}{' '}
-              (HydroRIVERS), whose own long-term mean there is {n(reach.meanDischargeCms, 1)} m³/s
-              against GloFAS&apos;s {n(result.meanCms, 1)}.
+              <b className="text-muted">River</b> — {n(study.reach.uplandKm2, 0)} km² upstream
+              (HydroRIVERS), whose own long-term mean here is {n(study.reach.meanDischargeCms, 1)}{' '}
+              m³/s against GloFAS&apos;s {n(meanCms, 1)}.
+              {study.followsRiver && ` Walked ${n(study.path[study.path.length - 1].km, 1)} km downstream.`}
             </div>
           )}
         </div>
       )}
 
       <div className="mt-auto border-l-2 border-amber bg-[color-mix(in_srgb,var(--color-amber)_7%,transparent)] px-3.5 py-2 text-[10.5px] leading-snug text-muted">
-        <b className="text-amber">Screening only.</b> Enough to rank ideas and decide what to survey
-        — not a feasibility study, and not a basis for investment.
+        <b className="text-amber">Screening only.</b> These compare options and tell you what to
+        survey next — they are not a feasibility study, and no waterway has been routed or costed.
       </div>
     </aside>
   );

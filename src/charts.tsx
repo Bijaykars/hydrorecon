@@ -1,10 +1,11 @@
 /**
  * Hand-drawn SVG. A chart library would be ~190 KB gzipped for two figures that
- * are a polyline each, and neither is a standard chart type: the FDC has an
- * inverted probability axis, the profile needs the head bracket drawn to scale.
+ * are a polyline each, and neither is a standard chart type: the FDC has a
+ * probability axis, and the long profile has to draw the diverted reach and its
+ * head bracket to scale on top of the river bed.
  */
 import type { FdcPoint } from './engine/hydro.ts';
-import type { ProfilePoint } from './api.ts';
+import type { StudyPoint } from './App.tsx';
 
 const INK = '#e6edf3';
 const MUTED = '#8fa3b5';
@@ -116,26 +117,33 @@ export function Fdc({
   );
 }
 
+
 /**
- * Ground profile from intake to powerhouse with the head drawn to scale.
- * The point of this figure is the shape of the drop — whether the head is a
- * genuine gorge or the DEM wandering over a flat reach.
+ * Long profile of the river, with the selected scheme drawn on it.
+ *
+ * This is the view that makes a scheme understandable rather than numerical:
+ * you see the whole studied reach, which part of it the intake and powerhouse
+ * enclose, and how much of the river's total drop that segment captures.
  */
-export function Profile({
-  points,
-  height = 150,
+export function RiverProfile({
+  path,
+  i,
+  j,
+  height = 148,
 }: {
-  points: ProfilePoint[];
+  path: StudyPoint[];
+  i: number;
+  j: number;
   height?: number;
 }) {
-  const valid = points.filter((p) => Number.isFinite(p.elevationM));
+  const valid = path.filter((p) => Number.isFinite(p.elevationM));
   if (valid.length < 2) return null;
 
   const W = 640;
   const H = height;
-  const m = { l: 42, r: 60, t: 14, b: 20 };
+  const m = { l: 40, r: 54, t: 14, b: 20 };
 
-  const chMax = points[points.length - 1].distanceKm;
+  const kmMax = path[path.length - 1].km || 1;
   const zs = valid.map((p) => p.elevationM);
   let zMin = Math.min(...zs);
   let zMax = Math.max(...zs);
@@ -143,20 +151,25 @@ export function Profile({
   zMin -= pad;
   zMax += pad;
 
-  const x = (km: number) => m.l + ((W - m.l - m.r) * km) / (chMax || 1);
+  const x = (km: number) => m.l + ((W - m.l - m.r) * km) / kmMax;
   const y = (z: number) => m.t + ((H - m.t - m.b) * (zMax - z)) / (zMax - zMin);
 
-  const d = valid
-    .map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.distanceKm).toFixed(1)},${y(p.elevationM).toFixed(1)}`)
-    .join('');
-  const area = `${d}L${x(valid[valid.length - 1].distanceKm).toFixed(1)},${y(zMin).toFixed(1)}L${x(valid[0].distanceKm).toFixed(1)},${y(zMin).toFixed(1)}Z`;
+  const line = (pts: StudyPoint[]) =>
+    pts
+      .filter((p) => Number.isFinite(p.elevationM))
+      .map((p, k) => `${k === 0 ? 'M' : 'L'}${x(p.km).toFixed(1)},${y(p.elevationM).toFixed(1)}`)
+      .join('');
 
-  const a = valid[0];
-  const b = valid[valid.length - 1];
-  const gross = a.elevationM - b.elevationM;
+  const bed = line(path);
+  const area = `${bed}L${x(kmMax).toFixed(1)},${y(zMin).toFixed(1)}L${x(0).toFixed(1)},${y(zMin).toFixed(1)}Z`;
+
+  const a = path[i];
+  const b = path[j];
+  const ok = a && b && Number.isFinite(a.elevationM) && Number.isFinite(b.elevationM);
+  const gross = ok ? a.elevationM - b.elevationM : 0;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Terrain profile">
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="River long profile">
       {niceTicks(zMin, zMax, 4).map((z) => (
         <g key={z}>
           <line x1={m.l} x2={W - m.r} y1={y(z)} y2={y(z)} stroke={LINE} strokeDasharray="3 4" />
@@ -165,38 +178,39 @@ export function Profile({
           </text>
         </g>
       ))}
-      {niceTicks(0, chMax, 4).map((km) => (
+      {niceTicks(0, kmMax, 4).map((km) => (
         <text key={km} x={x(km)} y={H - 5} textAnchor="middle" fontSize="9" fill={FAINT}>
-          {km >= 1 ? `${km.toFixed(km < 10 ? 1 : 0)} km` : `${Math.round(km * 1000)} m`}
+          {km.toFixed(km < 10 ? 1 : 0)} km
         </text>
       ))}
 
       <path d={area} fill="#151d26" />
-      <path d={d} fill="none" stroke="#3c556e" strokeWidth="1.5" />
+      <path d={bed} fill="none" stroke="#3c556e" strokeWidth="1.4" />
 
-      {/* head bracket, drawn to scale */}
-      {gross > 0 && (
-        <g>
+      {ok && (
+        <>
+          {/* the reach the scheme diverts */}
+          <path d={line(path.slice(i, j + 1))} fill="none" stroke={AMBER} strokeWidth="2.6" />
           <line
-            x1={x(b.distanceKm) + 14}
-            x2={x(b.distanceKm) + 14}
+            x1={x(b.km) + 12}
+            x2={x(b.km) + 12}
             y1={y(a.elevationM)}
             y2={y(b.elevationM)}
             stroke={RIVER}
             strokeWidth="1.2"
           />
           <line
-            x1={x(a.distanceKm)}
-            x2={x(b.distanceKm) + 14}
+            x1={x(a.km)}
+            x2={x(b.km) + 12}
             y1={y(a.elevationM)}
             y2={y(a.elevationM)}
             stroke={RIVER}
             strokeWidth="0.8"
             strokeDasharray="3 3"
-            opacity="0.6"
+            opacity="0.55"
           />
           <text
-            x={x(b.distanceKm) + 19}
+            x={x(b.km) + 17}
             y={(y(a.elevationM) + y(b.elevationM)) / 2}
             fontSize="10"
             fill={RIVER}
@@ -205,24 +219,23 @@ export function Profile({
             {Math.round(gross)} m
           </text>
           <text
-            x={x(b.distanceKm) + 19}
+            x={x(b.km) + 17}
             y={(y(a.elevationM) + y(b.elevationM)) / 2 + 11}
             fontSize="8"
             fill={MUTED}
           >
             gross
           </text>
-        </g>
+          <circle cx={x(a.km)} cy={y(a.elevationM)} r="3.6" fill={RIVER} />
+          <circle cx={x(b.km)} cy={y(b.elevationM)} r="3.6" fill={GREEN} />
+          <text x={x(a.km)} y={y(a.elevationM) - 7} fontSize="9" fill={INK} textAnchor="middle">
+            intake
+          </text>
+          <text x={x(b.km)} y={y(b.elevationM) + 14} fontSize="9" fill={INK} textAnchor="middle">
+            powerhouse
+          </text>
+        </>
       )}
-
-      <circle cx={x(a.distanceKm)} cy={y(a.elevationM)} r="3.5" fill={RIVER} />
-      <circle cx={x(b.distanceKm)} cy={y(b.elevationM)} r="3.5" fill={GREEN} />
-      <text x={x(a.distanceKm) + 6} y={y(a.elevationM) - 6} fontSize="9" fill={INK}>
-        intake
-      </text>
-      <text x={x(b.distanceKm) - 6} y={y(b.elevationM) - 8} fontSize="9" fill={INK} textAnchor="end">
-        powerhouse
-      </text>
     </svg>
   );
 }

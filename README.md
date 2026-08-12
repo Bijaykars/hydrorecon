@@ -72,6 +72,22 @@ Screening, not a feasibility study. It is enough to rank ideas and decide what t
 is not a basis for investment, licensing or design. The profile is a straight line between two
 points, not a routed waterway. Costs are not modelled at all.
 
+## Built on other people's work
+
+| Project | Licence | How it is used |
+|---|---|---|
+| [HydroGenerate](https://github.com/IdahoLabResearch/HydroGenerate) — Idaho National Laboratory | BSD-3-Clause | Turbine selection regions and part-load efficiency curves (CANMET/RETScreen 2004 correlations) **ported to TypeScript** in `src/engine/turbine.ts`. Two formulas are deliberately corrected to their published forms; both deviations are documented in the source with the reason. |
+| [GRASS GIS `r.green.hydro`](https://github.com/OSGeo/grass-addons) | GPL-2.0+ | Scheme search *method* only — a grid search over intake position × plant length. GPL code is not copied into this MIT project; the published algorithm is reimplemented, with residual flow and a real flow-duration curve added. |
+| [OpenHPL](https://github.com/OpenSimHub/OpenHPL) | MPL-2.0 | Equation reference for hydraulic losses (consulted; the 1D module is not yet built). |
+
+BSD-3-Clause notice for HydroGenerate: Copyright (c) Battelle Energy Alliance, LLC / Idaho
+National Laboratory. Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the conditions of the BSD-3-Clause licence are met.
+
+Not usable in a browser-only app, despite being excellent: HydroMT, pysheds (Python),
+OpenDroneMap (Python/C++), OpenFOAM (C++). These need a backend or a WASM runtime — see
+[plan.md](plan.md).
+
 ## Licence
 
 [MIT](LICENSE). Bundled data keeps its upstream licence.

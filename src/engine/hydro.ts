@@ -77,6 +77,14 @@ export type PlantParams = {
   headLossFrac: number;
   /** Overall efficiency: turbine x gearbox x generator x transformer. */
   efficiency: number;
+  /**
+   * Optional part-load efficiency, 0..1, as a function of the flow actually
+   * passing the turbine. When present this replaces the constant `efficiency`
+   * for every daily value, so a machine running at 20% of design is no longer
+   * credited with its best-point efficiency. `efficiency` still applies at
+   * design flow for rated power. See engine/turbine.ts.
+   */
+  efficiencyAt?: (qCms: number) => number;
   /** Turbine design (maximum) flow, m3/s. */
   designFlowCms: number;
   /** Environmental / residual flow left in the river, m3/s. Subtracted first. */
@@ -200,7 +208,7 @@ export function annualEnergy(seriesCms: readonly number[], p: PlantParams): Ener
   for (const q of clean) {
     const qt = turbineFlow(q, p);
     if (qt > 0) running++;
-    sumW += powerW(qt, h, p.efficiency);
+    sumW += powerW(qt, h, p.efficiencyAt ? p.efficiencyAt(qt) : p.efficiency);
   }
   const meanPowerW = sumW / clean.length;
   return {

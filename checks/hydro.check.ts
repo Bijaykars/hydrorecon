@@ -5,6 +5,8 @@
  * If the physics breaks, this fails.
  */
 import assert from 'node:assert/strict';
+import { discover, evaluate } from '../src/engine/discover.ts';
+import { selectTurbine, turbineCurve } from '../src/engine/turbine.ts';
 import {
   RHO,
   G,
@@ -347,6 +349,189 @@ ok('haversine matches a known separation', () => {
   const d = haversineKm([38.94977778, -77.12763889], [38.9072, -77.0369]);
   assert.ok(d > 8 && d < 14, `got ${d} km`);
   assert.equal(haversineKm([10, 20], [10, 20]), 0);
+});
+
+
+// ---------------------------------------------------------------------------
+// Scheme discovery
+// ---------------------------------------------------------------------------
+
+console.log('\nscheme discovery');
+
+/** A synthetic river: constant slope, constant flow, evenly spaced samples. */
+function ramp(points = 120, dropPerKm = 40, spacingKm = 0.12, meanCms = 10) {
+  return Array.from({ length: points }, (_, k) => ({
+    km: k * spacingKm,
+    lat: 28 + k * 1e-4,
+    lon: 84,
+    elevationM: 2000 - k * spacingKm * dropPerKm,
+    meanCms,
+  }));
+}
+
+const steady = (path: ReturnType<typeof ramp>) => ({
+  path,
+  series: new Array(2000).fill(12),
+  clickMeanCms: 10,
+  residualCms: 0,
+  exceedance: 0.4,
+  efficiency: 0.85,
+  headLossFrac: 0,
+  minFlowFrac: 0.2,
+});
+
+ok('evaluate reproduces P = rho*g*Q*H*eta by hand', () => {
+  const s = evaluate(steady(ramp()), 0, 50)!;
+  assert.ok(s, 'expected a scheme');
+  // 50 steps x 0.12 km x 40 m/km = 240 m of drop, no losses declared.
+  near(s.grossHeadM, 240, 1e-9);
+  near(s.netHeadM, 240, 1e-9);
+  near(s.waterwayKm, 6, 1e-9);
+  near(s.designFlowCms, 12, 1e-9); // flat series -> Q40 = 12, no residual
+  // Rated power now runs through the selected machine's best-point efficiency
+  // times the 0.85 generator/transformer train, not a flat 0.85 overall.
+  const c = turbineCurve(12, 240)!;
+  assert.ok(c, 'a 12 m3/s, 240 m duty point must select a machine');
+  near(s.turbinePeak, c.peak, 1e-12);
+  near(s.capacityMW, (1000 * 9.81 * 12 * 240 * c.peak * 0.85) / 1e6, 1e-9);
+});
+
+ok('an intake on a bigger catchment gets proportionally more water', () => {
+  const path = ramp();
+  for (let k = 60; k < path.length; k++) path[k].meanCms = 20; // a tributary joins
+  const upper = evaluate(steady(path), 0, 50)!;
+  const lower = evaluate(steady(path), 61, 111)!;
+  near(lower.designFlowCms / upper.designFlowCms, 2, 1e-9);
+  // Power tracks flow, but not to the last digit: the runner-size term in the
+  // efficiency correlation gives the larger machine a small scale advantage.
+  const ratio = lower.capacityMW / upper.capacityMW;
+  assert.ok(ratio > 2 && ratio < 2.05, `capacity ratio ${ratio} should exceed 2 slightly`);
+});
+
+ok('a tributary joining BELOW the intake never reaches the turbine', () => {
+  const plain = ramp();
+  const joined = ramp();
+  for (let k = 60; k < joined.length; k++) joined[k].meanCms = 40;
+  const a = evaluate(steady(plain), 0, 50)!;
+  const b = evaluate(steady(joined), 0, 50)!;
+  near(b.designFlowCms, a.designFlowCms, 1e-12);
+  near(b.capacityMW, a.capacityMW, 1e-12);
+});
+
+ok('residual flow is removed before the turbine', () => {
+  const s = evaluate({ ...steady(ramp()), residualCms: 2 }, 0, 50)!;
+  near(s.designFlowCms, 10, 1e-9); // 12 available, 2 stays in the river
+});
+
+ok('a powerhouse upstream of the intake is rejected outright', () => {
+  assert.equal(evaluate(steady(ramp()), 50, 20), null);
+  assert.equal(evaluate(steady(ramp()), 10, 10), null);
+});
+
+ok('discovery searches many pairs and returns explained alternatives', () => {
+  const r = discover(steady(ramp(200)));
+  assert.ok(r.evaluated > 50, `only evaluated ${r.evaluated}`);
+  assert.ok(r.schemes.length > 0, 'expected at least one scheme');
+  for (const s of r.schemes) {
+    assert.ok(s.j > s.i, 'powerhouse must be downstream of the intake');
+    assert.ok(s.grossHeadM > 0, 'head must be positive');
+    assert.ok(s.reasons.length > 0, 'every alternative must say why it survived');
+  }
+});
+
+ok('no surviving alternative is dominated by another', () => {
+  const r = discover(steady(ramp(200)));
+  for (const a of r.schemes) {
+    for (const b of r.schemes) {
+      if (a === b) continue;
+      const dominated =
+        b.energyGwh >= a.energyGwh &&
+        b.waterwayKm <= a.waterwayKm &&
+        b.grossHeadM >= a.grossHeadM &&
+        (b.energyGwh > a.energyGwh || b.waterwayKm < a.waterwayKm);
+      assert.ok(!dominated, 'a dominated scheme survived the Pareto filter');
+    }
+  }
+});
+
+ok('a flat river yields nothing rather than a bad scheme', () => {
+  // 0.5 m/km over 24 km never reaches the 15 m minimum head.
+  assert.equal(discover(steady(ramp(200, 0.5))).schemes.length, 0);
+});
+
+ok('longer waterways buy more head — the trade-off the list must preserve', () => {
+  const path = ramp();
+  const short = evaluate(steady(path), 0, 20)!;
+  const long = evaluate(steady(path), 0, 80)!;
+  assert.ok(long.grossHeadM > short.grossHeadM);
+  assert.ok(long.energyGwh > short.energyGwh);
+  assert.ok(long.waterwayKm > short.waterwayKm);
+});
+
+
+console.log('\nturbine selection and part-load curves (HydroGenerate port)');
+
+ok('turbine regions match HydroGenerate for classic duty points', () => {
+  assert.equal(selectTurbine(2, 400), 'Pelton'); // high head, small flow
+  assert.equal(selectTurbine(50, 100), 'Francis'); // above Kaplan's 80 m ceiling
+  assert.equal(selectTurbine(400, 8), 'Kaplan'); // low head, large flow
+  // 300 m3/s at 30 m sits inside both Francis and Kaplan; HydroGenerate breaks
+  // the tie on nearest polygon centroid, which gives Kaplan — also the machine
+  // actually used at that duty.
+  assert.equal(selectTurbine(300, 30), 'Kaplan');
+  assert.equal(selectTurbine(3, 30), 'Crossflow'); // small head, small flow
+  assert.equal(selectTurbine(5000, 2000), null); // outside every region
+});
+
+ok('part-load efficiency peaks below design flow and is never negative', () => {
+  const c = turbineCurve(12, 240)!;
+  assert.ok(c, 'expected a curve');
+  assert.ok(c.peak > 0.7 && c.peak < 0.96, `peak ${c.peak} implausible`);
+  for (let f = 0; f <= 1.2; f += 0.02) {
+    const e = c.at(f * 12);
+    assert.ok(e >= 0 && e <= 1, `efficiency ${e} out of range at ${f}`);
+  }
+  // Below the machine's minimum the unit is off, not merely inefficient.
+  assert.equal(c.at(0.01 * 12), 0);
+});
+
+ok('the Francis correction returns full-load efficiency at design flow', () => {
+  // The ported source squares only the denominator, which does not converge to
+  // the published full-load value. Guard the corrected form.
+  const c = turbineCurve(20, 120)!;
+  assert.equal(c.type, 'Francis');
+  const atDesign = c.at(20);
+  assert.ok(atDesign > 0.8 && atDesign < c.peak + 1e-9, `full load ${atDesign} vs peak ${c.peak}`);
+});
+
+ok('a crossflow still produces at half flow', () => {
+  // The ported source divides by q, driving this to zero at 0.5*Qd. A crossflow
+  // is chosen precisely for part-load, so that would be badly wrong.
+  const c = turbineCurve(3, 30)!;
+  assert.equal(c.type, 'Crossflow');
+  assert.ok(c.at(1.5) > 0.6, `half-flow efficiency ${c.at(1.5)} too low`);
+});
+
+ok('a part-load curve yields less energy than a flat best-point efficiency', () => {
+  // The whole point of curves: a river that spends most of the year well below
+  // design flow cannot be credited with peak efficiency every day.
+  const series = Array.from({ length: 365 }, (_, i) => (i < 90 ? 12 : 3));
+  const c = turbineCurve(12, 240)!;
+  const common = {
+    grossHeadM: 240,
+    headLossFrac: 0,
+    designFlowCms: 12,
+    residualFlowCms: 0,
+    minFlowFrac: c.minFlowFrac,
+  };
+  const flat = annualEnergy(series, { ...common, efficiency: c.peak });
+  const curved = annualEnergy(series, {
+    ...common,
+    efficiency: c.peak,
+    efficiencyAt: (q: number) => c.at(q),
+  });
+  assert.ok(curved.gwhPerYear < flat.gwhPerYear, 'curve must cost energy at part load');
+  assert.ok(curved.gwhPerYear > 0.5 * flat.gwhPerYear, 'but not collapse it');
 });
 
 console.log(`\n${passed} checks passed\n`);
