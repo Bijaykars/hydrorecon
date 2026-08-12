@@ -9,7 +9,7 @@
  * read as Gregorian.
  */
 import assert from 'node:assert/strict';
-import { measuredSpread, parseMeasured, scaleSeries } from '../src/measured.ts';
+import { fillGaps, measuredSpread, parseMeasured, scaleSeries } from '../src/measured.ts';
 
 let passed = 0;
 const ok = (name: string, fn: () => void) => {
@@ -152,6 +152,96 @@ ok('a measured record is far more trusted than a model, but never exact', () => 
     Math.abs(measuredSpread(3) - measuredSpread(1 / 3)) < 1e-12,
     'scaling up by 3 is exactly as uncertain as scaling down by 3'
   );
+});
+
+
+console.log('\nmeasured: filling gaps without inventing a river');
+
+/** A daily record with a hole cut out of it. */
+const withHole = (missingFrom: number, missingDays: number, year = 2020) => {
+  const rows = ['Date,Q'];
+  for (let d = 0; d < 120; d++) {
+    if (d >= missingFrom && d < missingFrom + missingDays) continue;
+    const date = new Date(Date.UTC(year, 0, 1 + d)).toISOString().slice(0, 10);
+    rows.push(`${date},${(10 + d).toFixed(1)}`);
+  }
+  return good(rows.join('\n'));
+};
+
+ok('a short gap is interpolated, and the values land on the straight line', () => {
+  const { series, report } = fillGaps(withHole(50, 3));
+  assert.equal(report.filled, 3);
+  assert.equal(report.leftEmpty, 0);
+  assert.equal(report.longestFilled, 3);
+  // The synthetic record is linear in the day index, so a correct interpolation
+  // reproduces it exactly — any other scheme would show up here.
+  const i = series.dates.indexOf('2020-02-21'); // day 51
+  assert.ok(i >= 0, 'the filled day must be present');
+  assert.ok(Math.abs(series.values[i] - 61) < 1e-9, `got ${series.values[i]}, expected 61`);
+  assert.ok(series.notes.some((n) => /estimates, not measurements/i.test(n)));
+});
+
+ok('a long gap is left empty rather than drawn through', () => {
+  const { series, report } = fillGaps(withHole(40, 30));
+  assert.equal(report.filled, 0, 'a 30-day hole must not be interpolated');
+  assert.equal(report.leftEmpty, 30);
+  assert.ok(report.longestGap >= 30);
+  assert.ok(
+    series.notes.some((n) => /stops resembling a river/i.test(n)),
+    'the refusal must be explained'
+  );
+});
+
+ok('filling adds days rather than replacing real ones', () => {
+  const before = withHole(50, 3);
+  const { series } = fillGaps(before);
+  assert.equal(series.values.length, before.values.length + 3);
+  // Every original reading survives unchanged.
+  for (let i = 0; i < before.dates.length; i++) {
+    const j = series.dates.indexOf(before.dates[i]);
+    assert.ok(j >= 0 && Math.abs(series.values[j] - before.values[i]) < 1e-12);
+  }
+});
+
+ok('seasonally clustered gaps are called out, because they bias the curve', () => {
+  // Two years of daily data with every August missing — the monsoon pattern a
+  // washed-out Nepali gauge produces, and the one that quietly removes high flows.
+  const rows = ['Date,Q'];
+  for (let y = 2018; y <= 2019; y++) {
+    for (let d = 0; d < 365; d++) {
+      const date = new Date(Date.UTC(y, 0, 1 + d)).toISOString().slice(0, 10);
+      if (date.slice(5, 7) === '08') continue;
+      rows.push(`${date},${20 + (d % 11)}`);
+    }
+  }
+  const { report, series } = fillGaps(good(rows.join('\n')));
+  assert.ok(report.clusteredMonths.includes(8), `clustered months: ${report.clusteredMonths}`);
+  assert.ok(
+    series.notes.some((n) => /Aug/.test(n) && /flood/i.test(n)),
+    'a record missing its monsoon must say so'
+  );
+});
+
+ok('a record with no gaps is returned untouched', () => {
+  const clean = withHole(0, 0);
+  const { series, report } = fillGaps(clean);
+  assert.equal(report.filled, 0);
+  assert.equal(report.leftEmpty, 0);
+  assert.equal(series.values.length, clean.values.length);
+  assert.equal(series.notes.length, clean.notes.length, 'nothing to report, nothing said');
+});
+
+ok('a monthly record is never gap-filled as if it were daily', () => {
+  const rows = ['Date,Q'];
+  for (let i = 0; i < 24; i++) {
+    const y = 2018 + Math.floor(i / 12);
+    const m = String((i % 12) + 1).padStart(2, '0');
+    rows.push(`${y}-${m}-01,${20 + (i % 7)}`);
+  }
+  const monthly = good(rows.join('\n'));
+  assert.equal(monthly.cadence, 'monthly');
+  const { report } = fillGaps(monthly);
+  assert.equal(report.filled, 0, 'the 29 days between monthly readings are not gaps');
 });
 
 console.log(`\n${passed} measured checks passed\n`);

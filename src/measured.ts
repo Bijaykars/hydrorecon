@@ -322,6 +322,142 @@ export function parseMeasured(text: string): ParseResult {
 }
 
 /**
+ * Longest run of missing days that may be interpolated across.
+ *
+ * A week is the usual limit in hydrological practice, and the reasoning is
+ * physical rather than statistical: a river's recession between storms is
+ * smooth over a few days, so a straight line between two real readings is close
+ * to what the gauge would have recorded. Over longer spans it is not — a whole
+ * missing fortnight can contain a flood peak, and drawing a line through it
+ * invents a river that never existed.
+ */
+const MAX_FILL_DAYS = 7;
+
+const dayNum = (iso: string) => Math.round(Date.parse(iso) / 86_400_000);
+const isoOf = (day: number) => new Date(day * 86_400_000).toISOString().slice(0, 10);
+
+export type GapReport = {
+  filled: number;
+  longestFilled: number;
+  leftEmpty: number;
+  longestGap: number;
+  /** Months, 1-12, where more than a third of the missing days fell. */
+  clusteredMonths: number[];
+};
+
+/**
+ * Fill short gaps in a daily record, and say exactly what was invented.
+ *
+ * WHY THIS IS NOT OPTIONAL: gauge records are not missing days at random.
+ * Nepali stations lose readings when the river is in flood — the staff cannot
+ * reach the gauge, or the gauge itself is damaged — so the absences cluster in
+ * the monsoon. Simply dropping them, which this parser used to do, removes high
+ * flows preferentially and quietly understates both the flood tail and annual
+ * energy. Interpolating short gaps is standard practice and it removes that bias.
+ *
+ * WHY IT IS BOUNDED: past a week, a straight line stops resembling a river. So
+ * long gaps stay empty, and the report says how many days were filled, the
+ * longest run filled, and whether the remaining holes cluster in particular
+ * months — because a record missing every August is telling you something about
+ * itself that no amount of interpolation should paper over.
+ */
+export function fillGaps(
+  series: MeasuredSeries,
+  maxGapDays = MAX_FILL_DAYS
+): { series: MeasuredSeries; report: GapReport } {
+  const empty: GapReport = {
+    filled: 0,
+    longestFilled: 0,
+    leftEmpty: 0,
+    longestGap: 0,
+    clusteredMonths: [],
+  };
+  if (series.cadence !== 'daily') return { series, report: empty };
+
+  const known = new Map<number, number>();
+  for (let i = 0; i < series.values.length; i++) {
+    const d = series.dates[i];
+    if (!d) continue;
+    const n = dayNum(d);
+    if (Number.isFinite(n)) known.set(n, series.values[i]);
+  }
+  if (known.size < 2) return { series, report: empty };
+
+  const days = [...known.keys()].sort((a, b) => a - b);
+  const first = days[0];
+  const last = days[days.length - 1];
+
+  const outDates: string[] = [];
+  const outValues: number[] = [];
+  const report: GapReport = { ...empty, clusteredMonths: [] };
+  const missingByMonth = new Array(13).fill(0);
+
+  let prevKnown = first;
+  for (let d = first; d <= last; d++) {
+    const here = known.get(d);
+    if (here !== undefined) {
+      outDates.push(isoOf(d));
+      outValues.push(here);
+      prevKnown = d;
+      continue;
+    }
+    // Find the next real reading to bracket this hole.
+    let next = d + 1;
+    while (next <= last && !known.has(next)) next++;
+    const gap = next - prevKnown - 1;
+    const month = Number(isoOf(d).slice(5, 7));
+    missingByMonth[month]++;
+    if (gap <= maxGapDays && next <= last) {
+      const a = known.get(prevKnown)!;
+      const b = known.get(next)!;
+      const t = (d - prevKnown) / (next - prevKnown);
+      outDates.push(isoOf(d));
+      outValues.push(a + t * (b - a));
+      report.filled++;
+      report.longestFilled = Math.max(report.longestFilled, gap);
+    } else {
+      report.leftEmpty++;
+    }
+    report.longestGap = Math.max(report.longestGap, gap);
+  }
+
+  const totalMissing = missingByMonth.reduce((a, b) => a + b, 0);
+  if (totalMissing > 0) {
+    for (let m = 1; m <= 12; m++) {
+      if (missingByMonth[m] > totalMissing / 3) report.clusteredMonths.push(m);
+    }
+  }
+
+  const notes = [...series.notes];
+  if (report.filled > 0) {
+    notes.push(
+      `${report.filled} missing days filled by interpolating between the readings either side ` +
+        `(longest run ${report.longestFilled} days). These are estimates, not measurements.`
+    );
+  }
+  if (report.leftEmpty > 0) {
+    notes.push(
+      `${report.leftEmpty} days left empty — the gaps are longer than ${maxGapDays} days ` +
+        `(longest ${report.longestGap}), where a straight line stops resembling a river.`
+    );
+  }
+  if (report.clusteredMonths.length > 0) {
+    notes.push(
+      `Missing days cluster in ${report.clusteredMonths.map((m) => MONTHS[m - 1]).join(', ')}. ` +
+        'Gauges are lost in flood, so absences are rarely random — a record missing its ' +
+        'monsoon under-reports high flows however the gaps are treated.'
+    );
+  }
+
+  return {
+    series: { ...series, dates: outDates, values: outValues, notes },
+    report,
+  };
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
  * Scale a record from a gauge onto this site by catchment area.
  *
  * Q_here = Q_gauge x (A_here / A_gauge) — the standard transfer, and what a

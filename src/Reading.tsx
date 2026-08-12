@@ -5,6 +5,7 @@ import type { Uncertainty } from './engine/uncertainty.ts';
 import type { Licence } from './context.ts';
 import { MONTH_NAMES } from './engine/hydest.ts';
 import { connectionVerdict, type GridLink } from './grid.ts';
+import type { ProtectedHit } from './protected.ts';
 import type { MeasuredSeries } from './measured.ts';
 import {
   DISCHARGE_GAUGE_COUNT,
@@ -113,6 +114,7 @@ export function Reading(props: {
     floods: { t: number; cms: number }[];
   } | null;
   grid: GridLink | null;
+  conservation: { inside: ProtectedHit[]; near: ProtectedHit[]; hard: boolean } | null;
   measured: { series: MeasuredSeries; ratio: number; name: string } | null;
   onImport: (file: File) => void;
   onClearMeasured: () => void;
@@ -143,6 +145,7 @@ export function Reading(props: {
     gauges,
     hydest,
     grid,
+    conservation,
     measured,
     onImport,
     onClearMeasured,
@@ -224,6 +227,45 @@ export function Reading(props: {
           No mapped river network covers this area, so the course was traced downhill through the
           terrain and the flood model&apos;s own flow is used unscaled. Both are weaker than where a
           network exists — treat this as a first look.
+        </div>
+      )}
+
+      {conservation && (
+        <div
+          className={`border-b border-line px-3.5 py-2.5 ${
+            conservation.hard
+              ? 'bg-[color-mix(in_srgb,var(--color-red)_10%,transparent)]'
+              : 'bg-[color-mix(in_srgb,var(--color-amber)_8%,transparent)]'
+          }`}
+        >
+          <div className="mb-1 text-[10px] uppercase tracking-[0.08em] text-faint">
+            {conservation.inside.length ? 'inside a protected area' : 'beside a protected area'}
+          </div>
+          {conservation.inside.map((h) => (
+            <div key={h.name} className="text-[11px] leading-snug">
+              <b className={conservation.hard ? 'text-red' : 'text-amber'}>{h.name}</b>
+              <span className="block text-[10px] text-muted">{h.regime}</span>
+              {h.nearEdge && (
+                <span className="block text-[9.5px] text-faint">
+                  close to the boundary — at this mapping accuracy, inside and outside cannot be
+                  told apart here
+                </span>
+              )}
+            </div>
+          ))}
+          {conservation.near.map((h) => (
+            <div key={h.name} className="text-[11px] leading-snug">
+              <b className="text-amber">{h.name}</b>
+              <span className="block text-[10px] text-muted">
+                within 3 km — {h.regime}
+              </span>
+            </div>
+          ))}
+          <p className="mt-1 text-[9.5px] leading-snug text-faint">
+            Boundaries from OpenStreetMap, © contributors, ODbL, simplified to ~200 m. Nepal&apos;s
+            conservation areas do host licensed hydropower; national parks and reserves effectively
+            do not. The permission question is DNPWC&apos;s, not this tool&apos;s.
+          </p>
         </div>
       )}
 

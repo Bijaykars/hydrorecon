@@ -24,7 +24,14 @@ import { haversineKm, minMonthlyMean, wetDryEnergy, type PlantParams } from './e
 import { licencesAlong, loadLicences, type Licence } from './context.ts';
 import { gaugesFor, type Gauge } from './gauges.ts';
 import { gridLink } from './grid.ts';
-import { measuredSpread, parseMeasured, scaleSeries, type MeasuredSeries } from './measured.ts';
+import { isHardStop, protectedAt, protectedNear } from './protected.ts';
+import {
+  fillGaps,
+  measuredSpread,
+  parseMeasured,
+  scaleSeries,
+  type MeasuredSeries,
+} from './measured.ts';
 import {
   RETURN_PERIODS,
   designFlood,
@@ -604,6 +611,29 @@ export default function App() {
     [scheme]
   );
 
+  /**
+   * Whether this scheme sits inside a protected area.
+   *
+   * Tested at BOTH ends: an intake outside a park with its powerhouse inside is
+   * still a park problem, and so is the reverse. Near-misses are reported too,
+   * because a boundary simplified to 200 m cannot settle a site 300 m outside one.
+   */
+  const conservation = useMemo(() => {
+    if (!scheme) return null;
+    const hits = [
+      ...protectedAt(scheme.intake.lat, scheme.intake.lon),
+      ...protectedAt(scheme.power.lat, scheme.power.lon),
+    ];
+    const seen = new Set<string>();
+    const inside = hits.filter((h) => !seen.has(h.name) && seen.add(h.name));
+    const near = inside.length
+      ? []
+      : protectedNear(scheme.intake.lat, scheme.intake.lon, 3);
+    return inside.length || near.length
+      ? { inside, near, hard: isHardStop(inside) }
+      : null;
+  }, [scheme]);
+
   const uncertainty = useMemo(() => {
     if (!input || !scheme || !study) return null;
     return uncertaintyFor(
@@ -634,8 +664,19 @@ export default function App() {
       // Pre-fill the transfer factor from the best connected gauge, when it has
       // a defensible one — that is exactly what this record is likely to be.
       const suggested = gauges?.find((g) => g.trustworthy && g.areaRatio)?.areaRatio ?? 1;
+      /**
+       * Close short holes before anything else touches the record.
+       *
+       * Missing days in a gauge record are not missing at random: Nepali
+       * stations lose readings when the river is in flood, so the absences sit
+       * in the monsoon. Dropping them, which is what happened before, removes
+       * high flows preferentially and understates the flood tail and the energy
+       * with it. Filled days are labelled as estimates in the notes the panel
+       * shows, and long gaps are still left open.
+       */
+      const { series } = fillGaps(parsed.series);
       setMeasured({
-        series: scaleSeries(parsed.series, suggested),
+        series: scaleSeries(series, suggested),
         ratio: suggested,
         name: file.name,
       });
@@ -874,6 +915,7 @@ export default function App() {
         gauges={gauges}
         hydest={hydest}
         grid={grid}
+        conservation={conservation}
         measured={measured}
         onImport={onImport}
         onClearMeasured={() => setMeasured(null)}
