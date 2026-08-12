@@ -4,10 +4,10 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   fetchDischarge,
   fetchPathProfile,
-  fetchProfile,
   meanOf,
   probeNeighbours,
   reanchorToRiver,
+  traceDownhill,
   type DischargeSeries,
   type ElevationProfile,
 } from './api.ts';
@@ -63,6 +63,8 @@ export type Study = {
   dem: ElevationProfile;
   /** False when the river had to be approximated by a straight line. */
   followsRiver: boolean;
+  /** True when the course came from tracing terrain, not a mapped river network. */
+  tracedFromTerrain?: boolean;
   reach: Reach | null;
   /** Set when the flow query had to be moved onto the right channel. */
   movedKm?: number;
@@ -70,30 +72,25 @@ export type Study = {
 
 // ---------------------------------------------------------------------------
 
-type UrlState = { view: { lat: number; lon: number; zoom: number }; at: Pt | null; to: Pt | null };
+type UrlState = { view: { lat: number; lon: number; zoom: number }; at: Pt | null };
 
 function readUrl(): UrlState {
   const p = new URLSearchParams(location.hash.slice(1));
-  const pt = (s: string | null): Pt | null => {
-    const m = s?.split(',').map(Number);
-    return m && m.length === 2 && m.every(Number.isFinite) ? { lat: m[0], lon: m[1] } : null;
-  };
+  const m = p.get('at')?.split(',').map(Number);
   const v = p.get('map')?.split('/').map(Number);
   return {
     view:
       v && v.length === 3 && v.every(Number.isFinite)
         ? { zoom: v[0], lat: v[1], lon: v[2] }
         : { zoom: 3.2, lat: 22, lon: 20 },
-    at: pt(p.get('at')),
-    to: pt(p.get('to')),
+    at: m && m.length === 2 && m.every(Number.isFinite) ? { lat: m[0], lon: m[1] } : null,
   };
 }
 
-function writeUrl(view: { lat: number; lon: number; zoom: number }, at: Pt | null, to: Pt | null) {
+function writeUrl(view: { lat: number; lon: number; zoom: number }, at: Pt | null) {
   const p = new URLSearchParams();
   p.set('map', `${view.zoom.toFixed(2)}/${view.lat.toFixed(4)}/${view.lon.toFixed(4)}`);
   if (at) p.set('at', `${at.lat.toFixed(5)},${at.lon.toFixed(5)}`);
-  if (to) p.set('to', `${to.lat.toFixed(5)},${to.lon.toFixed(5)}`);
   history.replaceState(null, '', `#${p}`);
 }
 
@@ -105,10 +102,8 @@ export default function App() {
   const map = useRef<maplibregl.Map | null>(null);
   const markers = useRef<{ a?: maplibregl.Marker; b?: maplibregl.Marker }>({});
 
-  /** Where the user clicked on the river. The only required input. */
+  /** Where the user clicked on the river. The only input the app needs. */
   const [at, setAt] = useState<Pt | null>(initial.at);
-  /** Manual second point, only used where no river geometry is available. */
-  const [manualTo, setManualTo] = useState<Pt | null>(initial.to);
 
   const [study, setStudy] = useState<Study | null>(null);
   const [assume, setAssume] = useState<Assumptions>(DEFAULTS);
@@ -120,9 +115,7 @@ export default function App() {
   const [tweaked, setTweaked] = useState(false);
 
   const atRef = useRef(at);
-  const manualRef = useRef(manualTo);
   atRef.current = at;
-  manualRef.current = manualTo;
 
   // ---------------- map ----------------
   useEffect(() => {
@@ -248,7 +241,7 @@ export default function App() {
     m.on('click', (e) => void onClick(e.lngLat.lat, e.lngLat.lng));
     m.on('moveend', () => {
       const c = m.getCenter();
-      writeUrl({ lat: c.lat, lon: c.lng, zoom: m.getZoom() }, atRef.current, manualRef.current);
+      writeUrl({ lat: c.lat, lon: c.lng, zoom: m.getZoom() }, atRef.current);
     });
 
     return () => {
@@ -260,13 +253,7 @@ export default function App() {
   }, []);
 
   const onClick = useCallback(async (lat: number, lon: number) => {
-    // Outside river coverage a second click supplies the powerhouse by hand.
-    if (atRef.current && !hasReachData(atRef.current.lat, atRef.current.lon) && !manualRef.current) {
-      setManualTo({ lat, lon });
-      return;
-    }
     const hit = await nearestReach(lat, lon).catch(() => null);
-    setManualTo(null);
     setPick(null);
     setTweaked(false);
     setNeighbours(null);
@@ -320,30 +307,37 @@ export default function App() {
           movedKm,
         });
       } else {
-        // No mapped geometry here: fall back to a straight line to a second click.
-        if (!manualTo) {
-          const flow = await flowP;
-          if (dead) return;
-          setStudy(null);
-          setFlowOnly(flow);
-          setBusy(null);
-          return;
-        }
-        const dem = await fetchProfile([at.lat, at.lon], [manualTo.lat, manualTo.lon]);
+        // Anywhere without a bundled network: follow the valley down the DEM.
+        // Same one-click search, worldwide.
+        if (!dead) setBusy('Following the valley downhill…');
+        const traced = await traceDownhill(at.lat, at.lon, SEARCH_KM);
         const flow = await flowP;
         if (dead) return;
+        if (traced.length < 8) {
+          setStudy(null);
+          setFlowOnly(flow);
+          return;
+        }
         setStudy({
-          path: dem.points.map((p) => ({
-            km: p.distanceKm,
-            lat: p.lat,
-            lon: p.lon,
-            elevationM: p.elevationM,
-            meanCms: 1, // constant: a straight line has no catchment information
-          })),
+          // No catchment data out here, so flow is held constant along the
+          // reach rather than invented. Stated in the panel.
+          path: traced.map((p) => ({ ...p, meanCms: 1 })),
           flow,
           clickMeanCms: 1,
-          dem,
-          followsRiver: false,
+          dem: {
+            points: traced.map((p) => ({
+              distanceKm: p.km,
+              elevationM: p.elevationM,
+              lat: p.lat,
+              lon: p.lon,
+            })),
+            source: 'Re:Earth Mapterhorn (valley trace)',
+            zoom: 0,
+            resolutionM: NaN,
+            tilesFetched: 0,
+          },
+          followsRiver: true,
+          tracedFromTerrain: true,
           reach,
         });
       }
@@ -354,7 +348,7 @@ export default function App() {
     return () => {
       dead = true;
     };
-  }, [at, manualTo]);
+  }, [at]);
 
   /** Flow known but no scheme yet (outside river coverage, before the 2nd click). */
   const [flowOnly, setFlowOnly] = useState<DischargeSeries | null>(null);
@@ -470,7 +464,7 @@ export default function App() {
     };
 
     place('a', scheme?.intake ?? at, '#4db8ff', 'Intake — drag along the river', slide('i'));
-    place('b', scheme?.power ?? manualTo, '#3fb950', 'Powerhouse — drag along the river', slide('j'));
+    place('b', scheme?.power ?? null, '#3fb950', 'Powerhouse — drag along the river', slide('j'));
 
     const src = m.getSource('scheme') as maplibregl.GeoJSONSource | undefined;
     if (src) {
@@ -494,14 +488,14 @@ export default function App() {
           : empty()
       );
     }
-  }, [scheme, at, manualTo, study, pick]);
+  }, [scheme, at, study, pick]);
 
   useEffect(() => {
     const m = map.current;
     if (!m) return;
     const c = m.getCenter();
-    writeUrl({ lat: c.lat, lon: c.lng, zoom: m.getZoom() }, at, manualTo);
-  }, [at, manualTo]);
+    writeUrl({ lat: c.lat, lon: c.lng, zoom: m.getZoom() }, at);
+  }, [at]);
 
   const runProbe = useCallback(async () => {
     if (!at) return;
@@ -512,7 +506,6 @@ export default function App() {
 
   const reset = useCallback(() => {
     setAt(null);
-    setManualTo(null);
     setStudy(null);
     setPick(null);
     setTweaked(false);

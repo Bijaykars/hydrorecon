@@ -49,9 +49,48 @@ driest month, and the household figure used for the plain-language comparison. A
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm run check    # 36 assert-based physics checks
+npm run check    # 81 assert-based checks
 npm run build    # typecheck + production build
 ```
+
+Desktop build — the same app, packaged:
+
+```bash
+npm run desktop        # run it as a desktop app
+npm run desktop:dist   # installers into release/ (.exe, .dmg, AppImage, .deb)
+```
+
+There is one codebase. The desktop shell loads the identical build the website
+serves, over a custom `app://` scheme rather than `file://` so `fetch` and
+workers behave exactly as they do on the web. Verified: the same click produces
+the same 32.7 MW in both.
+
+## Is the arithmetic right?
+
+That is the question this project takes most seriously, so it is checked three ways.
+
+**Against the reference implementation.** The turbine module is a hand port of
+[HydroGenerate](https://github.com/IdahoLabResearch/HydroGenerate) (Idaho National
+Laboratory, BSD-3-Clause). `checks/hydrogenerate.check.ts` pins it to numbers
+produced by actually running that library — regenerate them with
+`tools/compare-hydrogenerate.py`. The port reproduces the library **exactly** at
+every sampled flow, except at three points where it departs on purpose, and each
+departure is itself asserted so it cannot happen by accident.
+
+**Against reality.** `checks/plants.check.ts` runs the engine at five built
+Nepali power stations — Chilime, Upper Tamakoshi, Nyadi, Kabeli A, Rasuwagadhi —
+and requires it to reproduce their published capacity, pick a machine whose ESHA
+head band contains the real head, and predict each plant's own efficiency within
+8 points. Measured spread: −6.2 to +6.1 points.
+
+This is not ceremony. It found a real defect: HydroGenerate refuses Upper
+Tamakoshi outright — Nepal's largest station, 456 MW — because its Pelton region
+stops at 60 m³/s and the plant runs 66. The port falls back to the ESHA 2004
+head bands and returns Pelton, as built.
+
+**Against itself.** `checks/hydro.check.ts` covers the energy maths, unit traps
+(m³/s vs ft³/s, MW vs GWh, gross vs net head), flow-duration construction and
+the Pareto invariant that no listed alternative is beaten outright by another.
 
 ## Data sources
 

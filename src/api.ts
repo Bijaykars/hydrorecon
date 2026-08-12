@@ -331,6 +331,132 @@ function loadTile(
   return p;
 }
 
+// ---------------------------------------------------------------------------
+// Following a valley downhill, from terrain alone.
+//
+// The bundled river network only covers one window of the world. Terrain tiles
+// cover all of it, and a river is simply the line of steepest descent along a
+// valley floor — so the same one-click search can run anywhere by tracing the
+// DEM. This is the D8 idea behind pysheds and WhiteboxTools (both copyleft, so
+// the method is reimplemented rather than copied), coarsened: instead of
+// stepping pixel to pixel, where a single noisy cell or a filled pit derails
+// the trace, it steps a fixed distance and picks the lowest of a fan of
+// forward-facing candidates. That averages over DEM noise and walks straight
+// through small pits without needing a pit-filling pass.
+// ---------------------------------------------------------------------------
+
+/** One elevation sample from the tiles already in memory. NaN if not loaded. */
+function elevationFromTiles(
+  tiles: Map<string, ImageData | null>,
+  zoom: number,
+  lat: number,
+  lon: number
+): number {
+  const fx = lonToTileX(lon, zoom);
+  const fy = latToTileY(lat, zoom);
+  const img = tiles.get(`${Math.floor(fx)}/${Math.floor(fy)}`);
+  return img ? sampleBilinear(img, fx % 1, fy % 1) : NaN;
+}
+
+const R_EARTH_KM = 6371.0088;
+
+/** Move a bearing and distance over the sphere. */
+function offset(lat: number, lon: number, bearingRad: number, km: number) {
+  const dLat = (km / R_EARTH_KM) * Math.cos(bearingRad) * (180 / Math.PI);
+  const dLon =
+    ((km / R_EARTH_KM) * Math.sin(bearingRad) * (180 / Math.PI)) /
+    Math.cos((lat * Math.PI) / 180);
+  return { lat: lat + dLat, lon: lon + dLon };
+}
+
+export type TracedPoint = { lat: number; lon: number; km: number; elevationM: number };
+
+/**
+ * Follow the valley downhill from a point, using terrain only.
+ * Returns evenly spaced points with elevation already attached.
+ */
+export async function traceDownhill(
+  lat: number,
+  lon: number,
+  maxKm = 22,
+  stepKm = 0.15
+): Promise<TracedPoint[]> {
+  // A generous tile patch around the click, at a zoom that keeps the count sane.
+  const src = DEM_SOURCES[0];
+  const spanDeg = maxKm / 111;
+  const corners = [
+    { lat: lat - spanDeg, lon: lon - spanDeg },
+    { lat: lat + spanDeg, lon: lon + spanDeg },
+  ];
+  let zoom = 13;
+  for (let z = 13; z >= 9; z--) {
+    const nx =
+      Math.floor(lonToTileX(corners[1].lon, z)) - Math.floor(lonToTileX(corners[0].lon, z)) + 1;
+    const ny =
+      Math.floor(latToTileY(corners[0].lat, z)) - Math.floor(latToTileY(corners[1].lat, z)) + 1;
+    if (nx * ny <= 36) {
+      zoom = z;
+      break;
+    }
+  }
+
+  const x0 = Math.floor(lonToTileX(corners[0].lon, zoom));
+  const x1 = Math.floor(lonToTileX(corners[1].lon, zoom));
+  const y0 = Math.floor(latToTileY(corners[1].lat, zoom));
+  const y1 = Math.floor(latToTileY(corners[0].lat, zoom));
+  const tiles = new Map<string, ImageData | null>();
+  const jobs: Promise<void>[] = [];
+  for (let x = x0; x <= x1; x++) {
+    for (let y = y0; y <= y1; y++) {
+      jobs.push(loadTile(src, zoom, x, y).then((img) => void tiles.set(`${x}/${y}`, img)));
+    }
+  }
+  await Promise.all(jobs);
+  if ([...tiles.values()].every((t) => t === null)) return [];
+
+  const z0 = elevationFromTiles(tiles, zoom, lat, lon);
+  if (!Number.isFinite(z0)) return [];
+
+  const out: TracedPoint[] = [{ lat, lon, km: 0, elevationM: z0 }];
+  let cur = { lat, lon };
+  let curZ = z0;
+  let bearing: number | null = null;
+  let km = 0;
+  /** Allowed climb per step, to cross a pool or a DEM pit without stalling. */
+  const CLIMB_TOLERANCE_M = 6;
+
+  while (km < maxKm) {
+    // Fan of candidates. Once moving, stay within ±100° of the current heading
+    // so the trace cannot double back up the valley it just came down.
+    const arc = bearing === null ? Math.PI : (100 * Math.PI) / 180;
+    const n = bearing === null ? 24 : 15;
+    let bestZ = Infinity;
+    let best: { lat: number; lon: number } | null = null;
+    let bestBearing = 0;
+    for (let i = 0; i < n; i++) {
+      const b = (bearing ?? 0) + (bearing === null ? (2 * Math.PI * i) / n : -arc + (2 * arc * i) / (n - 1));
+      const p = offset(cur.lat, cur.lon, b, stepKm);
+      const z = elevationFromTiles(tiles, zoom, p.lat, p.lon);
+      if (!Number.isFinite(z)) continue;
+      if (z < bestZ) {
+        bestZ = z;
+        best = p;
+        bestBearing = b;
+      }
+    }
+    if (!best) break;
+    if (bestZ > curZ + CLIMB_TOLERANCE_M) break; // genuinely uphill: the valley has ended
+
+    km += stepKm;
+    cur = best;
+    // Track the descent, but never let a pool raise the recorded profile.
+    curZ = Math.min(curZ, bestZ);
+    bearing = bestBearing;
+    out.push({ lat: cur.lat, lon: cur.lon, km, elevationM: bestZ });
+  }
+  return out;
+}
+
 export type ProfilePoint = { distanceKm: number; elevationM: number; lat: number; lon: number };
 
 export type ElevationProfile = {

@@ -22,3 +22,5 @@ npm-debug.log*
 .openai/
 .gstack/
 .codex-dev.*
+
+release/

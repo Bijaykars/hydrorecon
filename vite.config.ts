@@ -4,6 +4,9 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Relative asset URLs, so the identical build works served from a web root
+  // and loaded by the desktop shell's app:// scheme.
+  base: './',
   build: {
     rollupOptions: {
       // MapLibre is the only heavy dependency and it never changes between
