@@ -6,7 +6,6 @@ import {
   fetchPathProfile,
   meanOf,
   probeNeighbours,
-  reanchorToRiver,
   traceDownhill,
   type DischargeSeries,
   type ElevationProfile,
@@ -59,15 +58,12 @@ export type StudyPoint = {
 export type Study = {
   path: StudyPoint[];
   flow: DischargeSeries;
-  clickMeanCms: number;
   dem: ElevationProfile;
   /** False when the river had to be approximated by a straight line. */
   followsRiver: boolean;
   /** True when the course came from tracing terrain, not a mapped river network. */
   tracedFromTerrain?: boolean;
   reach: Reach | null;
-  /** Set when the flow query had to be moved onto the right channel. */
-  movedKm?: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -252,13 +248,67 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Pull a click onto a mapped watercourse using the basemap's own waterway
+   * geometry, which is already loaded and covers the whole world via OSM.
+   *
+   * This matters more than it looks. Tracing terrain downhill from a point that
+   * is NOT on a river runs straight down the hillside, which produced a
+   * "scheme" with 773 m of drop in 900 m — a cliff, not a river reach. Starting
+   * on the channel keeps the trace in the valley floor.
+   */
+  const snapToWaterway = useCallback((lat: number, lon: number): Pt => {
+    const m = map.current;
+    if (!m || !m.isStyleLoaded()) return { lat, lon };
+    const pt = m.project([lon, lat]);
+    const R = 22; // px
+    const layers = (m.getStyle().layers ?? [])
+      .filter((l) => l.type === 'line' && /water/i.test(l.id) && m.getLayer(l.id))
+      .map((l) => l.id);
+    if (layers.length === 0) return { lat, lon };
+    let feats: maplibregl.MapGeoJSONFeature[] = [];
+    try {
+      feats = m.queryRenderedFeatures(
+        [
+          [pt.x - R, pt.y - R],
+          [pt.x + R, pt.y + R],
+        ],
+        { layers }
+      );
+    } catch {
+      return { lat, lon };
+    }
+    let best: Pt | null = null;
+    let bestD = Infinity;
+    const consider = (coords: GeoJSON.Position[]) => {
+      for (const c of coords) {
+        const p = m.project([c[0], c[1]]);
+        const d = (p.x - pt.x) ** 2 + (p.y - pt.y) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          best = { lat: c[1], lon: c[0] };
+        }
+      }
+    };
+    for (const f of feats) {
+      const g = f.geometry;
+      if (g.type === 'LineString') consider(g.coordinates);
+      else if (g.type === 'MultiLineString') for (const l of g.coordinates) consider(l);
+    }
+    return best && bestD <= R * R ? best : { lat, lon };
+  }, []);
+
   const onClick = useCallback(async (lat: number, lon: number) => {
     const hit = await nearestReach(lat, lon).catch(() => null);
     setPick(null);
     setTweaked(false);
     setNeighbours(null);
-    setAt(hit && hit.nearest.distanceKm <= SNAP_KM ? hit.nearest.point : { lat, lon });
-  }, []);
+    // Prefer the detailed network where it exists, otherwise the basemap's
+    // waterways, otherwise the raw click.
+    setAt(
+      hit && hit.nearest.distanceKm <= SNAP_KM ? hit.nearest.point : snapToWaterway(lat, lon)
+    );
+  }, [snapToWaterway]);
 
   // ---------------- the study ----------------
   useEffect(() => {
@@ -280,31 +330,14 @@ export default function App() {
       if (river && river.length > 8) {
         if (!dead) setBusy('Reading the terrain along it…');
         const dem = await fetchPathProfile(river);
-        let flow = await flowP;
-        let movedKm: number | undefined;
-
-        // The flood model's grid cell can miss the channel. Where the mapped
-        // network gives an independent mean, use it to referee — but only when
-        // the two already disagree, since the check costs 8 requests.
-        const target = reach?.meanDischargeCms ?? 0;
-        const mean = meanOf(flow.values);
-        if (target > 0 && mean > 0 && Math.max(target / mean, mean / target) > 2) {
-          if (!dead) setBusy('Flow looks off-channel — finding the right cell…');
-          const fixed = await reanchorToRiver(river, target, flow).catch(() => null);
-          if (fixed) {
-            flow = fixed.series;
-            movedKm = fixed.movedKm;
-          }
-        }
+        const flow = await flowP;
         if (dead) return;
         setStudy({
           path: river.map((p, k) => ({ ...p, elevationM: dem.points[k]?.elevationM ?? NaN })),
           flow,
-          clickMeanCms: river[0].meanCms,
           dem,
           followsRiver: true,
           reach,
-          movedKm,
         });
       } else {
         // Anywhere without a bundled network: follow the valley down the DEM.
@@ -319,11 +352,10 @@ export default function App() {
           return;
         }
         setStudy({
-          // No catchment data out here, so flow is held constant along the
-          // reach rather than invented. Stated in the panel.
-          path: traced.map((p) => ({ ...p, meanCms: 1 })),
+          // meanCms 0 = no mapped network here, so the flood model's own
+          // magnitude is used unscaled and the panel says so.
+          path: traced.map((p) => ({ ...p, meanCms: 0 })),
           flow,
-          clickMeanCms: 1,
           dem: {
             points: traced.map((p) => ({
               distanceKm: p.km,
@@ -363,7 +395,7 @@ export default function App() {
     return {
       path: study.path,
       series: study.flow.values,
-      clickMeanCms: study.clickMeanCms,
+      seriesMeanCms: meanOf(study.flow.values),
       residualCms: Number.isFinite(minMonth) ? minMonth * assume.residualFrac : 0,
       exceedance: assume.exceedance,
       efficiency: assume.efficiency,
@@ -396,7 +428,8 @@ export default function App() {
 
   const seasons = useMemo(() => {
     if (!study || !scheme) return null;
-    const ratio = study.clickMeanCms > 0 ? study.path[scheme.i].meanCms / study.clickMeanCms : 1;
+    const gm = meanOf(study.flow.values);
+    const ratio = study.path[scheme.i].meanCms > 0 && gm > 0 ? study.path[scheme.i].meanCms / gm : 1;
     const p: PlantParams = {
       grossHeadM: Math.max(0, scheme.grossHeadM),
       headLossFrac: assume.headLossFrac,

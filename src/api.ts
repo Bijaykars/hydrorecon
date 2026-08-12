@@ -204,63 +204,6 @@ export async function probeNeighbours(
 
 export const meanOf = (v: readonly number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 
-/**
- * Re-anchor the flow query onto the cell that actually holds this river.
- *
- * The flood model runs on a ~5 km grid, so the cell nearest a click can sit on
- * a different channel entirely — measured here at 17x, which would have made
- * every scheme on the page 17x too small. The mapped river network gives an
- * independent long-term mean on the actual centreline, so it can referee which
- * neighbouring cell is the right one. GloFAS still supplies all the daily
- * dynamics; the network only decides *where* to ask.
- *
- * Only called when the two already disagree, because it costs 8 requests.
- */
-export async function reanchorToRiver(
-  path: { lat: number; lon: number }[],
-  targetMeanCms: number,
-  current: DischargeSeries,
-  maxProbes = 6
-): Promise<{ series: DischargeSeries; movedKm: number } | null> {
-  if (!(targetMeanCms > 0) || path.length < 2) return null;
-  // Compare in log space: being 10x under is as wrong as 10x over.
-  const err = (m: number) => (m > 0 ? Math.abs(Math.log(m / targetMeanCms)) : Infinity);
-  let best = current;
-  let bestErr = err(meanOf(current.values));
-
-  // Sample points spread along the channel itself, deduped to distinct model
-  // cells. Every one is guaranteed to be on the river, which a blind grid
-  // sweep around the click is not.
-  const seen = new Set<string>();
-  const probes: { lat: number; lon: number }[] = [];
-  for (let k = 0; k < maxProbes; k++) {
-    const p = path[Math.floor(((path.length - 1) * k) / Math.max(1, maxProbes - 1))];
-    const c = quantize(p.lat, p.lon);
-    const key = `${c.lat.toFixed(2)},${c.lon.toFixed(2)}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    probes.push(p);
-  }
-
-  for (const p of probes) {
-    try {
-      const s = await fetchDischarge(p.lat, p.lon);
-      const e = err(meanOf(s.values));
-      if (e < bestErr) {
-        bestErr = e;
-        best = s;
-      }
-    } catch {
-      // Rate-limited or dry; the current cell stays.
-    }
-  }
-  if (best === current) return null;
-  return {
-    series: best,
-    movedKm: haversineKm([current.cell.lat, current.cell.lon], [best.cell.lat, best.cell.lon]),
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Terrain — Terrarium DEM tiles decoded in the browser.
 // O(tiles), not O(points): once tiles are cached, sampling more points is free.

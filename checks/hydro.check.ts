@@ -359,7 +359,7 @@ ok('haversine matches a known separation', () => {
 console.log('\nscheme discovery');
 
 /** A synthetic river: constant slope, constant flow, evenly spaced samples. */
-function ramp(points = 120, dropPerKm = 40, spacingKm = 0.12, meanCms = 10) {
+function ramp(points = 120, dropPerKm = 40, spacingKm = 0.12, meanCms = 12) {
   return Array.from({ length: points }, (_, k) => ({
     km: k * spacingKm,
     lat: 28 + k * 1e-4,
@@ -372,7 +372,7 @@ function ramp(points = 120, dropPerKm = 40, spacingKm = 0.12, meanCms = 10) {
 const steady = (path: ReturnType<typeof ramp>) => ({
   path,
   series: new Array(2000).fill(12),
-  clickMeanCms: 10,
+  seriesMeanCms: 12,
   residualCms: 0,
   exceedance: 0.4,
   efficiency: 0.85,
@@ -398,7 +398,7 @@ ok('evaluate reproduces P = rho*g*Q*H*eta by hand', () => {
 
 ok('an intake on a bigger catchment gets proportionally more water', () => {
   const path = ramp();
-  for (let k = 60; k < path.length; k++) path[k].meanCms = 20; // a tributary joins
+  for (let k = 60; k < path.length; k++) path[k].meanCms = 24; // a tributary joins
   const upper = evaluate(steady(path), 0, 50)!;
   const lower = evaluate(steady(path), 61, 111)!;
   near(lower.designFlowCms / upper.designFlowCms, 2, 1e-9);
@@ -411,7 +411,7 @@ ok('an intake on a bigger catchment gets proportionally more water', () => {
 ok('a tributary joining BELOW the intake never reaches the turbine', () => {
   const plain = ramp();
   const joined = ramp();
-  for (let k = 60; k < joined.length; k++) joined[k].meanCms = 40;
+  for (let k = 60; k < joined.length; k++) joined[k].meanCms = 48;
   const a = evaluate(steady(plain), 0, 50)!;
   const b = evaluate(steady(joined), 0, 50)!;
   near(b.designFlowCms, a.designFlowCms, 1e-12);

@@ -16,11 +16,15 @@ import { turbineCurve, type TurbineType } from './turbine.ts';
 
 export type SchemeInput = {
   /** Evenly spaced points down the river, with elevation attached. */
+  /**
+   * Points down the river. `meanCms` is the mapped network's own long-term mean
+   * at that point, or 0 where no such network covers the area.
+   */
   path: { km: number; lat: number; lon: number; elevationM: number; meanCms: number }[];
-  /** Daily discharge at the clicked point, m³/s. */
+  /** Daily discharge series from the flood model, m³/s. */
   series: number[];
-  /** HydroRIVERS mean at the clicked point, used to rescale the series along the river. */
-  clickMeanCms: number;
+  /** Mean of `series`. Used to rescale it onto the mapped network's magnitude. */
+  seriesMeanCms: number;
   /** Residual flow at the clicked point, m³/s. */
   residualCms: number;
   exceedance: number;
@@ -64,6 +68,19 @@ const MIN_LEN_KM = 0.4;
 const MAX_LEN_KM = 14;
 
 /**
+ * Steepest drop a diverted river reach can credibly have, m per km.
+ *
+ * Built high-head schemes sit near 100 m/km — Upper Tamakoshi is 822 m over
+ * roughly 8 km, Chilime 337 m over about 3 km. This bound is deliberately more
+ * than twice that, so it never rejects a real gorge. What it does reject is a
+ * trace that has run off a hillside instead of following a watercourse:
+ * measured in the Peruvian Andes, an unfiltered search returned 773 m of drop
+ * in 900 m, which is an 86% slope. That is a cliff face, and no intake,
+ * headrace or tailrace can be built along it.
+ */
+const MAX_SLOPE_M_PER_KM = 250;
+
+/**
  * Rank by more than one thing, then keep only what nothing else beats outright.
  *
  * A scheme survives when no other scheme is at least as good on every axis and
@@ -96,16 +113,31 @@ export function evaluate(
   j: number,
   qAtClickPre?: number
 ): Scheme | null {
-  const { path, series, clickMeanCms, residualCms, exceedance, efficiency } = input;
+  const { path, series, seriesMeanCms, residualCms, exceedance, efficiency } = input;
   if (i < 0 || j >= path.length || j <= i) return null;
   const zi = path[i].elevationM;
   const zj = path[j].elevationM;
   if (!Number.isFinite(zi) || !Number.isFinite(zj)) return null;
 
   const qAtClick = qAtClickPre ?? flowAtExceedance(buildFdc(series), exceedance);
-  // Only what the intake diverts reaches the turbine, so the record is rescaled
-  // to this intake's catchment; tributaries joining below it never arrive.
-  const ratio = clickMeanCms > 0 && path[i].meanCms > 0 ? path[i].meanCms / clickMeanCms : 1;
+
+  /**
+   * How much of the daily record actually arrives at THIS intake.
+   *
+   * The two models are used for what each is good at. The flood model runs on a
+   * ~5 km grid, so its magnitude can belong to a different channel entirely, but
+   * its day-to-day shape is sound. The mapped river network carries a long-term
+   * mean per reach, on the actual centreline, and it changes correctly at every
+   * confluence. So the series supplies the shape and the network supplies the
+   * magnitude: rescale the record so its mean equals the network's mean at the
+   * intake. Tributaries joining below the intake never reach the turbine, and
+   * this gets that right for free.
+   *
+   * Where no mapped network covers the area, `meanCms` is 0 and the record is
+   * used exactly as the flood model gave it.
+   */
+  const ratio =
+    path[i].meanCms > 0 && seriesMeanCms > 0 ? path[i].meanCms / seriesMeanCms : 1;
   if (!Number.isFinite(ratio) || ratio <= 0) return null;
   const qDesign = Math.max(0, (qAtClick - residualCms) * ratio);
   if (qDesign <= 0) return null;
@@ -183,6 +215,7 @@ export function discover(input: SchemeInput): DiscoverResult {
       if (!s) continue;
       evaluated++;
       if (s.grossHeadM < MIN_HEAD_M || s.capacityMW < MIN_CAPACITY_MW) continue;
+      if (s.slopeMPerKm > MAX_SLOPE_M_PER_KM) continue; // a cliff, not a river reach
       candidates.push(s);
     }
   }

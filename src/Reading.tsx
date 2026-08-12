@@ -175,25 +175,20 @@ export function Reading(props: {
         </div>
       )}
 
-      {study && !study.followsRiver && (
+      {study?.tracedFromTerrain && (
         <div className="border-b border-line px-3.5 py-2 text-[10.5px] leading-snug text-faint">
-          Straight line between your two points, not a routed waterway.
-        </div>
-      )}
-
-      {study?.movedKm !== undefined && (
-        <div className="border-b border-line px-3.5 py-2 text-[11px] leading-snug text-muted">
-          The flood model&apos;s nearest cell was not on this river, so the flow was re-read{' '}
-          {n(study.movedKm, 1)} km away, on the cell that matches the mapped channel
-          ({n(rival ?? 0, 1)} m³/s). GloFAS still supplies the daily record.
+          No mapped river network covers this area, so the course was traced downhill through the
+          terrain and the flood model&apos;s own flow is used unscaled. Both are weaker than where a
+          network exists — treat this as a first look.
         </div>
       )}
 
       {disagreement && disagreement > 2 && (
-        <div className="border-b border-line bg-[color-mix(in_srgb,var(--color-amber)_7%,transparent)] px-3.5 py-2 text-[11px] leading-snug text-muted">
-          <b className="text-amber">Two models still disagree {n(disagreement, 1)}×</b> about the
-          flow here: GloFAS {n(meanCms, 1)} m³/s, HydroRIVERS {n(rival!, 1)} m³/s. Treat the
-          capacity below as an order of magnitude, not a number, and move the intake a little.
+        <div className="border-b border-line px-3.5 py-2 text-[11px] leading-snug text-muted">
+          The flood model&apos;s ~5 km cell reads {n(meanCms, 1)} m³/s here, {n(disagreement, 1)}×
+          off the {n(rival!, 1)} m³/s the mapped river network gives for this reach — its cell is
+          not on this channel. Flows below use the network&apos;s magnitude and the model&apos;s
+          day-to-day shape.
         </div>
       )}
 
@@ -339,9 +334,17 @@ export function Reading(props: {
       )}
       {found && alternatives.length === 0 && !busy && (
         <div className="border-b border-line px-3.5 py-2.5 text-[11.5px] leading-snug text-muted">
-          Nothing here clears the screening thresholds — {n(found.evaluated, 0)} intake and
-          powerhouse pairs were tried and none reached 15 m of head with usable flow. This stretch
-          is probably too flat or too small.
+          <b className="text-ink">Nothing here clears screening.</b> {n(found.evaluated, 0)} intake
+          and powerhouse pairs were tried; none combined at least 15 m of drop with usable flow at a
+          buildable gradient.
+          {study?.tracedFromTerrain && (
+            <>
+              {' '}
+              This course was traced from terrain rather than a mapped river. If the click was on a
+              hillside the trace runs down the slope, which is too steep to build along —{' '}
+              <b className="text-ink">click directly on the watercourse</b> and try again.
+            </>
+          )}
         </div>
       )}
 

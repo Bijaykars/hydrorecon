@@ -114,13 +114,27 @@ const ESHA_HEAD_RANGE: Record<TurbineType, [number, number]> = {
   Kaplan: [2, 40],
   Propeller: [2, 40],
   Francis: [25, 350],
-  Pelton: [50, 1300],
+  // ESHA prints 1300 m as the typical ceiling, not a physical one: Bieudron in
+  // Switzerland runs Pelton units at 1883 m. Capping at 1300 left alpine
+  // schemes with no machine at all, which is less useful than naming the one
+  // that would actually be installed.
+  Pelton: [50, 2000],
   Crossflow: [5, 200],
   Turgo: [50, 250],
 };
 
 /** Above this, crossflow and Turgo are not the machines anyone installs. */
 const SMALL_MACHINE_MAX_CMS = 10;
+
+/**
+ * Largest flow an impulse machine is built for, m³/s.
+ *
+ * Pelton runners take a jet, not a full-bore passage, so they stay in the
+ * low-flow/high-head corner. Bieudron, among the largest ever built, passes
+ * about 75 m³/s. Twice that is a generous ceiling; beyond it there is no real
+ * machine to name and the honest answer is none.
+ */
+const IMPULSE_MAX_CMS = 150;
 
 /**
  * Pick a turbine for this duty point.
@@ -158,6 +172,7 @@ export function selectTurbine(designFlowCms: number, headM: number): TurbineType
     if (designFlowCms > SMALL_MACHINE_MAX_CMS && (type === 'Crossflow' || type === 'Turgo')) {
       continue;
     }
+    if (designFlowCms > IMPULSE_MAX_CMS && (type === 'Pelton' || type === 'Turgo')) continue;
     const fit = Math.abs(Math.log(headM / Math.sqrt(lo * hi)));
     if (fit < bestFit) {
       bestFit = fit;
