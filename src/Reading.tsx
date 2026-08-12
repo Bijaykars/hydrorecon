@@ -3,6 +3,7 @@ import type { Assumptions, Pt, Study } from './App.tsx';
 import type { DiscoverResult, Scheme } from './engine/discover.ts';
 import type { Uncertainty } from './engine/uncertainty.ts';
 import type { Licence } from './context.ts';
+import { RIVER_GAUGE_COUNT, transferAdvice, type Gauge } from './gauges.ts';
 import { Fdc, RiverProfile } from './charts.tsx';
 import { buildFdc } from './engine/hydro.ts';
 
@@ -93,6 +94,7 @@ export function Reading(props: {
   assume: Assumptions;
   setAssume: (a: Assumptions) => void;
   licences: Licence[] | null;
+  gauges: Gauge[] | null;
   wideSearch: boolean;
   onWideSearch: (v: boolean) => void;
   canExport: boolean;
@@ -117,6 +119,7 @@ export function Reading(props: {
     assume,
     setAssume,
     licences,
+    gauges,
     wideSearch,
     onWideSearch,
     canExport,
@@ -444,6 +447,41 @@ export function Reading(props: {
             <span className="text-amber">construction</span> licences are a hard constraint on this
             water; a survey licence means someone is already studying it. The public snapshot lags,
             so check the current register before relying on this.
+          </p>
+        </div>
+      )}
+
+      {/* ---- where the real measurements are ---- */}
+      {gauges && gauges.length > 0 && (
+        <div className="border-b border-line px-3.5 py-3">
+          <div className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
+            nearest measured record
+          </div>
+          <div className="space-y-1.5">
+            {gauges.slice(0, 3).map((g) => (
+              <div key={g.name} className="flex items-baseline gap-2 text-[11px]">
+                <span
+                  className="mt-[3px] size-2 shrink-0 rounded-full"
+                  style={{
+                    background: g.trustworthy ? 'var(--color-accent)' : 'var(--color-muted)',
+                  }}
+                />
+                <span className="min-w-0 flex-1 leading-tight text-ink">
+                  {g.name}
+                  <span className="block text-[9.5px] text-faint">
+                    {g.relation} · {n(g.distanceKm, 1)} km away
+                    {g.uplandKm2 ? ` · ${n(g.uplandKm2, 0)} km² catchment` : ''}
+                  </span>
+                  <span className="block text-[9.5px] text-muted">{transferAdvice(g)}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
+            Flow is the largest error in this estimate and a gauged record is the only thing that
+            shrinks it. DHM operates {RIVER_GAUGE_COUNT} river stations; their readings are not
+            public (the API requires a key), so request the record for the station above and scale
+            it by catchment area. That is what a feasibility study would do with it.
           </p>
         </div>
       )}

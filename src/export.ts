@@ -11,6 +11,7 @@
  */
 import type { Scheme } from './engine/discover.ts';
 import type { Licence } from './context.ts';
+import { transferAdvice, type Gauge } from './gauges.ts';
 
 export type ExportContext = {
   at: { lat: number; lon: number };
@@ -27,6 +28,7 @@ export type ExportContext = {
   tracedFromTerrain: boolean;
   evaluated: number;
   licences: Licence[];
+  gauges: Gauge[];
   assumptions: {
     exceedance: number;
     efficiency: number;
@@ -90,6 +92,21 @@ function provenance(c: ExportContext): string[] {
       `  energy:   ${c.band.energyLow.toFixed(0)} - ${c.band.energyHigh.toFixed(0)} GWh/yr ` +
         `(reported ${c.selected.energyGwh.toFixed(0)})`,
       '  the single figures in the table below are midpoints, not measurements'
+    );
+  }
+  if (c.gauges.length > 0) {
+    lines.push(
+      '',
+      'TO NARROW THE FLOW UNCERTAINTY, request these gauged records from Nepal DHM:',
+      ...c.gauges
+        .slice(0, 3)
+        .map(
+          (g) =>
+            `  ${g.name} — ${g.relation}, ${g.distanceKm.toFixed(1)} km away` +
+            `${g.uplandKm2 ? `, ${g.uplandKm2.toFixed(0)} km2 catchment` : ''}\n` +
+            `    ${transferAdvice(g)}`
+        ),
+      '  station values are not public (the DHM API requires a key); locations are.'
     );
   }
   if (c.licences.length > 0) {

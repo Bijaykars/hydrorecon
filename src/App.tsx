@@ -22,6 +22,7 @@ import { discover, evaluate, type Scheme, type SchemeInput } from './engine/disc
 import { uncertaintyFor } from './engine/uncertainty.ts';
 import { haversineKm, minMonthlyMean, wetDryEnergy, type PlantParams } from './engine/hydro.ts';
 import { licencesAlong, loadLicences, type Licence } from './context.ts';
+import { gaugesFor, type Gauge } from './gauges.ts';
 import {
   download,
   fileStem,
@@ -128,6 +129,7 @@ export default function App() {
   const [wideSearch, setWideSearch] = useState(false);
   /** Licensed and operating projects sitting on the studied reach. */
   const [licences, setLicences] = useState<Licence[] | null>(null);
+  const [gauges, setGauges] = useState<Gauge[] | null>(null);
 
   const atRef = useRef(at);
   atRef.current = at;
@@ -472,6 +474,27 @@ export default function App() {
     };
   }, [study]);
 
+  // Where a real measured record exists. Flow is the dominant error here, and
+  // this is the only thing that would actually shrink it — so it is worth
+  // saying which station to go and ask for, even though the values are gated.
+  useEffect(() => {
+    if (!study) {
+      setGauges(null);
+      return;
+    }
+    let dead = false;
+    gaugesFor(study.path, study.reach?.uplandKm2 ?? null)
+      .then((g) => {
+        if (!dead) setGauges(g);
+      })
+      .catch(() => {
+        if (!dead) setGauges(null); // context is optional; never block the study
+      });
+    return () => {
+      dead = true;
+    };
+  }, [study]);
+
   const found = useMemo(() => {
     if (!input || !study?.followsRiver) return null;
     return discover(input);
@@ -657,6 +680,7 @@ export default function App() {
       tracedFromTerrain: Boolean(study.tracedFromTerrain),
       evaluated: found.evaluated,
       licences: licences ?? [],
+      gauges: gauges ?? [],
       assumptions: {
         exceedance: assume.exceedance,
         efficiency: assume.efficiency,
@@ -664,7 +688,7 @@ export default function App() {
         residualFrac: assume.residualFrac,
       },
     };
-  }, [at, study, found, scheme, licences, assume, uncertainty]);
+  }, [at, study, found, scheme, licences, gauges, assume, uncertainty]);
 
   const onExport = useCallback(
     (kind: 'csv' | 'geojson') => {
@@ -688,6 +712,7 @@ export default function App() {
     setError(null);
     setFlowOnly(null);
     setLicences(null);
+    setGauges(null);
     setWideSearch(false);
   }, []);
 
@@ -719,6 +744,7 @@ export default function App() {
         busy={busy}
         error={error}
         licences={licences}
+        gauges={gauges}
         wideSearch={wideSearch}
         onWideSearch={setWideSearch}
         canExport={Boolean(exportCtx && exportCtx.schemes.length > 0)}
