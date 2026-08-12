@@ -1,6 +1,7 @@
 import type { DischargeSeries } from './api.ts';
 import type { Assumptions, Pt, Study } from './App.tsx';
 import type { DiscoverResult, Scheme } from './engine/discover.ts';
+import type { Licence } from './context.ts';
 import { Fdc, RiverProfile } from './charts.tsx';
 import { buildFdc } from './engine/hydro.ts';
 
@@ -89,6 +90,7 @@ export function Reading(props: {
   onPick: (s: Scheme) => void;
   assume: Assumptions;
   setAssume: (a: Assumptions) => void;
+  licences: Licence[] | null;
   busy: string | null;
   error: string | null;
   neighbours: { lat: number; lon: number; meanCms: number }[] | null;
@@ -107,6 +109,7 @@ export function Reading(props: {
     onPick,
     assume,
     setAssume,
+    licences,
     busy,
     error,
     neighbours,
@@ -169,9 +172,8 @@ export function Reading(props: {
 
       {at && !study && !busy && flowOnly && (
         <div className="border-b border-line px-3.5 py-2 text-[11.5px] leading-snug text-muted">
-          No mapped river geometry is bundled for this area, so the schemes cannot be searched
-          automatically here. <b className="text-ink">Click once more downstream</b> to place a
-          powerhouse yourself.
+          The terrain here does not descend far enough to trace a river course.{' '}
+          <b className="text-ink">Click directly on a watercourse</b> in a valley.
         </div>
       )}
 
@@ -345,6 +347,47 @@ export function Reading(props: {
               <b className="text-ink">click directly on the watercourse</b> and try again.
             </>
           )}
+        </div>
+      )}
+
+      {/* ---- who already holds this river ---- */}
+      {licences && licences.length > 0 && (
+        <div className="border-b border-line px-3.5 py-3">
+          <div className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
+            {licences.length} licensed project{licences.length > 1 ? 's' : ''} on this reach
+          </div>
+          <div className="space-y-1">
+            {licences.slice(0, 6).map((l) => (
+              <div key={l.licenceNo + l.name} className="flex items-baseline gap-2 text-[11px]">
+                <span
+                  className="mt-[3px] size-2 shrink-0 rounded-full"
+                  style={{
+                    background:
+                      l.stage === 'Operation'
+                        ? 'var(--color-red)'
+                        : l.stage === 'Generation'
+                          ? 'var(--color-amber)'
+                          : 'var(--color-muted)',
+                  }}
+                />
+                <span className="min-w-0 flex-1 leading-tight text-ink">
+                  {l.name}
+                  {l.capacityMW ? <span className="text-muted"> · {n(l.capacityMW, 1)} MW</span> : null}
+                  <span className="block text-[9.5px] text-faint">
+                    {l.stage}
+                    {l.river ? ` · ${l.river}` : ''} · {n(l.distanceKm, 1)} km away
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
+            Department of Electricity Development registry.{' '}
+            <span className="text-red">Operating</span> and{' '}
+            <span className="text-amber">construction</span> licences are a hard constraint on this
+            water; a survey licence means someone is already studying it. The public snapshot lags,
+            so check the current register before relying on this.
+          </p>
         </div>
       )}
 

@@ -26,6 +26,17 @@ deploys free to any static host and works the same running locally.
 
 The URL holds the whole session, so a link reproduces the exact reading.
 
+## Is the river already taken?
+
+Before any engineering, a developer needs to know who already holds the water.
+Schemes are cross-referenced against Nepal's Department of Electricity Development
+licence registry, and any project within 6 km of the studied reach is listed and
+mapped — operating plants and construction licences in red and amber, survey
+licences in grey. On the Marsyangdi it correctly surfaces Madhya Marsyangdi, a
+built 70 MW station, sitting across the reach the search just proposed.
+
+The public snapshot lags the live register, which the panel says.
+
 ## What it refuses to hide
 
 - **Two models, one river.** Where a mapped river network is available it reports its independent
@@ -101,6 +112,7 @@ the Pareto invariant that no listed alternative is beaten outright by another.
 | AWS Terrain Tiles | runtime, keyless, CORS ✓ | public domain / attribution | Hillshade, and DEM fallback |
 | OpenFreeMap / OpenMapTiles / OSM | runtime, keyless | ODbL | Basemap |
 | HydroRIVERS v1.0 extract | bundled, 525 KB gz | HydroSHEDS licence | Catchment area, click snapping, the cross-check |
+| DoED licence registry via Open Data Nepal | runtime, keyless, CORS ✓ | CC BY-SA | Which projects already hold this river |
 
 Every runtime endpoint had its `access-control-allow-origin` verified with a real request — see
 [docs/research/](docs/research/).

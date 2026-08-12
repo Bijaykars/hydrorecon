@@ -20,6 +20,7 @@ import {
 } from './rivers.ts';
 import { discover, evaluate, type Scheme, type SchemeInput } from './engine/discover.ts';
 import { haversineKm, minMonthlyMean, wetDryEnergy, type PlantParams } from './engine/hydro.ts';
+import { licencesAlong, loadLicences, type Licence } from './context.ts';
 import { Reading } from './Reading.tsx';
 
 export type Pt = { lat: number; lon: number };
@@ -109,6 +110,8 @@ export default function App() {
   /** Chosen intake/powerhouse indices into study.path. */
   const [pick, setPick] = useState<{ i: number; j: number } | null>(null);
   const [tweaked, setTweaked] = useState(false);
+  /** Licensed and operating projects sitting on the studied reach. */
+  const [licences, setLicences] = useState<Licence[] | null>(null);
 
   const atRef = useRef(at);
   atRef.current = at;
@@ -179,6 +182,33 @@ export default function App() {
         m.setPaintProperty('waterway', 'line-color', '#4db8ff');
         m.setPaintProperty('waterway', 'line-opacity', 0.85);
       }
+
+      // Licensed and operating projects already on this river.
+      m.addSource('licences', { type: 'geojson', data: empty() });
+      m.addLayer({
+        id: 'licences',
+        type: 'circle',
+        source: 'licences',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 3, 13, 6],
+          // Operating plants are a hard constraint; a survey licence is a soft one.
+          'circle-color': ['match', ['get', 'stage'], 'Operation', '#f85149', 'Generation', '#d29922', '#8fa3b5'],
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': '#0b0f14',
+        },
+      });
+      m.on('click', 'licences', (e) => {
+        const f = e.features?.[0];
+        if (!f) return;
+        const p = f.properties as { name: string; stage: string; cap: string; promoter: string };
+        new maplibregl.Popup({ closeButton: false })
+          .setLngLat(e.lngLat)
+          .setHTML(
+            `<b>${p.name}</b><br/><span style="color:#8fa3b5">${p.stage}` +
+              `${p.cap ? ` · ${p.cap} MW` : ''}${p.promoter ? `<br/>${p.promoter}` : ''}</span>`
+          )
+          .addTo(m);
+      });
 
       // The diverted reach of the selected scheme.
       m.addSource('scheme', { type: 'geojson', data: empty() });
@@ -404,6 +434,26 @@ export default function App() {
     };
   }, [study, assume]);
 
+  // Who already holds this river. The registry is one 128 KB download, cached
+  // for the session, so this costs nothing after the first study.
+  useEffect(() => {
+    if (!study) {
+      setLicences(null);
+      return;
+    }
+    let dead = false;
+    loadLicences()
+      .then((all) => {
+        if (!dead) setLicences(licencesAlong(all, study.path));
+      })
+      .catch(() => {
+        if (!dead) setLicences(null); // context is optional; never block the study
+      });
+    return () => {
+      dead = true;
+    };
+  }, [study]);
+
   const found = useMemo(() => {
     if (!input || !study?.followsRiver) return null;
     return discover(input);
@@ -499,6 +549,23 @@ export default function App() {
     place('a', scheme?.intake ?? at, '#4db8ff', 'Intake — drag along the river', slide('i'));
     place('b', scheme?.power ?? null, '#3fb950', 'Powerhouse — drag along the river', slide('j'));
 
+    const lic = m.getSource('licences') as maplibregl.GeoJSONSource | undefined;
+    if (lic) {
+      lic.setData({
+        type: 'FeatureCollection',
+        features: (licences ?? []).map((l) => ({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [l.lon, l.lat] },
+          properties: {
+            name: l.name,
+            stage: l.stage,
+            cap: l.capacityMW ?? '',
+            promoter: l.promoter,
+          },
+        })),
+      });
+    }
+
     const src = m.getSource('scheme') as maplibregl.GeoJSONSource | undefined;
     if (src) {
       src.setData(
@@ -521,7 +588,7 @@ export default function App() {
           : empty()
       );
     }
-  }, [scheme, at, study, pick]);
+  }, [scheme, at, study, pick, licences]);
 
   useEffect(() => {
     const m = map.current;
@@ -545,6 +612,7 @@ export default function App() {
     setNeighbours(null);
     setError(null);
     setFlowOnly(null);
+    setLicences(null);
   }, []);
 
   return (
@@ -573,6 +641,7 @@ export default function App() {
         setAssume={setAssume}
         busy={busy}
         error={error}
+        licences={licences}
         neighbours={neighbours}
         onProbe={runProbe}
         onReset={reset}
