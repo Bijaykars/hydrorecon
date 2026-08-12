@@ -31,6 +31,20 @@ export type SchemeInput = {
   efficiency: number;
   headLossFrac: number;
   minFlowFrac: number;
+  /**
+   * How far below the study point an intake may sit, km.
+   *
+   * This exists because of a real failure. With the whole reach open, the
+   * search always won at the far downstream end — flow grows with catchment, so
+   * energy does too — and the intake landed 9.6 km from where the user clicked
+   * while the powerhouse landed 18.6 km away. The click then meant only "this
+   * river", not "here", which is not what clicking a spot on a map means.
+   *
+   * A short window keeps the intake where it was asked for while still letting
+   * the search find a better sill a little downstream. Set it large to sweep a
+   * whole corridor instead.
+   */
+  intakeWindowKm: number;
 };
 
 export type Scheme = {
@@ -208,7 +222,13 @@ export function discover(input: SchemeInput): DiscoverResult {
   const candidates: Scheme[] = [];
   let evaluated = 0;
 
-  for (let i = 0; i < n - minSteps; i += stride) {
+  // Last index still inside the intake window. `km` is monotonic, so a scan is
+  // enough and avoids needing a newer lib target for findLastIndex.
+  let lastIntake = 1;
+  while (lastIntake < n && path[lastIntake].km <= input.intakeWindowKm) lastIntake++;
+  lastIntake = Math.min(n - minSteps, Math.max(1, lastIntake));
+
+  for (let i = 0; i < lastIntake; i += stride) {
     if (!Number.isFinite(path[i].elevationM)) continue;
     for (let j = i + minSteps; j < Math.min(n, i + maxSteps); j += stride) {
       const s = evaluate(input, i, j, qAtClick);

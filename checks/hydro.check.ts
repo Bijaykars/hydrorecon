@@ -378,6 +378,8 @@ const steady = (path: ReturnType<typeof ramp>) => ({
   efficiency: 0.85,
   headLossFrac: 0,
   minFlowFrac: 0.2,
+  // Whole-reach sweep, so the existing discovery checks keep their coverage.
+  intakeWindowKm: Number.POSITIVE_INFINITY,
 });
 
 ok('evaluate reproduces P = rho*g*Q*H*eta by hand', () => {
@@ -452,6 +454,35 @@ ok('no surviving alternative is dominated by another', () => {
       assert.ok(!dominated, 'a dominated scheme survived the Pareto filter');
     }
   }
+});
+
+
+ok('the intake stays near the click unless a wide sweep is asked for', () => {
+  // The bug this guards: with the whole reach open, energy grows downstream
+  // (bigger catchment) so the winner always sat at the far end. Measured on the
+  // Marsyangdi, the intake landed 9.6 km from the click and the powerhouse
+  // 18.6 km. A click on a map has to mean "here".
+  const path = ramp(200);
+  for (let k = 100; k < path.length; k++) path[k].meanCms = 60; // a big tributary joins
+
+  const anchored = discover({ ...steady(path), intakeWindowKm: 2 });
+  assert.ok(anchored.schemes.length > 0, 'anchored search must still find schemes');
+  for (const s of anchored.schemes) {
+    assert.ok(
+      path[s.i].km <= 2 + 1e-9,
+      `intake at ${path[s.i].km.toFixed(2)} km escaped the 2 km window`
+    );
+  }
+
+  // Widened, it is allowed to chase the tributary far downstream.
+  const wide = discover({ ...steady(path), intakeWindowKm: Number.POSITIVE_INFINITY });
+  const furthest = Math.max(...wide.schemes.map((s) => path[s.i].km));
+  assert.ok(furthest > 2, 'a wide sweep should reach past the anchor window');
+  assert.ok(
+    Math.max(...wide.schemes.map((s) => s.capacityMW)) >=
+      Math.max(...anchored.schemes.map((s) => s.capacityMW)),
+    'the wide sweep cannot be worse than the anchored one'
+  );
 });
 
 ok('a flat river yields nothing rather than a bad scheme', () => {

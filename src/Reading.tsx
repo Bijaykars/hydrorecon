@@ -91,6 +91,8 @@ export function Reading(props: {
   assume: Assumptions;
   setAssume: (a: Assumptions) => void;
   licences: Licence[] | null;
+  wideSearch: boolean;
+  onWideSearch: (v: boolean) => void;
   canExport: boolean;
   onExport: (kind: 'csv' | 'geojson') => void;
   busy: string | null;
@@ -112,6 +114,8 @@ export function Reading(props: {
     assume,
     setAssume,
     licences,
+    wideSearch,
+    onWideSearch,
     canExport,
     onExport,
     busy,
@@ -330,6 +334,25 @@ export function Reading(props: {
             Every one of these beats all the others on at least one of energy, waterway length or
             head — none is simply worse than another. Which matters is your call.
           </p>
+          <button
+            type="button"
+            onClick={() => onWideSearch(!wideSearch)}
+            className="mt-2 w-full rounded-md border border-line bg-panel-2 px-2 py-1.5 text-left text-[10.5px] leading-snug text-muted hover:border-river hover:text-ink"
+          >
+            {wideSearch ? (
+              <>
+                <b className="text-river">Sweeping the whole reach.</b> The intake can sit anywhere
+                in the 22 km below your click, so it may be far from it. Click to anchor it back to
+                where you clicked.
+              </>
+            ) : (
+              <>
+                <b className="text-ink">Intake anchored near your click.</b> Click to sweep the
+                whole 22 km downstream instead and find the strongest site on this river — the
+                intake may then land well away from your click.
+              </>
+            )}
+          </button>
         </div>
       )}
 

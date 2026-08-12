@@ -53,6 +53,12 @@ const DEFAULTS: Assumptions = {
 const MIN_FLOW_FRAC = 0.2;
 /** How far downstream to look for schemes. */
 const SEARCH_KM = 22;
+/**
+ * Keep the intake near where the user actually clicked. Two kilometres lets the
+ * search slide onto a better sill without the marker teleporting down the
+ * valley, which is what it used to do.
+ */
+const INTAKE_WINDOW_KM = 2;
 
 /** A point on the studied river with everything the engine needs. */
 export type StudyPoint = {
@@ -117,6 +123,8 @@ export default function App() {
   /** Chosen intake/powerhouse indices into study.path. */
   const [pick, setPick] = useState<{ i: number; j: number } | null>(null);
   const [tweaked, setTweaked] = useState(false);
+  /** Sweep the whole downstream reach instead of anchoring to the click. */
+  const [wideSearch, setWideSearch] = useState(false);
   /** Licensed and operating projects sitting on the studied reach. */
   const [licences, setLicences] = useState<Licence[] | null>(null);
 
@@ -339,6 +347,7 @@ export default function App() {
     const hit = await nearestReach(lat, lon).catch(() => null);
     setPick(null);
     setTweaked(false);
+    setWideSearch(false);
     setNeighbours(null);
     // Prefer the detailed network where it exists, otherwise the basemap's
     // waterways, otherwise the raw click.
@@ -438,8 +447,9 @@ export default function App() {
       efficiency: assume.efficiency,
       headLossFrac: assume.headLossFrac,
       minFlowFrac: MIN_FLOW_FRAC,
+      intakeWindowKm: wideSearch ? Number.POSITIVE_INFINITY : INTAKE_WINDOW_KM,
     };
-  }, [study, assume]);
+  }, [study, assume, wideSearch]);
 
   // Who already holds this river. The registry is one 128 KB download, cached
   // for the session, so this costs nothing after the first study.
@@ -658,6 +668,7 @@ export default function App() {
     setError(null);
     setFlowOnly(null);
     setLicences(null);
+    setWideSearch(false);
   }, []);
 
   return (
@@ -687,6 +698,8 @@ export default function App() {
         busy={busy}
         error={error}
         licences={licences}
+        wideSearch={wideSearch}
+        onWideSearch={setWideSearch}
         canExport={Boolean(exportCtx && exportCtx.schemes.length > 0)}
         onExport={onExport}
         neighbours={neighbours}
