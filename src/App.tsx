@@ -20,6 +20,7 @@ import {
   type Reach,
 } from './rivers.ts';
 import { discover, evaluate, type Scheme, type SchemeInput } from './engine/discover.ts';
+import { chooseFlowMagnitude } from './engine/flowchoice.ts';
 import { uncertaintyFor } from './engine/uncertainty.ts';
 import { haversineKm, minMonthlyMean, wetDryEnergy, type PlantParams } from './engine/hydro.ts';
 import { licencesAlong, loadLicences, type Licence } from './context.ts';
@@ -520,6 +521,34 @@ export default function App() {
     if (study || !at) setFlowOnly(null);
   }, [study, at]);
 
+  /**
+   * Which flow source gets to set the magnitude on this reach.
+   *
+   * Validation against built plants caught the network's discharge collapsing
+   * up to 200× low in the high border valleys — the Tamakoshi at Lamabagar
+   * carries 0.3 m³/s in the bundled data and 66 m³/s in the turbines of a
+   * built 456 MW plant. Where the two global sources disagree beyond
+   * rescaling range, HYDEST — fitted to Nepali gauges, independent of both —
+   * picks the winner. See engine/flowchoice.ts.
+   */
+  const flowChoice = useMemo(() => {
+    if (!study) return null;
+    const r = study.reach;
+    return chooseFlowMagnitude({
+      dates: study.flow.dates,
+      series: study.flow.values,
+      networkMeanCms: study.path[0]?.meanCms ?? 0,
+      hydest:
+        r && Number.isFinite(r.below5000Frac) && r.uplandKm2 > 0
+          ? {
+              totalKm2: r.uplandKm2,
+              below5000Km2: r.below5000Frac * r.uplandKm2,
+              below3000Km2: r.below3000Frac * r.uplandKm2,
+            }
+          : null,
+    });
+  }, [study]);
+
   // ---------------- discovery ----------------
   const input: SchemeInput | null = useMemo(() => {
     if (!study) return null;
@@ -539,12 +568,23 @@ export default function App() {
     const dates = measured ? measured.series.dates : study.flow.dates;
     const seriesMean = meanOf(series);
     const minMonth = minMonthlyMean(dates, series);
+    /**
+     * When the network's magnitude lost the argument (flowchoice.ts), its
+     * per-point means are stripped so the engine runs the record unscaled —
+     * the same path it already takes where no network exists at all. This
+     * also disables downstream growth, which is honest: relative growth from
+     * broken absolute numbers is not information.
+     */
+    const path =
+      flowChoice?.authority === 'model'
+        ? study.path.map((p) => ({ ...p, meanCms: 0 }))
+        : study.path;
     return {
-      path: study.path,
+      path,
       series,
       // With a measured record, keep its magnitude: pass the network's own mean
       // so the rescale is a no-op instead of pulling it onto a modelled figure.
-      seriesMeanCms: measured ? (study.path[0]?.meanCms || seriesMean) : seriesMean,
+      seriesMeanCms: measured ? (path[0]?.meanCms || seriesMean) : seriesMean,
       residualCms: Number.isFinite(minMonth) ? minMonth * assume.residualFrac : 0,
       exceedance: assume.exceedance,
       efficiency: assume.efficiency,
@@ -552,7 +592,7 @@ export default function App() {
       minFlowFrac: MIN_FLOW_FRAC,
       intakeWindowKm: wideSearch ? Number.POSITIVE_INFINITY : INTAKE_WINDOW_KM,
     };
-  }, [study, assume, wideSearch, measured]);
+  }, [study, assume, wideSearch, measured, flowChoice]);
 
   // Who already holds this river. The registry is one 128 KB download, cached
   // for the session, so this costs nothing after the first study.
@@ -628,7 +668,14 @@ export default function App() {
      */
     const seriesMean = meanOf(study.flow.values);
     const networkMean = study.path[0]?.meanCms ?? 0;
-    const ratio = networkMean > 0 && seriesMean > 0 ? networkMean / seriesMean : 1;
+    // When the network's magnitude was rejected, HYDEST is compared against the
+    // unscaled model — the figure the engine is actually using.
+    const ratio =
+      flowChoice?.authority === 'model'
+        ? 1
+        : networkMean > 0 && seriesMean > 0
+          ? networkMean / seriesMean
+          : 1;
     const modelled = monthMean(study.flow.dates, study.flow.values, driest.month) * ratio;
     return {
       input,
@@ -640,7 +687,7 @@ export default function App() {
         (f): f is { t: number; cms: number } => f.cms !== null
       ),
     };
-  }, [study]);
+  }, [study, flowChoice]);
 
   const found = useMemo(() => {
     if (!input || !study?.followsRiver) return null;
@@ -786,9 +833,10 @@ export default function App() {
       meanOf(study.flow.values),
       study.reach?.meanDischargeCms ?? null,
       // A supplied record replaces the model-disagreement logic entirely.
-      measured ? measuredSpread(measured.ratio) : undefined
+      measured ? measuredSpread(measured.ratio) : undefined,
+      flowChoice?.authority
     );
-  }, [input, scheme, study, measured]);
+  }, [input, scheme, study, measured, flowChoice]);
 
   /**
    * Take a record file from the engineer.
@@ -1063,6 +1111,7 @@ export default function App() {
         hydest={hydest}
         grid={grid}
         conservation={conservation}
+        flowChoice={flowChoice}
         sediment={sediment}
         bench={bench}
         measured={measured}

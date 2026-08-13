@@ -9,6 +9,8 @@ export default defineConfig({
   base: './',
   build: {
     rollupOptions: {
+      // The app plus the validation page — predicted vs built, shipped beside it.
+      input: { main: 'index.html', validation: 'validation.html' },
       // MapLibre is the only heavy dependency and it never changes between
       // deploys — its own chunk stays cached across releases.
       output: {

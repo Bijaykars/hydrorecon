@@ -6,6 +6,7 @@ import type { Licence } from './context.ts';
 import { MONTH_NAMES } from './engine/hydest.ts';
 import { connectionVerdict, type GridLink } from './grid.ts';
 import type { BenchFit, Desander, SedimentSource } from './engine/sediment.ts';
+import type { FlowChoice } from './engine/flowchoice.ts';
 import type { ProtectedHit } from './protected.ts';
 import type { MeasuredSeries } from './measured.ts';
 import {
@@ -153,6 +154,7 @@ export function Reading(props: {
   } | null;
   grid: GridLink | null;
   conservation: { inside: ProtectedHit[]; near: ProtectedHit[]; hard: boolean } | null;
+  flowChoice: FlowChoice | null;
   sediment: { basin: Desander; source: SedimentSource | null } | null;
   bench: BenchFit | null;
   measured: { series: MeasuredSeries; ratio: number; name: string } | null;
@@ -186,6 +188,7 @@ export function Reading(props: {
     hydest,
     grid,
     conservation,
+    flowChoice,
     sediment,
     bench,
     measured,
@@ -328,10 +331,38 @@ export function Reading(props: {
 
       {disagreement && disagreement > 2 && (
         <div className="border-b border-line px-4 py-2.5 text-[11px] leading-relaxed text-muted">
-          The flood model&apos;s ~5 km cell reads {n(meanCms, 1)} m³/s here, {n(disagreement, 1)}×
-          off the {n(rival!, 1)} m³/s the mapped river network gives for this reach — its cell is
-          not on this channel. Flows below use the network&apos;s magnitude and the model&apos;s
-          day-to-day shape.
+          {flowChoice?.authority === 'model' ? (
+            <>
+              The mapped network claims {n(rival!, 1)} m³/s for this reach against the flood
+              model&apos;s {n(meanCms, 1)} — {n(disagreement, 1)}× apart, and Nepal&apos;s own
+              regression sides with the flood model
+              {flowChoice.judgeCms !== null && (
+                <>
+                  {' '}
+                  ({n(flowChoice.modelCms ?? NaN, 1)} vs its {n(flowChoice.judgeCms, 1)} m³/s
+                  dry-season figure)
+                </>
+              )}
+              . The network&apos;s discharge is broken on this reach — a known failure of its
+              global water model in high Himalayan valleys — so flows below use the flood model
+              as-is.
+            </>
+          ) : (
+            <>
+              The flood model&apos;s ~5 km cell reads {n(meanCms, 1)} m³/s here,{' '}
+              {n(disagreement, 1)}× off the {n(rival!, 1)} m³/s the mapped river network gives for
+              this reach — its cell is not on this channel. Flows below use the network&apos;s
+              magnitude and the model&apos;s day-to-day shape
+              {flowChoice?.judgeCms != null && flowChoice.authority === 'network' && (
+                <>
+                  , and Nepal&apos;s own regression agrees with that choice (
+                  {n(flowChoice.networkCms ?? NaN, 1)} vs its {n(flowChoice.judgeCms, 1)} m³/s
+                  dry-season figure)
+                </>
+              )}
+              .
+            </>
+          )}
         </div>
       )}
 
@@ -1095,7 +1126,13 @@ export function Reading(props: {
 
       <div className="mt-auto border-l-2 border-amber bg-[color-mix(in_srgb,var(--color-amber)_7%,transparent)] px-4 py-2.5 text-[11px] leading-relaxed text-muted">
         <b className="text-amber">Screening only.</b> These compare options and tell you what to
-        survey next — they are not a feasibility study, and no waterway has been routed or costed.
+        survey next — they are not a feasibility study, and no waterway has been routed or costed.{' '}
+        <a
+          href="./validation.html"
+          className="text-river underline-offset-2 hover:underline"
+        >
+          How wrong is it? See it run at ten built plants.
+        </a>
       </div>
     </aside>
   );

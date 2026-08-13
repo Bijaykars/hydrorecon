@@ -97,7 +97,9 @@ export function uncertaintyFor(
    * measured.ts, which sets it from rating-curve error plus whatever
    * catchment-area transfer was applied.
    */
-  measuredSpreadFrac?: number
+  measuredSpreadFrac?: number,
+  /** Which flow source won the magnitude (engine/flowchoice.ts) — wording only. */
+  authority?: 'network' | 'model'
 ): Uncertainty | null {
   const best = evaluate(input, scheme.i, scheme.j);
   if (!best || best.capacityMW <= 0) return null;
@@ -161,7 +163,9 @@ export function uncertaintyFor(
         : corroborated
           ? 'two global models agree here, but neither is gauged at this site'
           : haveBoth
-            ? `the flood model's cell is off this channel (${ratio.toFixed(0)}× out), so the mapped network is carrying this alone`
+            ? authority === 'model'
+              ? `the network's discharge is broken on this reach (${ratio.toFixed(0)}× off), so the flood model is carrying this alone`
+              : `the flood model's cell is off this channel (${ratio.toFixed(0)}× out), so the mapped network is carrying this alone`
             : 'a single global model, with nothing checking it',
     },
     {

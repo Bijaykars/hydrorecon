@@ -231,14 +231,28 @@ export async function nearestReach(lat: number, lon: number): Promise<ReachHit |
     below3000Frac: n.hypso && n.hypso[i * 2 + 1] !== 255 ? n.hypso[i * 2 + 1] / 254 : NaN,
   });
 
+  /**
+   * Reaches closer together than this are the same place as far as a click can
+   * say. It matters at confluences, where the tributary and the river SHARE the
+   * junction vertex: both sit at exactly 0.000 km, and "nearest" used to go to
+   * whichever the file listed first. Validation caught it handing the Khimti —
+   * 379 km², carrying 15 m³/s in the bundle — to a 3.4 km² rivulet, and every
+   * study clicked near that junction inherited the rivulet's flow. Within the
+   * tie, the larger river wins; anyone genuinely studying the rivulet clicks a
+   * hundred metres up it and the tie disappears.
+   */
+  const TIE_KM = 0.03;
+
   let nearestI = -1;
   let nearestKm = Infinity;
   let biggestI = -1;
   let biggestUp = -1;
   let biggestKm = 0;
   for (const [i, hit] of seen) {
-    if (hit.distanceKm < nearestKm) {
-      nearestKm = hit.distanceKm;
+    const closer = hit.distanceKm < nearestKm - TIE_KM;
+    const tied = nearestI >= 0 && Math.abs(hit.distanceKm - nearestKm) <= TIE_KM;
+    if (nearestI < 0 || closer || (tied && n.upland[i] > n.upland[nearestI])) {
+      nearestKm = Math.min(nearestKm, hit.distanceKm);
       nearestI = i;
     }
     if (hit.distanceKm <= MAIN_STEM_KM && n.upland[i] > biggestUp) {
@@ -315,8 +329,13 @@ export async function downstreamPath(
             const dx = (vx - target.lon) * cosLat;
             const dy = vy - target.lat;
             const d = dx * dx + dy * dy;
-            if (d < bestD) {
-              bestD = d;
+            // Same confluence tie-break as nearestReach: a junction vertex
+            // belongs to every reach that meets there, and the walk must start
+            // down the river, not down the first-listed rivulet. ~35 m.
+            const TIE_D2 = 1e-7;
+            const tied = bestI >= 0 && Math.abs(d - bestD) <= TIE_D2;
+            if (d < bestD - TIE_D2 || (bestI < 0 && d < bestD) || (tied && n.upland[i] > n.upland[bestI])) {
+              bestD = Math.min(bestD, d);
               bestI = i;
               bestK = k;
             }

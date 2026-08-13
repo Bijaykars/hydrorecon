@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
-    "check": "node --experimental-strip-types --no-warnings checks/hydro.check.ts && node --experimental-strip-types --no-warnings checks/plants.check.ts && node --experimental-strip-types --no-warnings checks/hydrogenerate.check.ts && node --experimental-strip-types --no-warnings checks/export.check.ts && node --experimental-strip-types --no-warnings checks/gauges.check.ts && node --experimental-strip-types --no-warnings checks/waterway.check.ts && node --experimental-strip-types --no-warnings checks/hydest.check.ts && node --experimental-strip-types --no-warnings checks/grid.check.ts && node --experimental-strip-types --no-warnings checks/measured.check.ts && node --experimental-strip-types --no-warnings checks/protected.check.ts && node --experimental-strip-types --no-warnings checks/sediment.check.ts",
+    "check": "node --experimental-strip-types --no-warnings checks/hydro.check.ts && node --experimental-strip-types --no-warnings checks/plants.check.ts && node --experimental-strip-types --no-warnings checks/hydrogenerate.check.ts && node --experimental-strip-types --no-warnings checks/export.check.ts && node --experimental-strip-types --no-warnings checks/gauges.check.ts && node --experimental-strip-types --no-warnings checks/waterway.check.ts && node --experimental-strip-types --no-warnings checks/hydest.check.ts && node --experimental-strip-types --no-warnings checks/grid.check.ts && node --experimental-strip-types --no-warnings checks/measured.check.ts && node --experimental-strip-types --no-warnings checks/protected.check.ts && node --experimental-strip-types --no-warnings checks/sediment.check.ts && node --experimental-strip-types --no-warnings checks/flowchoice.check.ts",
     "desktop": "npm run build && electron desktop/main.cjs",
     "desktop:dev": "electron desktop/main.cjs",
     "desktop:pack": "npm run build && electron-builder --dir",
@@ -19,7 +19,8 @@
     "probe:dem": "node checks/dem-vs-survey.probe.mjs",
     "build:hypso": "node pipeline/build-hypsometry.mjs",
     "build:grid": "node pipeline/build-grid.mjs",
-    "build:protected": "node pipeline/build-protected.mjs"
+    "build:protected": "node pipeline/build-protected.mjs",
+    "build:validation": "node pipeline/build-validation.mjs"
   },
   "dependencies": {
     "maplibre-gl": "^5.6.0",

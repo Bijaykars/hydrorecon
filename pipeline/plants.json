@@ -1,0 +1,140 @@
+{
+  "_what": "Ten built Nepali run-of-river plants used to validate Ghatta against reality. Coordinates and specifications were researched independently of the app — nothing here was chosen to make the comparison look good, and the derivations are stated so they can be re-checked.",
+  "_coordinateNote": "intake/powerhouse are [lat, lon]. 'derived' means the point was placed on the OSM-mapped stream at the published waterway length upstream of the powerhouse — the DEM was never consulted, so the head comparison stays independent. 'approx' means village-level accuracy.",
+  "_excluded": "Jhimruk and Andhikhola divert water through a ridge into a different valley; Ghatta deliberately models same-valley schemes only, so they cannot be run. Kulekhani is storage, not run-of-river.",
+  "plants": [
+    {
+      "name": "Upper Tamakoshi",
+      "river": "Tamakoshi",
+      "intake": [27.924, 86.2139],
+      "intakeSource": "OSM: 'Upper Tamakoshi Headworks Diversion Dam' (way centre)",
+      "powerhouse": [27.8533, 86.2142],
+      "powerhouseSource": "GeoNames: Gongar, Dolakha (underground powerhouse village)",
+      "actual": { "capacityMW": 456, "designQ": 66, "head": 822, "headBasis": "gross", "energyGwh": 2281 },
+      "transHimalayan": true,
+      "note": "Nepal's largest plant. Peaking run-of-river with a 22 m dam. Most of its catchment lies north of the border on the Tibetan plateau, where every global flow product this app can reach runs low together and HYDEST — fitted to Nepali catchments — is out of its domain. The feasibility study stood on years of site gauging; nothing less answers here.",
+      "sources": [
+        "https://en.wikipedia.org/wiki/Upper_Tamakoshi_Hydroelectric_Project",
+        "https://www.power-technology.com/projects/upper-tamakoshi-hydroelectric-project/"
+      ]
+    },
+    {
+      "name": "Kali Gandaki A",
+      "river": "Kali Gandaki",
+      "intake": [27.97913, 83.58047],
+      "intakeSource": "Wikipedia infobox: dam at Mirmi",
+      "powerhouse": [27.93094, 83.61509],
+      "powerhouseSource": "Wikipedia infobox: powerhouse at Beltari; matches OSM plant polygon",
+      "actual": { "capacityMW": 144, "designQ": 141, "head": 115, "headBasis": "net", "energyGwh": 842 },
+      "note": "44 m high dam raises the intake level well above the riverbed; Ghatta models a low weir, so it should under-read the head here by roughly the dam height.",
+      "sources": [
+        "https://en.wikipedia.org/wiki/Kaligandaki_A_Hydroelectric_Power_Station",
+        "https://www.adb.org/features/kali-gandaki-hydroelectric-project-report-card"
+      ]
+    },
+    {
+      "name": "Middle Marsyangdi",
+      "river": "Marsyangdi",
+      "intake": [28.189, 84.4197],
+      "intakeSource": "OSM: 'Middle Marshyandi Hydropower Dam'",
+      "powerhouse": [28.1408, 84.44],
+      "powerhouseSource": "Wikipedia station coordinate (Siundibar, underground)",
+      "actual": { "capacityMW": 70, "designQ": 80, "head": 110, "headBasis": "gross", "energyGwh": 398 },
+      "note": "Peaking run-of-river with five hours of daily pondage.",
+      "sources": [
+        "https://en.wikipedia.org/wiki/Middle_Marsyangdi_Hydropower_Station",
+        "https://international.strabag.com/en/projects/middle-marsyangdi-hydroelectric-power-plant"
+      ]
+    },
+    {
+      "name": "Marsyangdi",
+      "river": "Marsyangdi",
+      "intake": [27.9256, 84.4974],
+      "intakeSource": "Wikipedia station coordinate (dam upstream of Aanbu Khaireni)",
+      "powerhouse": [27.8763, 84.5393],
+      "powerhouseSource": "OSM: 'Marsyangdi Hydro Power' plant polygon at Aanbukhaireni",
+      "actual": { "capacityMW": 69, "designQ": 91.5, "head": 90.5, "headBasis": "net", "energyGwh": 462.5 },
+      "note": "Design flow is 3 turbines at 30.5 m³/s each. Peaking plant: its dam ponds the river well above the bed, and Ghatta models a low weir reading the riverbed — so an under-read head here is the model being honest about what it measures, not a terrain error.",
+      "sources": ["https://en.wikipedia.org/wiki/Marsyangdi_Hydropower_Station"]
+    },
+    {
+      "name": "Khimti I",
+      "river": "Khimti Khola",
+      "intake": [27.52977, 86.15286],
+      "intakeSource": "derived: OSM-mapped Khimti Khola walked 9.3 km (published headrace + penstock) upstream of the Tamakoshi confluence",
+      "powerhouse": [27.4749, 86.1127],
+      "powerhouseSource": "downstream end of the OSM-mapped Khimti Khola (Kirne, at the Tamakoshi confluence); Wikipedia's 27.474, 86.101 corroborates",
+      "actual": { "capacityMW": 60, "designQ": 10.75, "head": 684, "headBasis": "gross", "energyGwh": 350 },
+      "note": "Intake at el. 1270 m, tailrace to the Tamakoshi at el. 586 m — the published figures the head is checked against.",
+      "sources": [
+        "https://www.statkraft.com/Global-presence/nepal/khimti-hydropower-plant/",
+        "https://hpl.com.np/projects/khimti-power-plant/"
+      ]
+    },
+    {
+      "name": "Upper Marsyangdi A",
+      "river": "Marsyangdi",
+      "intake": [28.3121, 84.4002],
+      "intakeSource": "OSM: 'Upper Marsyangdi Dam'",
+      "powerhouse": [28.2832, 84.3628],
+      "powerhouseSource": "OSM: 'Upper Marsyangdi A Hydroelectric Station' plant polygon at Bhulbhule",
+      "actual": { "capacityMW": 50, "designQ": null, "head": null, "headBasis": null, "energyGwh": 317 },
+      "note": "Design discharge and head are not published where they could be verified, so only capacity and energy are compared.",
+      "sources": [
+        "https://en.wikipedia.org/wiki/Upper_Marsyangdi_A_Hydroelectric_Station",
+        "https://www.renewableenergyworld.com/energy-business/new-project-development/first-half-of-nepal-s-50-mw-upper-marsyangdi-hydroelectric-project-commissioned/"
+      ]
+    },
+    {
+      "name": "Upper Bhote Koshi",
+      "river": "Bhote Koshi",
+      "intake": [27.9388, 85.945],
+      "intakeSource": "Global Energy Observatory: side intake ~500 m below the Jung Khola confluence near Tatopani",
+      "powerhouse": [27.9123, 85.9257],
+      "powerhouseSource": "OSM: 'Upper Bhotekoshi - I' plant polygon",
+      "actual": { "capacityMW": 45, "designQ": 36.8, "head": 145, "headBasis": "gross", "energyGwh": 246 },
+      "transHimalayan": true,
+      "note": "Rebuilt after the 2015 earthquake and 2016 GLOF — the river that shows why hazard layers matter. The Bhote Koshi drains Tibet: the numbers land here, but nothing local can corroborate the global models on this river, so treat the agreement as luck to be verified, not a property to rely on.",
+      "sources": [
+        "https://en.wikipedia.org/wiki/Bhote_Koshi_Power_Plant",
+        "https://www.renewableenergyworld.com/energy-business/surviving-three-natural-disasters-lessons-learned-at-upper-bhote-koshi-in-nepal/"
+      ]
+    },
+    {
+      "name": "Mistri Khola",
+      "river": "Mistri Khola",
+      "intake": [28.518, 83.683],
+      "intakeSource": "approx: ~4 km up the Mistri Khola from the powerhouse per published tunnel (2.29 km) + penstock (1.42 km); the stream is unnamed in OSM so this is village-level accuracy",
+      "powerhouse": [28.5071, 83.6598],
+      "powerhouseSource": "OSM: 'Mistri Khola Powerhouse' (left bank of the Kali Gandaki below the confluence)",
+      "actual": { "capacityMW": 42, "designQ": 17.1, "head": 285, "headBasis": "net", "energyGwh": 239 },
+      "note": "High-head Pelton plant under the Nilgiri massif.",
+      "sources": ["https://www.mountainenergy.com.np/mistrikhola1.html"]
+    },
+    {
+      "name": "Chameliya",
+      "river": "Chameliya",
+      "intake": [29.71, 80.6852],
+      "intakeSource": "OSM: 'Chamelia Hydropower Dam'",
+      "powerhouse": [29.685, 80.6498],
+      "powerhouseSource": "OSM: 'Chameliya HEP' plant polygon",
+      "actual": { "capacityMW": 30, "designQ": 36, "head": 103.7, "headBasis": "gross", "energyGwh": 184.2 },
+      "note": "Far-western Nepal — the test that the data holds outside the famous central basins. Six-hour peaking: the dam ponds the river above the bed Ghatta reads, and pondage lets the design flow exceed what a pure run-of-river Q40 would be.",
+      "sources": ["https://en.wikipedia.org/wiki/Chameliya_Khola_Hydropower_Station"]
+    },
+    {
+      "name": "Chilime",
+      "river": "Chilime Khola",
+      "intake": [28.21661, 85.28491],
+      "intakeSource": "derived: upstream end of the OSM-mapped Chilime Khola at Chilime village, 4.2 km along the stream from the powerhouse — matches the published 'about 4.5 km'",
+      "powerhouse": [28.1865, 85.2999],
+      "powerhouseSource": "Wikipedia plant coordinate (underground powerhouse above Syafrubesi)",
+      "actual": { "capacityMW": 22.1, "designQ": 7.5, "head": 351.5, "headBasis": "gross", "energyGwh": 137.9 },
+      "note": "The plant Nepali engineers built themselves — the reason this tool exists.",
+      "sources": [
+        "https://en.wikipedia.org/wiki/Chilime_Hydropower_Plant",
+        "https://www.chilime.com.np/en/plant/"
+      ]
+    }
+  ]
+}
