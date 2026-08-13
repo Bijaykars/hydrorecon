@@ -7,13 +7,14 @@
 import type { FdcPoint } from './engine/hydro.ts';
 import type { StudyPoint } from './App.tsx';
 
-const INK = '#e6edf3';
-const MUTED = '#8fa3b5';
-const FAINT = '#5f7183';
-const LINE = '#1e2a38';
-const RIVER = '#4db8ff';
-const GREEN = '#3fb950';
-const AMBER = '#d29922';
+const INK = '#e9eaec';
+const MUTED = '#9aa1a9';
+const FAINT = '#6d747c';
+const LINE = '#24272c';
+const RIVER = '#4fc1d8';
+const GREEN = '#63b981';
+const AMBER = '#d2a04a';
+const MONO = "'Geist Mono', ui-monospace, monospace";
 
 function niceTicks(min: number, max: number, n: number): number[] {
   const span = max - min;
@@ -75,18 +76,18 @@ export function Fdc({
       {decades.map((v) => (
         <g key={v}>
           <line x1={m.l} x2={W - m.r} y1={y(v)} y2={y(v)} stroke={LINE} strokeDasharray="3 4" />
-          <text x={m.l - 5} y={y(v) + 3} textAnchor="end" fontSize="8.5" fill={FAINT}>
+          <text x={m.l - 5} y={y(v) + 3} textAnchor="end" fontSize="9" fontFamily={MONO} fill={FAINT}>
             {fmtAxis(v)}
           </text>
         </g>
       ))}
       {[0, 0.25, 0.5, 0.75, 1].map((p) => (
-        <text key={p} x={x(p)} y={H - 5} textAnchor="middle" fontSize="8.5" fill={FAINT}>
+        <text key={p} x={x(p)} y={H - 5} textAnchor="middle" fontSize="9" fontFamily={MONO} fill={FAINT}>
           {p * 100}%
         </text>
       ))}
 
-      <path d={d} fill="none" stroke={RIVER} strokeWidth="1.7" />
+      <path d={d} fill="none" stroke={RIVER} strokeWidth="1.8" />
 
       {residualCms > 0 && residualCms >= yMin && (
         <line
@@ -110,7 +111,7 @@ export function Fdc({
           strokeDasharray="4 3"
         />
       )}
-      <text x={W - m.r} y={y(designCms) - 3} textAnchor="end" fontSize="8" fill={GREEN}>
+      <text x={W - m.r} y={y(designCms) - 3} textAnchor="end" fontSize="8.5" fill={GREEN}>
         design
       </text>
     </svg>
@@ -173,19 +174,19 @@ export function RiverProfile({
       {niceTicks(zMin, zMax, 4).map((z) => (
         <g key={z}>
           <line x1={m.l} x2={W - m.r} y1={y(z)} y2={y(z)} stroke={LINE} strokeDasharray="3 4" />
-          <text x={m.l - 5} y={y(z) + 3} textAnchor="end" fontSize="9" fill={FAINT}>
+          <text x={m.l - 5} y={y(z) + 3} textAnchor="end" fontSize="9.5" fontFamily={MONO} fill={FAINT}>
             {Math.round(z)}
           </text>
         </g>
       ))}
       {niceTicks(0, kmMax, 4).map((km) => (
-        <text key={km} x={x(km)} y={H - 5} textAnchor="middle" fontSize="9" fill={FAINT}>
+        <text key={km} x={x(km)} y={H - 5} textAnchor="middle" fontSize="9.5" fontFamily={MONO} fill={FAINT}>
           {km.toFixed(km < 10 ? 1 : 0)} km
         </text>
       ))}
 
-      <path d={area} fill="#151d26" />
-      <path d={bed} fill="none" stroke="#3c556e" strokeWidth="1.4" />
+      <path d={area} fill="#17191d" />
+      <path d={bed} fill="none" stroke="#4a5560" strokeWidth="1.4" />
 
       {ok && (
         <>
@@ -212,7 +213,8 @@ export function RiverProfile({
           <text
             x={x(b.km) + 17}
             y={(y(a.elevationM) + y(b.elevationM)) / 2}
-            fontSize="10"
+            fontSize="10.5"
+            fontFamily={MONO}
             fill={RIVER}
             fontWeight="600"
           >
@@ -221,7 +223,7 @@ export function RiverProfile({
           <text
             x={x(b.km) + 17}
             y={(y(a.elevationM) + y(b.elevationM)) / 2 + 11}
-            fontSize="8"
+            fontSize="8.5"
             fill={MUTED}
           >
             gross

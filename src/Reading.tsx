@@ -25,6 +25,23 @@ const n = (v: number, d = 1) =>
       ? Math.round(v).toLocaleString('en-US')
       : v.toLocaleString('en-US', { maximumFractionDigits: d });
 
+/** Section heading — one style for the whole panel, so hierarchy comes free. */
+function H({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
+  return (
+    <div className="mb-2 flex items-baseline justify-between gap-2">
+      <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-faint">
+        {children}
+      </span>
+      {right && <span className="text-[10.5px] text-faint">{right}</span>}
+    </div>
+  );
+}
+
+/** The small print. Legible small, not decorative small. */
+function Fine({ children }: { children: React.ReactNode }) {
+  return <p className="mt-2 text-[10.5px] leading-relaxed text-faint">{children}</p>;
+}
+
 /** A value with its provenance stated underneath, always visible. */
 function Fact({
   label,
@@ -41,14 +58,34 @@ function Fact({
 }) {
   return (
     <div className="min-w-0">
-      <div className="text-[10px] uppercase tracking-[0.08em] text-faint">{label}</div>
+      <div className="text-[10px] uppercase tracking-[0.1em] text-faint">{label}</div>
       <div
-        className={`num text-[15px] leading-tight ${tone === 'good' ? 'text-green' : tone === 'warn' ? 'text-amber' : 'text-ink'}`}
+        className={`num mt-0.5 text-[16.5px] leading-tight ${tone === 'good' ? 'text-green' : tone === 'warn' ? 'text-amber' : 'text-ink'}`}
       >
         {value}
-        {unit && <span className="ml-0.5 text-[10.5px] text-muted">{unit}</span>}
+        {unit && <span className="ml-1 font-sans text-[10.5px] tracking-normal text-muted">{unit}</span>}
       </div>
-      <div className="mt-0.5 text-[9.5px] leading-tight text-faint">{from}</div>
+      <div className="mt-0.5 text-[10px] leading-snug text-faint">{from}</div>
+    </div>
+  );
+}
+
+/** The plausible range drawn as a range, with the reported figure ticked on it. */
+function Band({ low, mid, high, unit, d }: { low: number; mid: number; high: number; unit: string; d: number }) {
+  const t = high > low ? Math.min(1, Math.max(0, (mid - low) / (high - low))) : 0.5;
+  return (
+    <div>
+      <div className="relative h-1.5 rounded-full bg-[color-mix(in_srgb,var(--color-amber)_28%,transparent)]">
+        <div
+          className="absolute top-1/2 h-3 w-[3px] -translate-y-1/2 rounded-full bg-ink"
+          style={{ left: `calc(${(t * 100).toFixed(1)}% - 1px)` }}
+        />
+      </div>
+      <div className="num mt-1 flex items-baseline justify-between text-[11px] text-amber">
+        <span>{n(low, d)}</span>
+        <span className="font-sans text-[10px] tracking-normal text-faint">{unit}</span>
+        <span>{n(high, d)}</span>
+      </div>
     </div>
   );
 }
@@ -75,8 +112,8 @@ function Slider({
   return (
     <label className="block">
       <span className="flex items-baseline justify-between gap-2">
-        <span className="text-[11px] text-muted">{label}</span>
-        <span className="num text-[11.5px] text-ink">{display}</span>
+        <span className="text-[12px] text-muted">{label}</span>
+        <span className="num text-[12px] text-ink">{display}</span>
       </span>
       <input
         type="range"
@@ -85,9 +122,9 @@ function Slider({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="mt-1 w-full accent-[#4db8ff]"
+        className="mt-0.5 w-full"
       />
-      {note && <span className="block text-[9.5px] leading-tight text-faint">{note}</span>}
+      {note && <span className="block text-[10.5px] leading-snug text-faint">{note}</span>}
     </label>
   );
 }
@@ -185,17 +222,22 @@ export function Reading(props: {
   const alternatives = found?.schemes ?? [];
 
   return (
-    <aside className="z-10 flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-line bg-panel lg:absolute lg:right-3 lg:top-3 lg:max-h-[calc(100%-1.5rem)] lg:w-[356px] lg:flex-none lg:rounded-xl lg:border lg:shadow-[0_16px_50px_rgba(0,0,0,0.5)]">
-      <div className="flex items-center gap-2 border-b border-line px-3.5 py-2">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">
+    <aside className="z-10 flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-line bg-panel lg:absolute lg:right-3 lg:top-3 lg:max-h-[calc(100%-1.5rem)] lg:w-[400px] lg:flex-none lg:rounded-2xl lg:border lg:shadow-[0_24px_70px_rgba(0,0,0,0.55)] xl:w-[440px]">
+      <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-panel/90 px-4 py-2.5 backdrop-blur-md lg:rounded-t-2xl">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
           {!at ? 'Pick a river' : scheme ? 'Best scheme found' : 'Studying'}
         </span>
-        {busy && <span className="text-[10.5px] text-river">{busy}</span>}
+        {busy && (
+          <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-river">
+            <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-river" />
+            <span className="truncate">{busy}</span>
+          </span>
+        )}
         {at && (
           <button
             type="button"
             onClick={onReset}
-            className="ml-auto text-[10.5px] text-faint hover:text-ink"
+            className="ml-auto rounded px-1 text-[11px] text-faint hover:text-ink"
           >
             clear
           </button>
@@ -203,32 +245,46 @@ export function Reading(props: {
       </div>
 
       {!at && (
-        <div className="px-3.5 py-3 text-[12px] leading-relaxed text-muted">
-          <b className="text-ink">Click once on a river.</b> Ghatta walks {22} km downstream along
-          the real channel, reads the terrain and the flow, and searches hundreds of intake and
-          powerhouse positions for the schemes worth studying.
-          <div className="mt-2 text-[11px] text-faint">
+        <div className="px-4 pb-4 pt-5">
+          <p className="text-[15px] font-medium leading-snug text-ink [text-wrap:balance]">
+            Click once on a river, get the schemes worth studying.
+          </p>
+          <div className="mt-3.5 space-y-2.5">
+            {[
+              ['1', 'Ghatta walks 22 km downstream along the real channel.'],
+              ['2', 'It reads the terrain and twenty years of daily flow.'],
+              ['3', 'It searches hundreds of intake and powerhouse positions.'],
+            ].map(([k, t]) => (
+              <div key={k} className="flex items-start gap-2.5">
+                <span className="num mt-px flex size-5 shrink-0 items-center justify-center rounded-full bg-panel-2 text-[10.5px] text-muted">
+                  {k}
+                </span>
+                <span className="text-[12.5px] leading-relaxed text-muted">{t}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3.5 text-[11.5px] leading-relaxed text-faint">
             You get alternatives to compare, not one number. Drag either marker to slide it along
             the river.
-          </div>
+          </p>
         </div>
       )}
 
       {error && (
-        <div className="border-b border-line bg-[color-mix(in_srgb,var(--color-red)_8%,transparent)] px-3.5 py-2 text-[11px] leading-snug text-muted">
+        <div className="border-b border-line bg-[color-mix(in_srgb,var(--color-red)_9%,transparent)] px-4 py-2.5 text-[11.5px] leading-relaxed text-muted">
           <b className="text-red">{error}</b>
         </div>
       )}
 
       {at && !study && !busy && flowOnly && (
-        <div className="border-b border-line px-3.5 py-2 text-[11.5px] leading-snug text-muted">
+        <div className="border-b border-line px-4 py-3 text-[12px] leading-relaxed text-muted">
           The terrain here does not descend far enough to trace a river course.{' '}
           <b className="text-ink">Click directly on a watercourse</b> in a valley.
         </div>
       )}
 
       {study?.tracedFromTerrain && (
-        <div className="border-b border-line px-3.5 py-2 text-[10.5px] leading-snug text-faint">
+        <div className="border-b border-line px-4 py-2.5 text-[11px] leading-relaxed text-faint">
           No mapped river network covers this area, so the course was traced downhill through the
           terrain and the flood model&apos;s own flow is used unscaled. Both are weaker than where a
           network exists — treat this as a first look.
@@ -237,21 +293,19 @@ export function Reading(props: {
 
       {conservation && (
         <div
-          className={`border-b border-line px-3.5 py-2.5 ${
+          className={`border-b border-line px-4 py-3 ${
             conservation.hard
               ? 'bg-[color-mix(in_srgb,var(--color-red)_10%,transparent)]'
               : 'bg-[color-mix(in_srgb,var(--color-amber)_8%,transparent)]'
           }`}
         >
-          <div className="mb-1 text-[10px] uppercase tracking-[0.08em] text-faint">
-            {conservation.inside.length ? 'inside a protected area' : 'beside a protected area'}
-          </div>
+          <H>{conservation.inside.length ? 'inside a protected area' : 'beside a protected area'}</H>
           {conservation.inside.map((h) => (
-            <div key={h.name} className="text-[11px] leading-snug">
+            <div key={h.name} className="text-[12.5px] leading-snug">
               <b className={conservation.hard ? 'text-red' : 'text-amber'}>{h.name}</b>
-              <span className="block text-[10px] text-muted">{h.regime}</span>
+              <span className="block text-[11px] text-muted">{h.regime}</span>
               {h.nearEdge && (
-                <span className="block text-[9.5px] text-faint">
+                <span className="block text-[10.5px] leading-relaxed text-faint">
                   close to the boundary — at this mapping accuracy, inside and outside cannot be
                   told apart here
                 </span>
@@ -259,23 +313,21 @@ export function Reading(props: {
             </div>
           ))}
           {conservation.near.map((h) => (
-            <div key={h.name} className="text-[11px] leading-snug">
+            <div key={h.name} className="text-[12.5px] leading-snug">
               <b className="text-amber">{h.name}</b>
-              <span className="block text-[10px] text-muted">
-                within 3 km — {h.regime}
-              </span>
+              <span className="block text-[11px] text-muted">within 3 km — {h.regime}</span>
             </div>
           ))}
-          <p className="mt-1 text-[9.5px] leading-snug text-faint">
+          <Fine>
             Boundaries from OpenStreetMap, © contributors, ODbL, simplified to ~200 m. Nepal&apos;s
             conservation areas do host licensed hydropower; national parks and reserves effectively
             do not. The permission question is DNPWC&apos;s, not this tool&apos;s.
-          </p>
+          </Fine>
         </div>
       )}
 
       {disagreement && disagreement > 2 && (
-        <div className="border-b border-line px-3.5 py-2 text-[11px] leading-snug text-muted">
+        <div className="border-b border-line px-4 py-2.5 text-[11px] leading-relaxed text-muted">
           The flood model&apos;s ~5 km cell reads {n(meanCms, 1)} m³/s here, {n(disagreement, 1)}×
           off the {n(rival!, 1)} m³/s the mapped river network gives for this reach — its cell is
           not on this channel. Flows below use the network&apos;s magnitude and the model&apos;s
@@ -285,29 +337,33 @@ export function Reading(props: {
 
       {/* ---- the answer ---- */}
       {scheme && (
-        <div className="border-b border-line px-3.5 py-3">
+        <div className="border-b border-line px-4 pb-4 pt-3.5">
           {scheme.grossHeadM <= 0 ? (
-            <div className="text-[11.5px] leading-snug text-red">
+            <div className="text-[12.5px] leading-relaxed text-red">
               This pair has no drop between it — slide the powerhouse further downstream.
             </div>
           ) : (
             <>
               <div className="flex items-baseline gap-2">
-                <span className="num text-[34px] font-semibold leading-none tracking-tight">
+                <span className="num text-[42px] font-medium leading-none tracking-tight text-ink">
                   {n(scheme.capacityMW, scheme.capacityMW < 10 ? 2 : 1)}
                 </span>
-                <span className="text-[15px] text-muted">MW</span>
-                {tweaked && <span className="ml-auto text-[10px] text-amber">hand-adjusted</span>}
+                <span className="text-[15px] font-medium text-muted">MW</span>
+                {tweaked && (
+                  <span className="ml-auto rounded bg-[color-mix(in_srgb,var(--color-amber)_14%,transparent)] px-1.5 py-0.5 text-[10px] text-amber">
+                    hand-adjusted
+                  </span>
+                )}
               </div>
-              <div className="mt-1.5 flex items-baseline gap-2">
-                <span className="num text-[19px] font-semibold leading-none">
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="num text-[20px] font-medium leading-none text-ink">
                   {n(scheme.energyGwh, 1)}
                 </span>
                 <span className="text-[12px] text-muted">GWh per year</span>
               </div>
               {uncertainty && (
-                <div className="mt-2 rounded-md border border-amber/30 bg-[color-mix(in_srgb,var(--color-amber)_6%,transparent)] px-2.5 py-2">
-                  <div className="text-[11.5px] leading-snug text-ink">
+                <div className="mt-3 rounded-lg bg-panel-2 px-3 py-2.5">
+                  <div className="mb-1.5 text-[11.5px] leading-snug text-ink">
                     Realistically{' '}
                     <b className="num text-amber">
                       {n(uncertainty.capacityMW.low, 1)}–{n(uncertainty.capacityMW.high, 1)} MW
@@ -316,78 +372,82 @@ export function Reading(props: {
                     <b className="num text-amber">
                       {n(uncertainty.energyGwh.low, 0)}–{n(uncertainty.energyGwh.high, 0)} GWh/yr
                     </b>
-                    .
                   </div>
-                  <div className="mt-1 space-y-0.5">
+                  <Band
+                    low={uncertainty.capacityMW.low}
+                    mid={scheme.capacityMW}
+                    high={uncertainty.capacityMW.high}
+                    unit="MW"
+                    d={1}
+                  />
+                  <div className="mt-2 space-y-1 border-t border-line pt-2">
                     {uncertainty.drivers.map((d) => (
-                      <div key={d.name} className="text-[9.5px] leading-snug text-faint">
-                        <b className="text-muted">{d.name}</b> moves it ±
-                        {n(d.swingPct / 2, 0)}% — {d.note}
+                      <div key={d.name} className="flex items-baseline gap-2 text-[10.5px] leading-relaxed text-faint">
+                        <span className="num shrink-0 text-muted">±{n(d.swingPct / 2, 0)}%</span>
+                        <span>
+                          <b className="font-medium text-muted">{d.name}</b> — {d.note}
+                        </span>
                       </div>
                     ))}
                   </div>
-                  <div className="mt-1 text-[9.5px] leading-snug text-faint">
+                  <div className="mt-1.5 text-[10.5px] leading-relaxed text-faint">
                     The single figure above is the midpoint, not a measurement. Narrowing this needs
                     a gauge record and a survey, which is what screening is for deciding.
                   </div>
                 </div>
               )}
-              <p className="mt-2 text-[11.5px] leading-relaxed text-muted">
+              <p className="mt-3 text-[12.5px] leading-relaxed text-muted">
                 A <b className="text-ink">{n(scheme.waterwayKm, 1)} km</b> waterway taking{' '}
                 <b className="text-ink">{n(scheme.grossHeadM, 0)} m</b> of drop — about{' '}
-                <b className="text-ink">
-                  {n((scheme.energyGwh * 1e6) / assume.householdKwh, 0)}
-                </b>{' '}
+                <b className="text-ink">{n((scheme.energyGwh * 1e6) / assume.householdKwh, 0)}</b>{' '}
                 households, running at {n(scheme.plantFactor * 100, 0)}% of nameplate on hydrology
                 alone.
               </p>
-              <div className="mt-2.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-md bg-panel-2 px-2.5 py-2 text-[11px]">
-                <span className="num text-river">{n(scheme.designFlowCms, 2)} m³/s</span>
+              <div className="num mt-2.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-1 rounded-lg bg-panel-2 px-3 py-2 text-[11.5px] text-muted">
+                <span>{n(scheme.designFlowCms, 2)} m³/s</span>
                 <span className="text-faint">×</span>
-                <span className="num text-river">{n(scheme.netHeadM, 0)} m</span>
+                <span>{n(scheme.netHeadM, 0)} m</span>
                 <span className="text-faint">×</span>
-                <span className="num text-river">{n(scheme.turbinePeak * assume.efficiency * 100, 0)}%</span>
-                <span className="text-faint">× ρg →</span>
-                <span className="num font-semibold text-ink">{n(scheme.capacityMW, 2)} MW</span>
+                <span>{n(scheme.turbinePeak * assume.efficiency * 100, 0)}%</span>
+                <span className="font-sans text-faint">× ρg →</span>
+                <span className="font-semibold text-ink">{n(scheme.capacityMW, 2)} MW</span>
               </div>
               {scheme.waterway && (
-                <div className="mt-1.5 rounded-md border border-line px-2.5 py-2">
-                  <div className="mb-1 text-[10px] uppercase tracking-[0.08em] text-faint">
+                <div className="mt-2 rounded-lg border border-line px-3 py-2.5">
+                  <div className="mb-1.5 text-[10.5px] uppercase tracking-[0.1em] text-faint">
                     the waterway costs {n(scheme.grossHeadM - scheme.netHeadM, 1)} m of that drop
                     {' · '}
                     {n(scheme.waterway.lossFrac * 100, 1)}%
                   </div>
                   {scheme.waterway.segments.map((s) => (
-                    <div key={s.kind} className="flex items-baseline gap-1.5 text-[10px] leading-tight">
-                      <span className="w-14 shrink-0 text-muted">{s.kind}</span>
-                      <span className="num text-river">
-                        {s.lengthM >= 1000
-                          ? `${n(s.lengthM / 1000, 2)} km`
-                          : `${n(s.lengthM, 0)} m`}
+                    <div key={s.kind} className="flex items-baseline gap-2 text-[11px] leading-relaxed">
+                      <span className="w-16 shrink-0 text-muted">{s.kind}</span>
+                      <span className="num text-ink">
+                        {s.lengthM >= 1000 ? `${n(s.lengthM / 1000, 2)} km` : `${n(s.lengthM, 0)} m`}
                       </span>
                       <span className="text-faint">·</span>
-                      <span className="num text-river">{n(s.diameterM, 2)} m</span>
+                      <span className="num text-ink">{n(s.diameterM, 2)} m</span>
                       <span className="text-faint">·</span>
-                      <span className="num text-river">{n(s.velocityMs, 1)} m/s</span>
-                      <span className="ml-auto num text-ink">−{n(s.lossM, 2)} m</span>
+                      <span className="num text-ink">{n(s.velocityMs, 1)} m/s</span>
+                      <span className="num ml-auto text-muted">−{n(s.lossM, 2)} m</span>
                     </div>
                   ))}
-                  <p className="mt-1 text-[9.5px] leading-snug text-faint">
+                  <Fine>
                     Sized for this duty point, not assumed: ESHA 2004 economic diameter capped at
                     5 m/s, Darcy–Weisbach with Swamee–Jain friction, Manning for the headrace. This
                     is why a longer waterway is not free.
-                  </p>
+                  </Fine>
                 </div>
               )}
               {scheme.turbine ? (
-                <div className="mt-1 text-[10px] leading-snug text-faint">
-                  <b className="text-muted">{scheme.turbine}</b> selected for this duty point —
-                  best point {n(scheme.turbinePeak * 100, 1)}%, times {n(assume.efficiency * 100, 0)}%
+                <div className="mt-2 text-[11px] leading-relaxed text-faint">
+                  <b className="text-muted">{scheme.turbine}</b> selected for this duty point — best
+                  point {n(scheme.turbinePeak * 100, 1)}%, times {n(assume.efficiency * 100, 0)}%
                   generator. Every day of the record is dispatched on its part-load curve, so low
                   flows are not credited with best-point efficiency.
                 </div>
               ) : (
-                <div className="mt-1 text-[10px] leading-snug text-amber">
+                <div className="mt-2 text-[11px] leading-relaxed text-amber">
                   This duty point falls outside every standard turbine envelope — the flat
                   efficiency is a placeholder.
                 </div>
@@ -399,13 +459,17 @@ export function Reading(props: {
 
       {/* ---- river long profile with the scheme marked ---- */}
       {study && pick && (
-        <div className="border-b border-line px-2 pb-1.5 pt-2.5">
-          <div className="px-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
-            {study.followsRiver ? 'The river, downstream from your click' : 'Terrain between the two points'}
+        <div className="border-b border-line px-2.5 pb-2.5 pt-3">
+          <div className="px-1.5">
+            <H>
+              {study.followsRiver
+                ? 'The river, downstream from your click'
+                : 'Terrain between the two points'}
+            </H>
           </div>
           <RiverProfile path={study.path} i={pick.i} j={pick.j} />
           {scheme && (
-            <div className="grid grid-cols-3 gap-2 px-1.5 pt-1">
+            <div className="grid grid-cols-3 gap-2.5 px-1.5 pt-1.5">
               <Fact
                 label="Gross head"
                 value={n(scheme.grossHeadM, 0)}
@@ -431,14 +495,11 @@ export function Reading(props: {
 
       {/* ---- alternatives ---- */}
       {alternatives.length > 1 && (
-        <div className="border-b border-line px-3.5 py-3">
-          <div className="mb-1.5 flex items-baseline justify-between">
-            <span className="text-[10px] uppercase tracking-[0.08em] text-faint">
-              {alternatives.length} alternatives worth keeping
-            </span>
-            <span className="text-[9.5px] text-faint">of {n(found!.evaluated, 0)} tried</span>
-          </div>
-          <div className="space-y-1">
+        <div className="border-b border-line px-4 py-3.5">
+          <H right={<>of {n(found!.evaluated, 0)} tried</>}>
+            {alternatives.length} alternatives worth keeping
+          </H>
+          <div className="space-y-1.5">
             {alternatives.map((s) => {
               const active = pick?.i === s.i && pick?.j === s.j;
               return (
@@ -446,20 +507,20 @@ export function Reading(props: {
                   key={`${s.i}-${s.j}`}
                   type="button"
                   onClick={() => onPick(s)}
-                  className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left ${
+                  className={`flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left ${
                     active
-                      ? 'border-river bg-[color-mix(in_srgb,var(--color-river)_10%,transparent)]'
-                      : 'border-line hover:border-line-strong'
+                      ? 'border-river bg-[color-mix(in_srgb,var(--color-river)_9%,transparent)]'
+                      : 'border-line hover:border-line-strong hover:bg-panel-2'
                   }`}
                 >
-                  <span className="num w-[46px] shrink-0 text-[13px] font-semibold">
+                  <span className="num w-[52px] shrink-0 text-[14px] font-medium text-ink">
                     {n(s.capacityMW, s.capacityMW < 10 ? 1 : 0)}
-                    <span className="text-[9px] text-muted"> MW</span>
+                    <span className="ml-0.5 font-sans text-[9.5px] tracking-normal text-muted">MW</span>
                   </span>
-                  <span className="num w-[52px] shrink-0 text-[10.5px] text-muted">
-                    {n(s.grossHeadM, 0)} m / {n(s.waterwayKm, 1)} km
+                  <span className="num w-[88px] shrink-0 whitespace-nowrap text-[10.5px] leading-tight text-muted">
+                    {n(s.grossHeadM, 0)}&thinsp;m · {n(s.waterwayKm, 1)}&thinsp;km
                   </span>
-                  <span className="flex-1 text-[10px] leading-tight text-faint">
+                  <span className="flex-1 text-[10.5px] leading-snug text-faint">
                     {s.turbine ? `${s.turbine} · ` : ''}
                     {s.reasons.join(' · ')}
                   </span>
@@ -467,14 +528,16 @@ export function Reading(props: {
               );
             })}
           </div>
-          <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
+          <Fine>
             Every one of these beats all the others on at least one of energy, waterway length or
             head — none is simply worse than another. Which matters is your call.
-          </p>
+          </Fine>
           <button
             type="button"
             onClick={() => onWideSearch(!wideSearch)}
-            className="mt-2 w-full rounded-md border border-line bg-panel-2 px-2 py-1.5 text-left text-[10.5px] leading-snug text-muted hover:border-river hover:text-ink"
+            className={`mt-2.5 w-full rounded-lg border px-3 py-2 text-left text-[11px] leading-relaxed text-muted ${
+              wideSearch ? 'border-river/50 bg-[color-mix(in_srgb,var(--color-river)_6%,transparent)]' : 'border-line bg-panel-2 hover:border-line-strong hover:text-ink'
+            }`}
           >
             {wideSearch ? (
               <>
@@ -494,12 +557,12 @@ export function Reading(props: {
       )}
 
       {alternatives.length === 1 && (
-        <div className="border-b border-line px-3.5 py-2 text-[10.5px] leading-snug text-faint">
+        <div className="border-b border-line px-4 py-2.5 text-[11px] leading-relaxed text-faint">
           Only one scheme here survived screening out of {n(found!.evaluated, 0)} pairs tried.
         </div>
       )}
       {found && alternatives.length === 0 && !busy && (
-        <div className="border-b border-line px-3.5 py-2.5 text-[11.5px] leading-snug text-muted">
+        <div className="border-b border-line px-4 py-3 text-[12.5px] leading-relaxed text-muted">
           <b className="text-ink">Nothing here clears screening.</b> {n(found.evaluated, 0)} intake
           and powerhouse pairs were tried; none combined at least 15 m of drop with usable flow at a
           buildable gradient.
@@ -516,15 +579,15 @@ export function Reading(props: {
 
       {/* ---- who already holds this river ---- */}
       {licences && licences.length > 0 && (
-        <div className="border-b border-line px-3.5 py-3">
-          <div className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
+        <div className="border-b border-line px-4 py-3.5">
+          <H>
             {licences.length} licensed project{licences.length > 1 ? 's' : ''} on this reach
-          </div>
-          <div className="space-y-1">
+          </H>
+          <div className="space-y-2">
             {licences.slice(0, 6).map((l) => (
-              <div key={l.licenceNo + l.name} className="flex items-baseline gap-2 text-[11px]">
+              <div key={l.licenceNo + l.name} className="flex items-baseline gap-2.5 text-[12px]">
                 <span
-                  className="mt-[3px] size-2 shrink-0 rounded-full"
+                  className="mt-1 size-2 shrink-0 rounded-full"
                   style={{
                     background:
                       l.stage === 'Operation'
@@ -534,10 +597,12 @@ export function Reading(props: {
                           : 'var(--color-muted)',
                   }}
                 />
-                <span className="min-w-0 flex-1 leading-tight text-ink">
+                <span className="min-w-0 flex-1 leading-snug text-ink">
                   {l.name}
-                  {l.capacityMW ? <span className="text-muted"> · {n(l.capacityMW, 1)} MW</span> : null}
-                  <span className="block text-[9.5px] text-faint">
+                  {l.capacityMW ? (
+                    <span className="num text-muted"> · {n(l.capacityMW, 1)} MW</span>
+                  ) : null}
+                  <span className="block text-[10.5px] leading-relaxed text-faint">
                     {l.stage}
                     {l.river ? ` · ${l.river}` : ''} · {n(l.distanceKm, 1)} km away
                   </span>
@@ -545,43 +610,41 @@ export function Reading(props: {
               </div>
             ))}
           </div>
-          <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
+          <Fine>
             Department of Electricity Development registry.{' '}
             <span className="text-red">Operating</span> and{' '}
             <span className="text-amber">construction</span> licences are a hard constraint on this
             water; a survey licence means someone is already studying it. The public snapshot lags,
             so check the current register before relying on this.
-          </p>
+          </Fine>
         </div>
       )}
 
       {/* ---- sediment: the basin, and whether the valley has room for it ---- */}
       {sediment && scheme && (
-        <div className="border-b border-line px-3.5 py-3">
-          <div className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
-            sediment · desanding basin
-          </div>
+        <div className="border-b border-line px-4 py-3.5">
+          <H>sediment · desanding basin</H>
           {sediment.source && (
-            <div className="text-[11px] leading-snug">
+            <div className="text-[12.5px] leading-snug">
               <b className="text-ink">{sediment.source.label}</b>
               <span className="text-faint">
                 {' · '}
                 {n(sediment.source.highFrac * 100, 0)}% of the catchment above 3000 m
               </span>
-              <p className="mt-0.5 text-[10px] leading-snug text-muted">{sediment.source.note}</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted">{sediment.source.note}</p>
             </div>
           )}
-          <div className="mt-1.5 space-y-0.5 text-[10px]">
-            <div className="flex items-baseline gap-1.5">
+          <div className="mt-2.5 space-y-1 text-[11px]">
+            <div className="flex items-baseline gap-2">
               <span className="w-24 shrink-0 text-faint">to catch</span>
-              <span className="num text-river">{n(sediment.basin.particleMm, 2)} mm</span>
+              <span className="num text-ink">{n(sediment.basin.particleMm, 2)} mm</span>
               <span className="text-faint">
                 sand, settling at {n(sediment.basin.settlingMmS, 1)} mm/s
               </span>
             </div>
-            <div className="flex items-baseline gap-1.5">
+            <div className="flex items-baseline gap-2">
               <span className="w-24 shrink-0 text-faint">basin</span>
-              <span className="num text-river">
+              <span className="num text-ink">
                 {n(sediment.basin.totalLengthM, 0)} × {n(sediment.basin.totalWidthM, 1)} ×{' '}
                 {n(sediment.basin.depthM, 1)} m
               </span>
@@ -589,25 +652,25 @@ export function Reading(props: {
                 {sediment.basin.bays === 2 ? '2 chambers' : '1 chamber'}
               </span>
             </div>
-            <div className="flex items-baseline gap-1.5">
+            <div className="flex items-baseline gap-2">
               <span className="w-24 shrink-0 text-faint">flat ground</span>
-              <span className="num text-river">{n(sediment.basin.benchNeededM, 0)} m</span>
+              <span className="num text-ink">{n(sediment.basin.benchNeededM, 0)} m</span>
               <span className="text-faint">across the valley, beside the intake</span>
             </div>
           </div>
 
           {/* The part terrain can answer. */}
           {!bench ? (
-            <div className="mt-1.5 text-[10.5px] leading-snug text-muted">
+            <div className="mt-2 text-[11px] leading-relaxed text-muted">
               Reading the valley cross-section…
             </div>
           ) : bench.verdict === 'fits' ? (
-            <div className="mt-1.5 text-[11px] leading-snug text-ink">
-              About <b>{n(bench.widestM, 0)} m</b> of workable bench on the {bench.side} bank,{' '}
-              {n(bench.liftM, 0)} m above the river — enough to hold it.
+            <div className="mt-2 text-[12px] leading-relaxed text-ink">
+              About <b className="num">{n(bench.widestM, 0)} m</b> of workable bench on the{' '}
+              {bench.side} bank, {n(bench.liftM, 0)} m above the river — enough to hold it.
             </div>
           ) : bench.verdict === 'no-room' ? (
-            <div className="mt-1.5 text-[11px] leading-snug text-amber">
+            <div className="mt-2 text-[12px] leading-relaxed text-amber">
               <b>No bench wide enough.</b>{' '}
               {bench.widestM === 0
                 ? 'Nothing within 250 m of the intake is flatter than 1 in 4 — this is gorge.'
@@ -617,7 +680,7 @@ export function Reading(props: {
               or the intake moved — real money that a headline capacity figure will not show you.
             </div>
           ) : (
-            <div className="mt-1.5 text-[11px] leading-snug text-muted">
+            <div className="mt-2 text-[12px] leading-relaxed text-muted">
               About {n(bench.widestM, 0)} m of workable bench against{' '}
               {n(sediment.basin.benchNeededM, 0)} m needed — closer than the ~
               {n(bench.resolutionM, 0)} m the terrain is known to. Too close to call from a DEM.
@@ -625,43 +688,41 @@ export function Reading(props: {
             </div>
           )}
 
-          <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
+          <Fine>
             Zanke settling velocity for quartz, ideal basin × 2 for turbulence — a screening size,
             and deliberately on the generous side. Nepal does not publish suspended-sediment records,
             so the load here is inferred from catchment altitude, not measured. A real design needs
             a sampling programme; this is the flag that says you will need one.
-          </p>
+          </Fine>
         </div>
       )}
 
       {/* ---- getting the power out ---- */}
       {grid && scheme && (
-        <div className="border-b border-line px-3.5 py-3">
-          <div className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
-            grid connection
-          </div>
-          <div className={`text-[11px] leading-snug ${verdict!.hard ? 'text-amber' : 'text-ink'}`}>
+        <div className="border-b border-line px-4 py-3.5">
+          <H>grid connection</H>
+          <div className={`text-[12px] leading-relaxed ${verdict!.hard ? 'text-amber' : 'text-ink'}`}>
             {verdict!.text}
           </div>
-          <div className="mt-1.5 space-y-0.5 text-[10px]">
-            <div className="flex items-baseline gap-1.5">
+          <div className="mt-2 space-y-1 text-[11px]">
+            <div className="flex items-baseline gap-2">
               <span className="w-24 shrink-0 text-faint">nearest line</span>
-              <span className="num text-river">{n(grid.nearestKm, 1)} km</span>
+              <span className="num text-ink">{n(grid.nearestKm, 1)} km</span>
               <span className="text-faint">
                 {grid.nearestKv ? `${grid.nearestKv} kV` : 'voltage not tagged'}
               </span>
             </div>
             {grid.adequateKm !== null && (
-              <div className="flex items-baseline gap-1.5">
+              <div className="flex items-baseline gap-2">
                 <span className="w-24 shrink-0 text-faint">at {grid.requiredKv} kV+</span>
-                <span className="num text-river">{n(grid.adequateKm, 1)} km</span>
+                <span className="num text-ink">{n(grid.adequateKm, 1)} km</span>
                 <span className="text-faint">{grid.adequateKv} kV</span>
               </div>
             )}
             {grid.nearestSub && (
-              <div className="flex items-baseline gap-1.5">
+              <div className="flex items-baseline gap-2">
                 <span className="w-24 shrink-0 text-faint">substation</span>
-                <span className="num text-river">{n(grid.nearestSub.km, 1)} km</span>
+                <span className="num text-ink">{n(grid.nearestSub.km, 1)} km</span>
                 <span className="min-w-0 flex-1 truncate text-faint">
                   {grid.nearestSub.name ?? 'unnamed'}
                   {grid.nearestSub.kv ? ` · ${grid.nearestSub.kv} kV` : ''}
@@ -669,64 +730,65 @@ export function Reading(props: {
               </div>
             )}
           </div>
-          <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
+          <Fine>
             Straight-line distance from the powerhouse — a line is not built straight through this
             terrain, so treat it as a floor. {n(scheme.capacityMW, 1)} MW would typically connect at{' '}
             {grid.requiredKv} kV. OpenStreetMap, © contributors, ODbL; coverage is good on the
             transmission backbone and patchy below 66 kV, so an absent line means unmapped, not
             absent.
-          </p>
+          </Fine>
         </div>
       )}
 
       {/* ---- Nepal's own regression, as an independent third opinion ---- */}
       {hydest && (
-        <div className="border-b border-line px-3.5 py-3">
-          <div className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
-            HYDEST · Nepal's national method
-          </div>
-          <div className="flex items-baseline gap-2 text-[11px]">
+        <div className="border-b border-line px-4 py-3.5">
+          <H>HYDEST · Nepal&apos;s national method</H>
+          <div className="flex items-baseline gap-2 text-[12px]">
             <span className="text-muted">driest month</span>
-            <span className="num font-semibold text-ink">
+            <span className="num text-[13.5px] font-medium text-ink">
               {n(hydest.driest.cms, 2)} m³/s
             </span>
             <span className="text-faint">{MONTH_NAMES[hydest.driest.month]}</span>
           </div>
           {hydest.agreement && (
             <div
-              className={`mt-1 text-[10px] leading-snug ${
+              className={`mt-1.5 text-[11px] leading-relaxed ${
                 hydest.agreement.agree ? 'text-muted' : 'text-amber'
               }`}
             >
               {hydest.agreement.agree ? (
                 <>
-                  The global model gives {n(hydest.modelledCms, 2)} m³/s for the same month —{' '}
-                  within {n(hydest.agreement.ratio, 1)}×. Two methods built from different data
-                  agree, which is the strongest corroboration available without a gauge.
+                  The global model gives {n(hydest.modelledCms, 2)} m³/s for the same month — within{' '}
+                  {n(hydest.agreement.ratio, 1)}×. Two methods built from different data agree,
+                  which is the strongest corroboration available without a gauge.
                 </>
               ) : (
                 <>
                   The global model gives {n(hydest.modelledCms, 2)} m³/s for the same month —{' '}
-                  {n(hydest.agreement.ratio, 1)}× apart. Nepal's own regression and the flood model
-                  disagree about the dry season here, and the dry season is what sets firm power.
+                  {n(hydest.agreement.ratio, 1)}× apart. Nepal&apos;s own regression and the flood
+                  model disagree about the dry season here, and the dry season is what sets firm
+                  power.
                 </>
               )}
             </div>
           )}
-          <div className="mt-2 grid grid-cols-5 gap-1">
+          <div className="mt-2.5 grid grid-cols-5 gap-1 rounded-lg bg-panel-2 px-2 py-1.5">
             {hydest.months.map((m) => (
               <div key={m.month} className="text-center">
-                <div className="text-[9px] text-faint">{MONTH_NAMES[m.month]}</div>
-                <div className="num text-[10px] text-river">{n(m.cms, 1)}</div>
+                <div className="text-[9.5px] uppercase tracking-wide text-faint">
+                  {MONTH_NAMES[m.month]}
+                </div>
+                <div className="num text-[11px] text-ink">{n(m.cms, 1)}</div>
               </div>
             ))}
           </div>
           {hydest.floods.length > 0 && (
-            <div className="mt-2 border-t border-line pt-2">
-              <div className="mb-1 text-[10px] uppercase tracking-[0.08em] text-faint">
+            <div className="mt-2.5 border-t border-line pt-2.5">
+              <div className="mb-1 text-[10.5px] uppercase tracking-[0.1em] text-faint">
                 design flood, m³/s
               </div>
-              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px]">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
                 {hydest.floods
                   .filter((f) => [2, 100, 500].includes(f.t))
                   .map((f) => (
@@ -738,43 +800,42 @@ export function Reading(props: {
               </div>
             </div>
           )}
-          <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
-            WECS/DHM 1990, fitted to Nepal's own gauged records — the method a feasibility study
-            would use for an ungauged site. Needs the catchment below 5000 m ({n(hydest.input.below5000Km2, 0)} of{' '}
-            {n(hydest.input.totalKm2, 0)} km²) and below 3000 m ({n(hydest.input.below3000Km2, 0)} km²).
-            Only Jan–May and the floods are shown: the monsoon months need rainfall data this app
-            does not have yet, and a guessed monsoon flow would be worse than none.
-          </p>
+          <Fine>
+            WECS/DHM 1990, fitted to Nepal&apos;s own gauged records — the method a feasibility
+            study would use for an ungauged site. Needs the catchment below 5000 m (
+            {n(hydest.input.below5000Km2, 0)} of {n(hydest.input.totalKm2, 0)} km²) and below 3000 m
+            ({n(hydest.input.below3000Km2, 0)} km²). Only Jan–May and the floods are shown: the
+            monsoon months need rainfall data this app does not have yet, and a guessed monsoon flow
+            would be worse than none.
+          </Fine>
         </div>
       )}
 
       {/* ---- a real record, if the engineer has one ---- */}
       {study && (
-        <div className="border-b border-line px-3.5 py-3">
-          <div className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
-            {measured ? 'flow is measured, not modelled' : 'have a gauge record?'}
-          </div>
+        <div className="border-b border-line px-4 py-3.5">
+          <H>{measured ? 'flow is measured, not modelled' : 'have a gauge record?'}</H>
           {measured ? (
             <>
-              <div className="flex items-baseline gap-2 text-[11px]">
+              <div className="flex items-baseline gap-2 text-[12px]">
                 <span className="min-w-0 flex-1 truncate text-ink">{measured.name}</span>
                 <button
                   type="button"
                   onClick={onClearMeasured}
-                  className="shrink-0 text-[10px] text-faint hover:text-ink"
+                  className="shrink-0 rounded px-1 text-[11px] text-faint hover:text-ink"
                 >
                   remove
                 </button>
               </div>
-              <div className="mt-1 text-[10px] text-muted">
+              <div className="num mt-1 text-[11px] text-muted">
                 {measured.series.values.length.toLocaleString()} values
                 {measured.series.from ? `, ${measured.series.from} to ${measured.series.to}` : ''}
                 {measured.series.cadence !== 'unknown' ? ` · ${measured.series.cadence}` : ''}
                 {measured.ratio !== 1 ? ` · scaled ${n(measured.ratio, 3)}×` : ''}
               </div>
-              <ul className="mt-1.5 space-y-0.5">
+              <ul className="mt-1.5 space-y-1">
                 {measured.series.notes.map((note, k) => (
-                  <li key={k} className="text-[9.5px] leading-snug text-faint">
+                  <li key={k} className="text-[10.5px] leading-relaxed text-faint">
                     {note}
                   </li>
                 ))}
@@ -782,7 +843,7 @@ export function Reading(props: {
             </>
           ) : (
             <>
-              <label className="block cursor-pointer rounded-md border border-dashed border-line px-2.5 py-2.5 text-center text-[11px] text-muted hover:border-river hover:text-ink">
+              <label className="block cursor-pointer rounded-lg border border-dashed border-line-strong px-3 py-3 text-center text-[12px] text-muted hover:border-river hover:bg-[color-mix(in_srgb,var(--color-river)_5%,transparent)] hover:text-ink">
                 <input
                   type="file"
                   accept=".csv,.txt,.tsv,text/*"
@@ -795,12 +856,12 @@ export function Reading(props: {
                 />
                 Load a discharge record
               </label>
-              <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
-                CSV or text, one row per reading, discharge in m³/s — a date column if you have
-                one. This replaces both global models outright and is the only thing that turns the
-                range above into a measurement. Headers, tabs and no-data markers are handled;
-                Bikram Sambat dates are detected and refused rather than approximated.
-              </p>
+              <Fine>
+                CSV or text, one row per reading, discharge in m³/s — a date column if you have one.
+                This replaces both global models outright and is the only thing that turns the range
+                above into a measurement. Headers, tabs and no-data markers are handled; Bikram
+                Sambat dates are detected and refused rather than approximated.
+              </Fine>
             </>
           )}
         </div>
@@ -808,58 +869,59 @@ export function Reading(props: {
 
       {/* ---- where the real measurements are ---- */}
       {gauges && gauges.length > 0 && (
-        <div className="border-b border-line px-3.5 py-3">
-          <div className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
-            nearest measured record
-          </div>
-          <div className="space-y-1.5">
+        <div className="border-b border-line px-4 py-3.5">
+          <H>nearest measured record</H>
+          <div className="space-y-2.5">
             {gauges.slice(0, 3).map((g) => (
-              <div key={g.name} className="flex items-baseline gap-2 text-[11px]">
+              <div key={g.name} className="flex items-baseline gap-2.5 text-[12px]">
                 <span
-                  className="mt-[3px] size-2 shrink-0 rounded-full"
+                  className="mt-1 size-2 shrink-0 rounded-full"
                   style={{
-                    background: g.trustworthy ? 'var(--color-accent)' : 'var(--color-muted)',
+                    background: g.trustworthy ? 'var(--color-river)' : 'var(--color-muted)',
                   }}
                 />
-                <span className="min-w-0 flex-1 leading-tight text-ink">
+                <span className="min-w-0 flex-1 leading-snug text-ink">
                   {g.name}
-                  <span className="block text-[9.5px] text-faint">
+                  <span className="block text-[10.5px] leading-relaxed text-faint">
                     {g.relation} · {n(g.distanceKm, 1)} km away
                     {g.uplandKm2 ? ` · ${n(g.uplandKm2, 0)} km² catchment` : ''}
                     {g.basin ? ` · ${g.basin} basin` : ''}
                   </span>
                   <span
-                    className={`block text-[9.5px] ${g.measuresDischarge ? 'text-river' : 'text-faint'}`}
+                    className={`block text-[10.5px] leading-relaxed ${g.measuresDischarge ? 'text-river' : 'text-faint'}`}
                   >
                     {recordKind(g)}
                   </span>
-                  <span className="block text-[9.5px] text-muted">{transferAdvice(g)}</span>
+                  <span className="block text-[10.5px] leading-relaxed text-muted">
+                    {transferAdvice(g)}
+                  </span>
                 </span>
               </div>
             ))}
           </div>
-          <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
+          <Fine>
             Flow is the largest error in this estimate and a gauged record is the only thing that
             shrinks it. DHM runs {RIVER_GAUGE_COUNT} river stations, {DISCHARGE_GAUGE_COUNT} of them
             recording discharge rather than water level alone. The readings are not public — the API
-            requires a key, and refuses DHM's own portal too — so request the record for the station
-            above and scale it by catchment area, which is what a feasibility study would do with it.
-          </p>
+            requires a key, and refuses DHM&apos;s own portal too — so request the record for the
+            station above and scale it by catchment area, which is what a feasibility study would do
+            with it.
+          </Fine>
         </div>
       )}
 
       {/* ---- flow ---- */}
       {flow && fdc.length > 0 && (
-        <div className="border-b border-line px-2 pb-2 pt-2.5">
-          <div className="px-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
-            Flow at your click — m³/s vs % of time exceeded
+        <div className="border-b border-line px-2.5 pb-3 pt-3">
+          <div className="px-1.5">
+            <H>Flow at your click — m³/s vs % of time exceeded</H>
           </div>
           <Fdc
             fdc={fdc}
             designCms={scheme?.designFlowCms ?? 0}
             residualCms={scheme?.residualCms ?? 0}
           />
-          <div className="grid grid-cols-3 gap-2 px-1.5">
+          <div className="grid grid-cols-3 gap-2.5 px-1.5">
             <Fact
               label="Mean"
               value={n(meanCms, 2)}
@@ -882,7 +944,7 @@ export function Reading(props: {
             />
           </div>
           {seasons && (
-            <div className="mt-2 grid grid-cols-2 gap-2 px-1.5">
+            <div className="mt-2.5 grid grid-cols-2 gap-2.5 px-1.5">
               <Fact
                 label="Wet half-year"
                 value={n(seasons.wetGwh, 1)}
@@ -902,8 +964,8 @@ export function Reading(props: {
 
       {/* ---- assumptions ---- */}
       {flow && (
-        <div className="space-y-2.5 border-b border-line px-3.5 py-3">
-          <div className="text-[10px] uppercase tracking-[0.08em] text-faint">Assumptions</div>
+        <div className="space-y-3 border-b border-line px-4 py-3.5">
+          <H>Assumptions</H>
           <Slider
             label="Design flow exceedance"
             value={assume.exceedance}
@@ -935,14 +997,14 @@ export function Reading(props: {
             note="Left in the river. Bases vary by jurisdiction — set yours."
           />
           <label className="flex items-center justify-between gap-2 pt-0.5">
-            <span className="text-[11px] text-muted">Household use, kWh/yr</span>
+            <span className="text-[12px] text-muted">Household use, kWh/yr</span>
             <input
               type="number"
               value={assume.householdKwh}
               min={100}
               step={50}
               onChange={(e) => set('householdKwh', Math.max(1, Number(e.target.value) || 1))}
-              className="num w-20 rounded border border-line bg-panel-2 px-1.5 py-0.5 text-right text-[11.5px] text-ink"
+              className="num w-24 rounded-md border border-line bg-panel-2 px-2 py-1 text-right text-[12px] text-ink"
             />
           </label>
         </div>
@@ -950,16 +1012,21 @@ export function Reading(props: {
 
       {/* ---- evidence ---- */}
       {flow && (
-        <div className="border-b border-line px-3.5 py-2.5 text-[10.5px] leading-relaxed text-faint">
-          <div className="mb-1 text-[10px] uppercase tracking-[0.08em]">Where this comes from</div>
+        <div className="border-b border-line px-4 py-3.5 text-[11px] leading-relaxed text-faint">
+          <H>Where this comes from</H>
           <div>
             <b className="text-muted">Flow</b> — GloFAS v4 reanalysis, {n(years, 0)} years,{' '}
             {flow.from === 'network' ? 'fetched now' : flow.from === 'cache' ? 'from cache' : 'stale cache'}
             . Modelled, not gauged. Rescaled along the river by catchment.
           </div>
-          <div className="mt-0.5">
+          <div className="mt-1">
             <b className="text-muted">Model cell</b> — {n(
-              at ? Math.hypot((flow.cell.lat - at.lat) * 111.32, (flow.cell.lon - at.lon) * 111.32 * Math.cos((at.lat * Math.PI) / 180)) : 0,
+              at
+                ? Math.hypot(
+                    (flow.cell.lat - at.lat) * 111.32,
+                    (flow.cell.lon - at.lon) * 111.32 * Math.cos((at.lat * Math.PI) / 180)
+                  )
+                : 0,
               1
             )}{' '}
             km from your click.{' '}
@@ -974,60 +1041,59 @@ export function Reading(props: {
               <button
                 type="button"
                 onClick={onProbe}
-                className="text-river underline underline-offset-2 hover:text-ink"
+                className="rounded text-river underline underline-offset-2 hover:text-ink"
               >
                 check neighbouring cells
               </button>
             )}
           </div>
           {study && (
-            <div className="mt-0.5">
+            <div className="mt-1">
               <b className="text-muted">Terrain</b> — {study.dem.source}, zoom {study.dem.zoom},{' '}
               {n(study.dem.resolutionM, 0)} m sample spacing, {study.dem.tilesFetched} tiles. Global
               DEMs carry roughly ±10–16 m of vertical error in steep ground.
             </div>
           )}
           {study?.reach && (
-            <div className="mt-0.5">
+            <div className="mt-1">
               <b className="text-muted">River</b> — {n(study.reach.uplandKm2, 0)} km² upstream
               (HydroRIVERS), whose own long-term mean here is {n(study.reach.meanDischargeCms, 1)}{' '}
               m³/s against GloFAS&apos;s {n(meanCms, 1)}.
-              {study.followsRiver && ` Walked ${n(study.path[study.path.length - 1].km, 1)} km downstream.`}
+              {study.followsRiver &&
+                ` Walked ${n(study.path[study.path.length - 1].km, 1)} km downstream.`}
             </div>
           )}
         </div>
       )}
 
       {canExport && (
-        <div className="border-b border-line px-3.5 py-3">
-          <div className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-faint">
-            Take it with you
-          </div>
+        <div className="border-b border-line px-4 py-3.5">
+          <H>Take it with you</H>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => onExport('csv')}
-              className="flex-1 rounded-md border border-line bg-panel-2 px-2 py-1.5 text-[11.5px] text-ink hover:border-river hover:text-river"
+              className="flex-1 rounded-lg border border-line bg-panel-2 px-3 py-2 text-[12px] font-medium text-ink hover:border-river/60 hover:bg-[color-mix(in_srgb,var(--color-river)_8%,transparent)] hover:text-river"
             >
               CSV — the numbers
             </button>
             <button
               type="button"
               onClick={() => onExport('geojson')}
-              className="flex-1 rounded-md border border-line bg-panel-2 px-2 py-1.5 text-[11.5px] text-ink hover:border-river hover:text-river"
+              className="flex-1 rounded-lg border border-line bg-panel-2 px-3 py-2 text-[12px] font-medium text-ink hover:border-river/60 hover:bg-[color-mix(in_srgb,var(--color-river)_8%,transparent)] hover:text-river"
             >
               GeoJSON — for QGIS
             </button>
           </div>
-          <p className="mt-1.5 text-[9.5px] leading-snug text-faint">
+          <Fine>
             Every alternative, plus a header naming each source, assumption and limitation — so the
             file still explains itself when nobody remembers where it came from. The link in your
             address bar reopens this exact study.
-          </p>
+          </Fine>
         </div>
       )}
 
-      <div className="mt-auto border-l-2 border-amber bg-[color-mix(in_srgb,var(--color-amber)_7%,transparent)] px-3.5 py-2 text-[10.5px] leading-snug text-muted">
+      <div className="mt-auto border-l-2 border-amber bg-[color-mix(in_srgb,var(--color-amber)_7%,transparent)] px-4 py-2.5 text-[11px] leading-relaxed text-muted">
         <b className="text-amber">Screening only.</b> These compare options and tell you what to
         survey next — they are not a feasibility study, and no waterway has been routed or costed.
       </div>

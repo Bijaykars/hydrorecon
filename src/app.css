@@ -1,19 +1,48 @@
 @import 'tailwindcss';
 
-@theme {
-  --color-bg: #0b0f14;
-  --color-panel: #10161d;
-  --color-panel-2: #172029;
-  --color-ink: #e6edf3;
-  --color-muted: #8fa3b5;
-  --color-faint: #5f7183;
-  --color-line: #1e2a38;
-  --color-river: #4db8ff;
-  --color-green: #3fb950;
-  --color-amber: #d29922;
-  --color-red: #f85149;
+/*
+ * Geist (Vercel, SIL OFL 1.1) — bundled so the desktop app works offline.
+ * Sans for prose, Mono for every number: an instrument reads better when its
+ * figures line up in columns without asking.
+ */
+@font-face {
+  font-family: 'Geist';
+  src: url('./assets/fonts/geist-sans.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('./assets/fonts/geist-mono.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-display: swap;
+}
 
-  --font-sans: ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+/*
+ * The palette rule: neutral charcoal surfaces, one gray family, ONE accent.
+ * The accent is glacial-river teal and it is reserved for water and for
+ * interaction — when everything was blue, nothing was. Semantic colours
+ * (green/amber/red) are kept desaturated so a warning reads as a note from a
+ * colleague, not a siren.
+ */
+@theme {
+  --color-bg: #0e0f11;
+  --color-panel: #141619;
+  --color-panel-2: #1b1e22;
+  --color-ink: #e9eaec;
+  --color-muted: #9aa1a9;
+  --color-faint: #6d747c;
+  --color-line: #24272c;
+  --color-line-strong: #363b42;
+  --color-river: #4fc1d8;
+  --color-accent: #4fc1d8;
+  --color-green: #63b981;
+  --color-amber: #d2a04a;
+  --color-red: #e06552;
+
+  --font-sans: 'Geist', ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
 }
 
 :root {
@@ -31,14 +60,44 @@ body {
   background: var(--color-bg);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 13.5px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
 
+/* Numbers: mono, tabular, slightly tightened. */
 .num {
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Interactive elements feel alive but never showy. */
+button,
+input,
+label,
+a {
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 120ms ease,
+    opacity 160ms ease;
+}
+button:active {
+  transform: scale(0.985);
+}
+:focus-visible {
+  outline: 2px solid var(--color-river);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Sliders on the panel's accent. */
+input[type='range'] {
+  accent-color: var(--color-river);
+  height: 22px;
 }
 
 /* Intake / powerhouse pins. One element, coloured by a custom property. */
@@ -47,7 +106,7 @@ body {
   height: 15px;
   border-radius: 50%;
   background: var(--c);
-  border: 2.5px solid #0b0f14;
+  border: 2.5px solid var(--color-bg);
   box-shadow:
     0 0 0 1.5px var(--c),
     0 2px 10px rgba(0, 0, 0, 0.6);
@@ -59,13 +118,13 @@ body {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2c3d52 transparent;
+  scrollbar-color: #3a3f46 transparent;
 }
 *::-webkit-scrollbar {
   width: 7px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #2c3d52;
+  background: #3a3f46;
   border-radius: 4px;
 }
 
@@ -85,7 +144,7 @@ body {
   filter: invert(0.85);
 }
 .maplibregl-ctrl-attrib {
-  background: rgba(11, 15, 20, 0.72) !important;
+  background: rgba(14, 15, 17, 0.72) !important;
   color: var(--color-faint) !important;
   font-size: 10px !important;
 }
@@ -93,12 +152,31 @@ body {
   color: var(--color-faint) !important;
 }
 .maplibregl-ctrl-scale {
-  background: rgba(11, 15, 20, 0.6) !important;
-  border-color: #2c3d52 !important;
+  background: rgba(14, 15, 17, 0.6) !important;
+  border-color: #3a3f46 !important;
   color: var(--color-muted) !important;
 }
 .maplibregl-canvas {
   cursor: crosshair;
+}
+
+/* Licence popups were shipping in MapLibre's default white. */
+.maplibregl-popup-content {
+  background: var(--color-panel-2) !important;
+  color: var(--color-ink) !important;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px !important;
+  padding: 8px 11px !important;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.45;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5) !important;
+}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: var(--color-panel-2) !important;
+}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: var(--color-panel-2) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

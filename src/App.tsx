@@ -220,17 +220,68 @@ export default function App() {
           maxzoom: 16,
           paint: {
             'hillshade-exaggeration': ['interpolate', ['linear'], ['zoom'], 5, 0.3, 11, 0.5, 14, 0.22],
-            'hillshade-shadow-color': '#000914',
-            'hillshade-highlight-color': '#43617d',
-            'hillshade-accent-color': '#0d1a26',
+            // Neutral rock-grey relief. The old steel-blue highlight tinted the
+            // entire country the same hue as the rivers, and both disappeared.
+            'hillshade-shadow-color': '#030405',
+            'hillshade-highlight-color': '#5a6169',
+            'hillshade-accent-color': '#0f1114',
           },
         },
         firstWater
       );
-      if (m.getLayer('water')) m.setPaintProperty('water', 'fill-color', '#12456b');
+      if (m.getLayer('water')) m.setPaintProperty('water', 'fill-color', '#1b3540');
       if (m.getLayer('waterway')) {
-        m.setPaintProperty('waterway', 'line-color', '#4db8ff');
-        m.setPaintProperty('waterway', 'line-opacity', 0.85);
+        m.setPaintProperty('waterway', 'line-color', '#4fc1d8');
+        m.setPaintProperty('waterway', 'line-opacity', 0.8);
+      }
+
+      /**
+       * National borders, drawn on purpose rather than left to the basemap.
+       *
+       * The engineer's first orientation question on a country-scale view is
+       * "where is Nepal" — and the basemap's own hairline drowned under the
+       * hillshade. A dark casing under a sand-coloured line reads on ridge and
+       * shadow alike, and sand is deliberately neither the river teal nor any
+       * alert colour: a border is geography, not a warning.
+       */
+      const vectorSource = Object.entries(m.getStyle().sources).find(
+        ([, s]) => (s as { type?: string }).type === 'vector'
+      )?.[0];
+      if (vectorSource) {
+        const national = [
+          'all',
+          ['==', ['get', 'admin_level'], 2],
+          ['!=', ['get', 'maritime'], 1],
+        ] as maplibregl.FilterSpecification;
+        m.addLayer({
+          id: 'border-casing',
+          type: 'line',
+          source: vectorSource,
+          'source-layer': 'boundary',
+          filter: national,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#000000',
+            'line-opacity': 0.5,
+            'line-blur': 1.4,
+            'line-width': ['interpolate', ['linear'], ['zoom'], 3, 2.4, 8, 4.6],
+          },
+        });
+        m.addLayer({
+          id: 'border-line',
+          type: 'line',
+          source: vectorSource,
+          'source-layer': 'boundary',
+          filter: national,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#cfc7a8',
+            'line-opacity': 0.9,
+            'line-width': ['interpolate', ['linear'], ['zoom'], 3, 1.3, 8, 2],
+            // Disputed stretches stay visible but honest.
+            'line-dasharray': ['case', ['==', ['get', 'disputed'], 1], ['literal', [2, 2]], ['literal', [1, 0]]],
+          },
+        });
       }
 
       // Licensed and operating projects already on this river.
@@ -242,9 +293,9 @@ export default function App() {
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 3, 13, 6],
           // Operating plants are a hard constraint; a survey licence is a soft one.
-          'circle-color': ['match', ['get', 'stage'], 'Operation', '#f85149', 'Generation', '#d29922', '#8fa3b5'],
+          'circle-color': ['match', ['get', 'stage'], 'Operation', '#e06552', 'Generation', '#d2a04a', '#9aa1a9'],
           'circle-stroke-width': 1.5,
-          'circle-stroke-color': '#0b0f14',
+          'circle-stroke-color': '#0e0f11',
         },
       });
       m.on('click', 'licences', (e) => {
@@ -254,7 +305,7 @@ export default function App() {
         new maplibregl.Popup({ closeButton: false })
           .setLngLat(e.lngLat)
           .setHTML(
-            `<b>${p.name}</b><br/><span style="color:#8fa3b5">${p.stage}` +
+            `<b>${p.name}</b><br/><span style="color:#9aa1a9">${p.stage}` +
               `${p.cap ? ` · ${p.cap} MW` : ''}${p.promoter ? `<br/>${p.promoter}` : ''}</span>`
           )
           .addTo(m);
@@ -292,8 +343,8 @@ export default function App() {
                 source: 'reaches',
                 layout: { 'line-cap': 'round', 'line-join': 'round' },
                 paint: {
-                  'line-color': '#4db8ff',
-                  'line-opacity': 0.8,
+                  'line-color': '#4fc1d8',
+                  'line-opacity': 0.75,
                   'line-width': [
                     'interpolate',
                     ['exponential', 1.6],
@@ -982,10 +1033,12 @@ export default function App() {
     <div className="flex h-full flex-col lg:block">
       <div ref={mapEl} className="h-[46vh] w-full shrink-0 lg:absolute lg:inset-0 lg:h-full" />
 
-      <header className="pointer-events-none absolute left-0 right-0 top-0 z-10 hidden items-center gap-2 px-4 py-3 lg:flex">
-        <Mark />
-        <span className="text-[13px] font-semibold tracking-tight">Ghatta</span>
-        <span className="text-[11px] text-muted">hydropower scheme finder</span>
+      <header className="pointer-events-none absolute left-3 top-3 z-10 hidden lg:block">
+        <div className="flex items-center gap-2 rounded-full border border-line bg-bg/75 py-1.5 pl-3 pr-4 backdrop-blur-md">
+          <Mark />
+          <span className="text-[13.5px] font-semibold tracking-tight">Ghatta</span>
+          <span className="mt-px text-[11px] text-muted">hydropower scheme finder</span>
+        </div>
       </header>
 
       <Reading
@@ -1033,12 +1086,12 @@ const empty = (): GeoJSON.FeatureCollection => ({ type: 'FeatureCollection', fea
 function Mark() {
   return (
     <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden>
-      <circle cx="9" cy="9" r="8" fill="none" stroke="#4db8ff" strokeWidth="1.6" />
+      <circle cx="9" cy="9" r="8" fill="none" stroke="#4fc1d8" strokeWidth="1.6" />
       {[0, 120, 240].map((r) => (
         <path
           key={r}
           d="M9 3.2C10.4 5.4 10.4 7 9 9C7.6 7 7.6 5.4 9 3.2Z"
-          fill="#4db8ff"
+          fill="#4fc1d8"
           transform={`rotate(${r} 9 9)`}
         />
       ))}

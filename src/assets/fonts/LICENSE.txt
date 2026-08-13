@@ -1,0 +1,5 @@
+Geist Sans and Geist Mono, © Vercel Inc.
+Licensed under the SIL Open Font License 1.1 — https://openfontlicense.org
+Subset (latin, variable weight) via Fontsource. Bundled so the desktop app
+renders identically offline. The OFL governs these two files, not the MIT
+licence on the rest of this repository.
