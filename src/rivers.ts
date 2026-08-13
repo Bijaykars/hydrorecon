@@ -36,6 +36,12 @@ export type Reach = {
    */
   below5000Frac: number;
   below3000Frac: number;
+  /**
+   * Catchment-mean monsoon (Jun–Sep) precipitation, mm — HYDEST's MMP input,
+   * from the CHPclim climatology via pipeline/build-mmp.mjs. NaN when the file
+   * predates MMP or the catchment falls outside the coverage.
+   */
+  monsoonMm: number;
 };
 
 type RiverNet = {
@@ -57,6 +63,8 @@ type RiverNet = {
    * app worked before it existed.
    */
   hypso: Uint8Array | null;
+  /** Bytes per reach in `hypso`: 2 (fractions only) or 4 (plus MMP uint16). */
+  hypsoStride: number;
 };
 
 const GRID_DEG = 0.1;
@@ -149,17 +157,25 @@ function load(): Promise<RiverNet> {
      * other feature must keep working when it is absent or fails to load.
      */
     let hypso: Uint8Array | null = null;
+    let hypsoStride = 2;
     try {
       const hr = await fetch(`${import.meta.env.BASE_URL}nepal-hypso.dat`);
       if (hr.ok) {
         const hb = new Uint8Array(await hr.arrayBuffer());
-        if (hb.length === count * 2) hypso = hb;
+        // Two generations of the file: 2 bytes/reach (hypsometry only) and
+        // 4 bytes/reach (plus a uint16 of catchment monsoon precipitation, mm).
+        if (hb.length === count * 4) {
+          hypso = hb;
+          hypsoStride = 4;
+        } else if (hb.length === count * 2) {
+          hypso = hb;
+        }
       }
     } catch {
       // Enhancement only — never block the river network on it.
     }
 
-    return { count, scale, upland, dis, ord, start, len, xy, grid, byFirst, hypso };
+    return { count, scale, upland, dis, ord, start, len, xy, grid, byFirst, hypso, hypsoStride };
   })().catch((e) => {
     net = null; // allow a retry
     throw e;
@@ -227,8 +243,15 @@ export async function nearestReach(lat: number, lon: number): Promise<ReachHit |
     distanceKm: hit.distanceKm,
     point: hit.point,
     // 255 is the "no hypsometry here" sentinel; 0-254 spans 0..1.
-    below5000Frac: n.hypso && n.hypso[i * 2] !== 255 ? n.hypso[i * 2] / 254 : NaN,
-    below3000Frac: n.hypso && n.hypso[i * 2 + 1] !== 255 ? n.hypso[i * 2 + 1] / 254 : NaN,
+    below5000Frac:
+      n.hypso && n.hypso[i * n.hypsoStride] !== 255 ? n.hypso[i * n.hypsoStride] / 254 : NaN,
+    below3000Frac:
+      n.hypso && n.hypso[i * n.hypsoStride + 1] !== 255 ? n.hypso[i * n.hypsoStride + 1] / 254 : NaN,
+    monsoonMm: (() => {
+      if (!n.hypso || n.hypsoStride < 4) return NaN;
+      const v = n.hypso[i * 4 + 2] | (n.hypso[i * 4 + 3] << 8);
+      return v === 0xffff ? NaN : v;
+    })(),
   });
 
   /**

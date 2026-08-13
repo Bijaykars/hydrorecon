@@ -18,14 +18,15 @@
  *
  *   Q_month = C · A_total^A1 · (A_below5000m + 1)^A2 · MMP^A3
  *
- * and MMP — mean monsoon precipitation — is not yet available, so the six months
- * with a non-zero A3 are deliberately absent rather than guessed. What survives
- * is exactly the part that needs no rainfall data at all:
+ * MMP — the monsoon wetness index, mm of Jun–Sep precipitation over the
+ * catchment — now comes per reach from the CHPclim climatology
+ * (pipeline/build-mmp.mjs), so all twelve months answer where that layer
+ * exists. Where it does not, the six months with a non-zero A3 stay absent
+ * rather than guessed, leaving the part that needs no rainfall data at all:
  *
  *   JANUARY TO MAY, where A3 is zero. These are the dry-season months that set
  *   firm power, that Nepal's PPA pays 8.40 NPR/kWh for against 4.80 in the wet
- *   season, and that decide whether a scheme can be financed. It is the half
- *   worth having first.
+ *   season, and that decide whether a scheme can be financed.
  *
  *   DESIGN FLOODS, which depend only on the area below 3000 m. Spillway and
  *   diversion sizing, and the single number most likely to be asked for after
@@ -71,33 +72,64 @@ export type HydestInput = {
   below5000Km2: number;
   /** Upstream catchment lying below 3000 m, km². */
   below3000Km2: number;
+  /**
+   * Catchment-mean monsoon (Jun–Sep) precipitation, mm — the MMP term.
+   * Optional: without it the six monsoon months stay absent, as before, and
+   * the dry season and floods work exactly as they always did.
+   */
+  monsoonMm?: number;
 };
 
 /**
- * Mean monthly flow, m³/s, for the months that need no rainfall input.
+ * Mean monthly flow, m³/s.
  *
- * Returns null for the six monsoon-influenced months rather than substituting a
- * value for MMP. A wrong monsoon flow would be worse than an absent one: it
- * would flow straight into annual energy and make the whole estimate look
- * better founded than it is.
+ * The six monsoon-influenced months need MMP; when it is absent they return
+ * null rather than substituting a value. A wrong monsoon flow would be worse
+ * than an absent one: it would flow straight into annual energy and make the
+ * whole estimate look better founded than it is. With MMP supplied (from the
+ * CHPclim climatology, pipeline/build-mmp.mjs) all twelve months answer.
  */
 export function monthlyFlow(input: HydestInput, month: number): number | null {
   const c = MONTHLY[month];
-  if (!c || c.a3 !== 0) return null;
+  if (!c) return null;
   if (!(input.totalKm2 > 0) || !(input.below5000Km2 >= 0)) return null;
-  return (
-    c.C * input.totalKm2 ** c.a1 * (input.below5000Km2 + 1) ** c.a2
-  );
+  const mmpTerm = c.a3 === 0 ? 1 : input.monsoonMm && input.monsoonMm > 0 ? input.monsoonMm ** c.a3 : null;
+  if (mmpTerm === null) return null;
+  return c.C * input.totalKm2 ** c.a1 * (input.below5000Km2 + 1) ** c.a2 * mmpTerm;
 }
 
-/** Every month HYDEST can answer for, in order. */
-export function drySeasonFlows(input: HydestInput): { month: number; cms: number }[] {
+/** Every month HYDEST can answer for, in order — 5 without MMP, 12 with it. */
+export function allMonthlyFlows(input: HydestInput): { month: number; cms: number }[] {
   const out: { month: number; cms: number }[] = [];
-  for (const m of RAINFALL_FREE_MONTHS) {
+  for (let m = 0; m < 12; m++) {
     const q = monthlyFlow(input, m);
     if (q !== null && Number.isFinite(q)) out.push({ month: m, cms: q });
   }
   return out;
+}
+
+/** The rainfall-free months only — the original dry-season set. */
+export function drySeasonFlows(input: HydestInput): { month: number; cms: number }[] {
+  return allMonthlyFlows(input).filter((m) => RAINFALL_FREE_MONTHS.includes(m.month));
+}
+
+/** Day counts for a day-weighted annual mean; leap February is noise here. */
+const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/**
+ * HYDEST's long-term annual mean flow, m³/s — only when every month answers.
+ *
+ * This is the number that lets Nepal's own regression referee the global
+ * models' MAGNITUDE, not just their dry season. A partial-year mean would be
+ * biased low (the missing months are the monsoon), so it is all twelve or
+ * nothing.
+ */
+export function annualMeanCms(input: HydestInput): number | null {
+  const months = allMonthlyFlows(input);
+  if (months.length !== 12) return null;
+  let sum = 0;
+  for (const m of months) sum += m.cms * MONTH_DAYS[m.month];
+  return sum / 365;
 }
 
 /**

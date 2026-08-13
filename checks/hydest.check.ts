@@ -12,6 +12,8 @@ import assert from 'node:assert/strict';
 import {
   RAINFALL_FREE_MONTHS,
   RETURN_PERIODS,
+  allMonthlyFlows,
+  annualMeanCms,
   designFlood,
   driestMonthFlow,
   drySeasonAgreement,
@@ -152,6 +154,47 @@ ok('a factor-of-two gap is the line between agreeing and not', () => {
   // The ratio is symmetric — which source is larger must not change the verdict.
   near(drySeasonAgreement(10, 40)!.ratio, drySeasonAgreement(40, 10)!.ratio, 1e-12);
   assert.equal(drySeasonAgreement(0, 10), null, 'a zero flow cannot be compared');
+});
+
+console.log('\nhydest: the monsoon months, once MMP exists');
+
+/** A mid-hills catchment with the monsoon-rainfall layer present. */
+const WET = { totalKm2: 1000, below5000Km2: 950, below3000Km2: 500, monsoonMm: 1500 };
+
+ok('without MMP the monsoon months stay absent, exactly as before', () => {
+  const dry = { totalKm2: 1000, below5000Km2: 950, below3000Km2: 500 };
+  assert.equal(monthlyFlow(dry, 6), null, 'July must not be guessed');
+  assert.equal(allMonthlyFlows(dry).length, 5);
+  assert.equal(annualMeanCms(dry), null, 'a partial year would be biased low, so no annual mean');
+});
+
+ok('with MMP all twelve months answer and the monsoon dwarfs the dry season', () => {
+  const months = allMonthlyFlows(WET);
+  assert.equal(months.length, 12);
+  const jul = monthlyFlow(WET, 6)!;
+  const aug = monthlyFlow(WET, 7)!;
+  const apr = monthlyFlow(WET, 3)!;
+  assert.ok(aug > apr * 5, `August ${aug.toFixed(0)} vs April ${apr.toFixed(0)} — no monsoon?`);
+  assert.ok(jul > 80 && jul < 220, `July ${jul.toFixed(0)} m³/s from 1000 km² at 1500 mm`);
+});
+
+ok('the whole year adds up to a believable Nepali water balance', () => {
+  // Annual specific runoff in Nepal's monsoon-fed mid-hills runs roughly
+  // 40-90 l/s/km². If the MMP convention (Jun-Sep total, mm) were wrong by the
+  // factor-of-four gap between seasonal-total and monthly-mean readings, this
+  // lands outside the band — so this check pins the convention.
+  const annual = annualMeanCms(WET)!;
+  const specific = (annual * 1000) / WET.totalKm2;
+  assert.ok(
+    specific > 35 && specific < 95,
+    `${specific.toFixed(0)} l/s/km² — outside any plausible Nepali water balance`
+  );
+});
+
+ok('more monsoon rain means more monsoon water, gently', () => {
+  // The exponent is ~0.25: doubling MMP should raise July by ~19%, not double it.
+  const wetter = monthlyFlow({ ...WET, monsoonMm: 3000 }, 6)! / monthlyFlow(WET, 6)!;
+  near(wetter, 2 ** 0.2523, 0.01);
 });
 
 console.log(`\n${passed} hydest checks passed\n`);

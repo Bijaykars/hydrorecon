@@ -8,7 +8,7 @@
  */
 import assert from 'node:assert/strict';
 import { chooseFlowMagnitude, DISAGREE_RATIO } from '../src/engine/flowchoice.ts';
-import { driestMonthFlow } from '../src/engine/hydest.ts';
+import { annualMeanCms, driestMonthFlow } from '../src/engine/hydest.ts';
 
 let passed = 0;
 const ok = (name: string, fn: () => void) => {
@@ -73,6 +73,41 @@ ok('the Marsyangdi failure stays fixed: an off-channel cell loses to the network
   const s = shaped(judge.cms * 60);
   const c = chooseFlowMagnitude({ dates: s.dates, series: s.values, networkMeanCms: meanOf(s.values) / 60, hydest: HYDEST });
   assert.equal(c.authority, 'network', 'the off-channel cell must not win');
+});
+
+ok('when both global sources fail an annual-capable judge, the regression takes over', () => {
+  // With MMP the judge states a full annual mean. Make the model 6x above it
+  // and the network 8x below it — the Chilime pattern — and neither deserves
+  // to win. The record keeps its shape, rescaled onto the regression.
+  const WET = { ...HYDEST, monsoonMm: 1500 };
+  const s = shaped(judge.cms);
+  const mean = meanOf(s.values);
+  const c = chooseFlowMagnitude({
+    dates: s.dates,
+    series: s.values.map((v) => (v * (annualMeanCms(WET)! * 6)) / mean),
+    networkMeanCms: annualMeanCms(WET)! / 8,
+    hydest: WET,
+  });
+  assert.equal(c.authority, 'hydest', 'neither broken source should carry the magnitude');
+  assert.equal(c.judgeKind, 'annual');
+  assert.ok(Math.abs(c.targetMeanCms! - annualMeanCms(WET)!) < 1e-9, 'target must be the regression mean');
+  assert.match(c.note, /both global sources fail/);
+});
+
+ok('a candidate that satisfies the annual judge still wins normally', () => {
+  const WET = { ...HYDEST, monsoonMm: 1500 };
+  const target = annualMeanCms(WET)!;
+  const s = shaped(judge.cms);
+  const mean = meanOf(s.values);
+  // Model sits right on the regression's annual mean; network is 20x low.
+  const c = chooseFlowMagnitude({
+    dates: s.dates,
+    series: s.values.map((v) => (v * target) / mean),
+    networkMeanCms: target / 20,
+    hydest: WET,
+  });
+  assert.equal(c.authority, 'model');
+  assert.equal(c.judgeKind, 'annual');
 });
 
 ok('outside Nepal there is no judge, and the network keeps its long-standing role', () => {

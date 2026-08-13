@@ -37,10 +37,10 @@ import {
 } from './measured.ts';
 import {
   RETURN_PERIODS,
+  allMonthlyFlows,
   designFlood,
   driestMonthFlow,
   drySeasonAgreement,
-  drySeasonFlows,
   monthMean,
 } from './engine/hydest.ts';
 import {
@@ -345,7 +345,12 @@ export default function App() {
                 layout: { 'line-cap': 'round', 'line-join': 'round' },
                 paint: {
                   'line-color': '#4fc1d8',
-                  'line-opacity': 0.75,
+                  // Faded out at country scale: the bundled network only covers
+                  // one window of the world, and at low zoom it rendered as a
+                  // bright rectangle around Nepal — a data boundary masquerading
+                  // as geography. The basemap's own worldwide waterways carry
+                  // the country view; the detailed network arrives on approach.
+                  'line-opacity': ['interpolate', ['linear'], ['zoom'], 6.5, 0, 7.5, 0.3, 9, 0.75],
                   'line-width': [
                     'interpolate',
                     ['exponential', 1.6],
@@ -544,6 +549,7 @@ export default function App() {
               totalKm2: r.uplandKm2,
               below5000Km2: r.below5000Frac * r.uplandKm2,
               below3000Km2: r.below3000Frac * r.uplandKm2,
+              ...(Number.isFinite(r.monsoonMm) ? { monsoonMm: r.monsoonMm } : {}),
             }
           : null,
     });
@@ -578,7 +584,11 @@ export default function App() {
     const path =
       flowChoice?.authority === 'model'
         ? study.path.map((p) => ({ ...p, meanCms: 0 }))
-        : study.path;
+        : flowChoice?.authority === 'hydest' && flowChoice.targetMeanCms
+          ? // Both global sources failed the regression; its annual mean sets
+            // the magnitude at every point, and the record keeps only its shape.
+            study.path.map((p) => ({ ...p, meanCms: flowChoice.targetMeanCms! }))
+          : study.path;
     return {
       path,
       series,
@@ -650,6 +660,7 @@ export default function App() {
       totalKm2: r.uplandKm2,
       below5000Km2: r.below5000Frac * r.uplandKm2,
       below3000Km2: r.below3000Frac * r.uplandKm2,
+      ...(Number.isFinite(r.monsoonMm) ? { monsoonMm: r.monsoonMm } : {}),
     };
     const driest = driestMonthFlow(input);
     if (!driest) return null;
@@ -668,19 +679,21 @@ export default function App() {
      */
     const seriesMean = meanOf(study.flow.values);
     const networkMean = study.path[0]?.meanCms ?? 0;
-    // When the network's magnitude was rejected, HYDEST is compared against the
-    // unscaled model — the figure the engine is actually using.
+    // HYDEST is compared against the figure the engine is ACTUALLY using —
+    // whichever authority won the magnitude.
     const ratio =
       flowChoice?.authority === 'model'
         ? 1
-        : networkMean > 0 && seriesMean > 0
-          ? networkMean / seriesMean
-          : 1;
+        : flowChoice?.authority === 'hydest' && flowChoice.targetMeanCms && seriesMean > 0
+          ? flowChoice.targetMeanCms / seriesMean
+          : networkMean > 0 && seriesMean > 0
+            ? networkMean / seriesMean
+            : 1;
     const modelled = monthMean(study.flow.dates, study.flow.values, driest.month) * ratio;
     return {
       input,
       driest,
-      months: drySeasonFlows(input),
+      months: allMonthlyFlows(input),
       modelledCms: modelled,
       agreement: Number.isFinite(modelled) ? drySeasonAgreement(driest.cms, modelled) : null,
       floods: RETURN_PERIODS.map((t) => ({ t: t as number, cms: designFlood(input, t) })).filter(

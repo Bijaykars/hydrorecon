@@ -145,7 +145,7 @@ export function Reading(props: {
   licences: Licence[] | null;
   gauges: Gauge[] | null;
   hydest: {
-    input: { totalKm2: number; below5000Km2: number; below3000Km2: number };
+    input: { totalKm2: number; below5000Km2: number; below3000Km2: number; monsoonMm?: number };
     driest: { month: number; cms: number };
     months: { month: number; cms: number }[];
     modelledCms: number;
@@ -331,7 +331,18 @@ export function Reading(props: {
 
       {disagreement && disagreement > 2 && (
         <div className="border-b border-line px-4 py-2.5 text-[11px] leading-relaxed text-muted">
-          {flowChoice?.authority === 'model' ? (
+          {flowChoice?.authority === 'hydest' ? (
+            <>
+              The mapped network claims {n(rival!, 1)} m³/s for this reach and the flood model{' '}
+              {n(meanCms, 1)} — {n(disagreement, 1)}× apart, and <b className="text-ink">both fail
+              Nepal&apos;s own regression</b>, which puts the annual mean at{' '}
+              <b className="num text-ink">{n(flowChoice.judgeCms ?? NaN, 1)} m³/s</b> from this
+              catchment&apos;s area, hypsometry and monsoon rainfall. Flows below keep the flood
+              model&apos;s day-to-day shape rescaled onto the regression — a fitted method with
+              real scatter, so treat the band seriously and gauge this river before believing
+              anyone.
+            </>
+          ) : flowChoice?.authority === 'model' ? (
             <>
               The mapped network claims {n(rival!, 1)} m³/s for this reach against the flood
               model&apos;s {n(meanCms, 1)} — {n(disagreement, 1)}× apart, and Nepal&apos;s own
@@ -804,13 +815,17 @@ export function Reading(props: {
               )}
             </div>
           )}
-          <div className="mt-2.5 grid grid-cols-5 gap-1 rounded-lg bg-panel-2 px-2 py-1.5">
+          <div
+            className={`mt-2.5 grid gap-1 rounded-lg bg-panel-2 px-2 py-1.5 ${
+              hydest.months.length > 5 ? 'grid-cols-6' : 'grid-cols-5'
+            }`}
+          >
             {hydest.months.map((m) => (
               <div key={m.month} className="text-center">
                 <div className="text-[9.5px] uppercase tracking-wide text-faint">
                   {MONTH_NAMES[m.month]}
                 </div>
-                <div className="num text-[11px] text-ink">{n(m.cms, 1)}</div>
+                <div className="num text-[11px] text-ink">{n(m.cms, m.cms >= 100 ? 0 : 1)}</div>
               </div>
             ))}
           </div>
@@ -833,11 +848,20 @@ export function Reading(props: {
           )}
           <Fine>
             WECS/DHM 1990, fitted to Nepal&apos;s own gauged records — the method a feasibility
-            study would use for an ungauged site. Needs the catchment below 5000 m (
-            {n(hydest.input.below5000Km2, 0)} of {n(hydest.input.totalKm2, 0)} km²) and below 3000 m
-            ({n(hydest.input.below3000Km2, 0)} km²). Only Jan–May and the floods are shown: the
-            monsoon months need rainfall data this app does not have yet, and a guessed monsoon flow
-            would be worse than none.
+            study would use for an ungauged site. Catchment below 5000 m:{' '}
+            {n(hydest.input.below5000Km2, 0)} of {n(hydest.input.totalKm2, 0)} km²; below 3000 m:{' '}
+            {n(hydest.input.below3000Km2, 0)} km²
+            {hydest.months.length > 5 ? (
+              <>
+                ; monsoon rainfall over the catchment: {n(hydest.input.monsoonMm ?? NaN, 0)} mm
+                (CHPclim climatology), which is what lets the six monsoon months be stated at all.
+              </>
+            ) : (
+              <>
+                . Only Jan–May and the floods are shown here: this catchment falls outside the
+                monsoon-rainfall layer, and a guessed monsoon flow would be worse than none.
+              </>
+            )}
           </Fine>
         </div>
       )}

@@ -99,7 +99,7 @@ export function uncertaintyFor(
    */
   measuredSpreadFrac?: number,
   /** Which flow source won the magnitude (engine/flowchoice.ts) — wording only. */
-  authority?: 'network' | 'model'
+  authority?: 'network' | 'model' | 'hydest'
 ): Uncertainty | null {
   const best = evaluate(input, scheme.i, scheme.j);
   if (!best || best.capacityMW <= 0) return null;
@@ -163,9 +163,11 @@ export function uncertaintyFor(
         : corroborated
           ? 'two global models agree here, but neither is gauged at this site'
           : haveBoth
-            ? authority === 'model'
-              ? `the network's discharge is broken on this reach (${ratio.toFixed(0)}× off), so the flood model is carrying this alone`
-              : `the flood model's cell is off this channel (${ratio.toFixed(0)}× out), so the mapped network is carrying this alone`
+            ? authority === 'hydest'
+              ? `both global sources fail here (${ratio.toFixed(0)}× apart), so Nepal's own regression is carrying the magnitude — a fitted method with real scatter, not a measurement`
+              : authority === 'model'
+                ? `the network's discharge is broken on this reach (${ratio.toFixed(0)}× off), so the flood model is carrying this alone`
+                : `the flood model's cell is off this channel (${ratio.toFixed(0)}× out), so the mapped network is carrying this alone`
             : 'a single global model, with nothing checking it',
     },
     {

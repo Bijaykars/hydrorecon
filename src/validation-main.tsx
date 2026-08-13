@@ -90,7 +90,10 @@ const TRANS = new Set(
     .map((p) => p.name)
 );
 const flowBroken = (r: Row) =>
-  Boolean(r.result.ok && (r.result.flow?.authority === 'model' || TRANS.has(r.name)));
+  Boolean(
+    r.result.ok &&
+      ((r.result.flow && r.result.flow.authority !== 'network') || TRANS.has(r.name))
+  );
 
 const n = (v: number, d = 1) =>
   !Number.isFinite(v)
@@ -364,14 +367,15 @@ function Page() {
           Where the global flow data breaks — and what the app does about it
         </h2>
         <p className="mt-2 max-w-[62ch] text-[12px] leading-relaxed text-muted">
-          Rivers draining the arid Tibetan plateau defeat every flow source this app can reach —
-          sometimes loudly (the network claiming 1.6 m³/s for the Chilime while the flood model
-          claims 44), sometimes quietly, with the global products agreeing with each other and
-          still running three times low together, as at Upper Tamakoshi. Ghatta arbitrates loud
-          disagreements with Nepal&apos;s own HYDEST regression and widens its band; for the quiet
-          kind no regression fitted to Nepali catchments can help, because the water comes from
-          outside them. Either way the advice on screen is the same, and it is the advice these
-          plants&apos; own feasibility studies followed: gauge the river.
+          Rivers draining the arid Tibetan plateau defeat the flow sources this app can reach —
+          sometimes loudly, with the two global products a factor of eight apart, sometimes
+          quietly, with them agreeing with each other and still running three times low together,
+          as at Upper Tamakoshi. Loud disagreements are arbitrated by Nepal&apos;s own HYDEST
+          regression, now completed with monsoon rainfall over every catchment — the upgrade that
+          moved Chilime from a ×6.9 miss into the clean set above. The quiet kind no regression
+          fitted to Nepali catchments can fix, because the water comes from outside them. There
+          the band goes wide and the advice on screen is the one these plants&apos; own
+          feasibility studies followed: gauge the river.
         </p>
         <div className="mt-3 space-y-2.5">
           {warned.map((r) => (

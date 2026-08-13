@@ -28,7 +28,7 @@
  * trusted and why, because an engineer handed a flow figure deserves to know
  * which model produced it.
  */
-import { driestMonthFlow, monthMean, type HydestInput } from './hydest.ts';
+import { annualMeanCms, driestMonthFlow, monthMean, type HydestInput } from './hydest.ts';
 
 /**
  * Disagreement beyond this is no longer "the model cell is slightly off this
@@ -38,17 +38,32 @@ import { driestMonthFlow, monthMean, type HydestInput } from './hydest.ts';
 export const DISAGREE_RATIO = 3;
 
 export type FlowChoice = {
-  /** Which source supplies the magnitude. */
-  authority: 'network' | 'model';
+  /**
+   * Which source supplies the magnitude. 'hydest' means both global sources
+   * failed the judge and Nepal's own regression carries the figure itself.
+   */
+  authority: 'network' | 'model' | 'hydest';
   /** How far apart the two candidates were, as a ratio ≥ 1. */
   disagreement: number;
-  /** HYDEST's driest-month flow, when it could judge. */
+  /** The judged quantity — annual mean where MMP allows it, else driest month. */
   judgeCms: number | null;
-  /** Each candidate's flow for that same month, for the panel to show. */
+  judgeKind: 'annual' | 'dry-season' | null;
+  /** Each candidate rendered as that same quantity, for the panel to show. */
   networkCms: number | null;
   modelCms: number | null;
+  /** With authority 'hydest': the long-term mean the series is rescaled onto. */
+  targetMeanCms?: number;
   note: string;
 };
+
+/**
+ * A winner still this far off the judge has not won, it has merely lost less.
+ * Log-space factor: e^1 ≈ 2.7×. Beyond it, if HYDEST can state an annual mean
+ * of its own, the regression fitted to Nepali rivers beats two broken global
+ * models — the Chilime read 1.6 m³/s in one and 44 in the other around a river
+ * carrying about ten, and the less-wrong of those is still wrong.
+ */
+const BOTH_LOST = 1;
 
 export function chooseFlowMagnitude(opts: {
   dates: readonly string[];
@@ -66,6 +81,7 @@ export function chooseFlowMagnitude(opts: {
       authority: 'model',
       disagreement: 1,
       judgeCms: null,
+      judgeKind: null,
       networkCms: null,
       modelCms: null,
       note: 'no mapped network magnitude here — the flood model is used as-is',
@@ -78,18 +94,30 @@ export function chooseFlowMagnitude(opts: {
       authority: 'network',
       disagreement,
       judgeCms: null,
+      judgeKind: null,
       networkCms: null,
       modelCms: null,
       note: 'the two flow sources agree to within rescaling range',
     };
   }
 
+  /**
+   * The judged quantity. With MMP the regression states a full ANNUAL mean —
+   * the same quantity the two candidates disagree about, which makes the
+   * comparison direct. Without it, each candidate's dry-season flow is
+   * compared instead: the shape comes from the flood model either way, so the
+   * dry season still isolates exactly the disputed magnitude.
+   */
+  const annual = hydest ? annualMeanCms(hydest) : null;
   const driest = hydest ? driestMonthFlow(hydest) : null;
-  if (!driest || !(driest.cms > 0)) {
+  const judgeKind: FlowChoice['judgeKind'] = annual ? 'annual' : driest ? 'dry-season' : null;
+  const judge = annual ?? driest?.cms ?? null;
+  if (judge === null || !(judge > 0)) {
     return {
       authority: 'network',
       disagreement,
       judgeCms: null,
+      judgeKind: null,
       networkCms: null,
       modelCms: null,
       note:
@@ -98,39 +126,62 @@ export function chooseFlowMagnitude(opts: {
     };
   }
 
-  /**
-   * Both candidates rendered as the same quantity HYDEST predicts: the mean
-   * flow of the driest month. The shape comes from the flood model either way;
-   * only the magnitude differs, so this isolates exactly the disputed part.
-   */
-  const shapeCms = monthMean(dates as string[], series as number[], driest.month);
-  if (!Number.isFinite(shapeCms) || !(shapeCms > 0)) {
+  let networkCms: number;
+  let modelCms: number;
+  if (annual) {
+    networkCms = networkMeanCms;
+    modelCms = seriesMean;
+  } else {
+    const shapeCms = monthMean(dates as string[], series as number[], driest!.month);
+    if (!Number.isFinite(shapeCms) || !(shapeCms > 0)) {
+      return {
+        authority: 'network',
+        disagreement,
+        judgeCms: judge,
+        judgeKind,
+        networkCms: null,
+        modelCms: null,
+        note: 'the record has no usable dry-season months to judge with — keeping the mapped network',
+      };
+    }
+    networkCms = shapeCms * (networkMeanCms / seriesMean);
+    modelCms = shapeCms;
+  }
+
+  const offNetwork = Math.abs(Math.log(networkCms / judge));
+  const offModel = Math.abs(Math.log(modelCms / judge));
+  const kindWord = judgeKind === 'annual' ? 'annual-mean' : 'dry-season';
+
+  // Both candidates far off a judge that can state a full annual mean: the
+  // regression carries the magnitude itself, and says so.
+  if (annual && Math.min(offNetwork, offModel) > BOTH_LOST) {
     return {
-      authority: 'network',
+      authority: 'hydest',
       disagreement,
-      judgeCms: driest.cms,
-      networkCms: null,
-      modelCms: null,
-      note: 'the record has no usable dry-season months to judge with — keeping the mapped network',
+      judgeCms: judge,
+      judgeKind,
+      networkCms,
+      modelCms,
+      targetMeanCms: annual,
+      note:
+        `both global sources fail Nepal's own regression here (network ${networkCms.toFixed(1)}, ` +
+        `flood model ${modelCms.toFixed(1)}, against its ${judge.toFixed(1)} m³/s annual mean) — ` +
+        'the record keeps its day-to-day shape, rescaled onto the regression, and only a gauge record does better',
     };
   }
-  const networkCms = shapeCms * (networkMeanCms / seriesMean);
-  const modelCms = shapeCms;
 
-  const offNetwork = Math.abs(Math.log(networkCms / driest.cms));
-  const offModel = Math.abs(Math.log(modelCms / driest.cms));
   const authority = offNetwork <= offModel ? 'network' : 'model';
-
   return {
     authority,
     disagreement,
-    judgeCms: driest.cms,
+    judgeCms: judge,
+    judgeKind,
     networkCms,
     modelCms,
     note:
       authority === 'network'
-        ? `Nepal's own regression sides with the mapped network (${networkCms.toFixed(1)} vs its ${driest.cms.toFixed(1)} m³/s dry-season figure)`
-        : `Nepal's own regression sides with the flood model (${modelCms.toFixed(1)} vs its ${driest.cms.toFixed(1)} m³/s dry-season figure) — ` +
+        ? `Nepal's own regression sides with the mapped network (${networkCms.toFixed(1)} vs its ${judge.toFixed(1)} m³/s ${kindWord} figure)`
+        : `Nepal's own regression sides with the flood model (${modelCms.toFixed(1)} vs its ${judge.toFixed(1)} m³/s ${kindWord} figure) — ` +
           'the network\'s discharge is broken on this reach, a known failure of its global water model in high Himalayan valleys',
   };
 }

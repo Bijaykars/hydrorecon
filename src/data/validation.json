@@ -27,7 +27,8 @@
     "headBasis": "gross",
     "energyGwh": 2281
    },
-   "note": "Nepal's largest plant. Peaking run-of-river with a 22 m dam.",
+   "transHimalayan": true,
+   "note": "Nepal's largest plant. Peaking run-of-river with a 22 m dam. Most of its catchment lies north of the border on the Tibetan plateau, where every global flow product this app can reach runs low together and HYDEST — fitted to Nepali catchments — is out of its domain. The feasibility study stood on years of site gauging; nothing less answers here.",
    "sources": [
     "https://en.wikipedia.org/wiki/Upper_Tamakoshi_Hydroelectric_Project",
     "https://www.power-technology.com/projects/upper-tamakoshi-hydroelectric-project/"
@@ -55,6 +56,7 @@
      "authority": "network",
      "disagreement": 1.545934811744215,
      "judgeCms": null,
+     "judgeKind": null,
      "networkCms": null,
      "modelCms": null,
      "note": "the two flow sources agree to within rescaling range"
@@ -113,10 +115,11 @@
     "flow": {
      "authority": "network",
      "disagreement": 55.882417745197586,
-     "judgeCms": 53.67456786534776,
-     "networkCms": 27.21563877122967,
-     "modelCms": 0.4870161290322576,
-     "note": "Nepal's own regression sides with the mapped network (27.2 vs its 53.7 m³/s dry-season figure)"
+     "judgeCms": 285.09611318932446,
+     "judgeKind": "annual",
+     "networkCms": 290.481,
+     "modelCms": 5.198075024679176,
+     "note": "Nepal's own regression sides with the mapped network (290.5 vs its 285.1 m³/s annual-mean figure)"
     },
     "snappedIntake": [
      27.98125,
@@ -172,10 +175,11 @@
     "flow": {
      "authority": "network",
      "disagreement": 39.34015526033304,
-     "judgeCms": 18.23248907486241,
-     "networkCms": 45.367447757395965,
-     "modelCms": 1.1532096774193539,
-     "note": "Nepal's own regression sides with the mapped network (45.4 vs its 18.2 m³/s dry-season figure)"
+     "judgeCms": 97.99483105497586,
+     "judgeKind": "annual",
+     "networkCms": 132.569,
+     "modelCms": 3.369813848540406,
+     "note": "Nepal's own regression sides with the mapped network (132.6 vs its 98.0 m³/s annual-mean figure)"
     },
     "snappedIntake": [
      28.189583333333335,
@@ -230,10 +234,11 @@
     "flow": {
      "authority": "network",
      "disagreement": 5.363344674659793,
-     "judgeCms": 28.40045794072139,
-     "networkCms": 30.09078578050093,
-     "modelCms": 5.61045161290322,
-     "note": "Nepal's own regression sides with the mapped network (30.1 vs its 28.4 m³/s dry-season figure)"
+     "judgeCms": 157.31502702108017,
+     "judgeKind": "annual",
+     "networkCms": 204.989,
+     "modelCms": 38.220366661966,
+     "note": "Nepal's own regression sides with the mapped network (205.0 vs its 157.3 m³/s annual-mean figure)"
     },
     "snappedIntake": [
      27.927083333333332,
@@ -290,6 +295,7 @@
      "authority": "network",
      "disagreement": 1.7729459210952332,
      "judgeCms": null,
+     "judgeKind": null,
      "networkCms": null,
      "modelCms": null,
      "note": "the two flow sources agree to within rescaling range"
@@ -348,10 +354,11 @@
     "flow": {
      "authority": "network",
      "disagreement": 17.34614727441518,
-     "judgeCms": 15.88545822032088,
-     "networkCms": 40.94334242870548,
-     "modelCms": 2.3603709677419342,
-     "note": "Nepal's own regression sides with the mapped network (40.9 vs its 15.9 m³/s dry-season figure)"
+     "judgeCms": 83.70495872566742,
+     "judgeKind": "annual",
+     "networkCms": 115.965,
+     "modelCms": 6.685346213510096,
+     "note": "Nepal's own regression sides with the mapped network (116.0 vs its 83.7 m³/s annual-mean figure)"
     },
     "snappedIntake": [
      28.310416666666665,
@@ -380,7 +387,8 @@
     "headBasis": "gross",
     "energyGwh": 246
    },
-   "note": "Rebuilt after the 2015 earthquake and 2016 GLOF — the river that shows why hazard layers matter.",
+   "transHimalayan": true,
+   "note": "Rebuilt after the 2015 earthquake and 2016 GLOF — the river that shows why hazard layers matter. The Bhote Koshi drains Tibet: the numbers land here, but nothing local can corroborate the global models on this river, so treat the agreement as luck to be verified, not a property to rely on.",
    "sources": [
     "https://en.wikipedia.org/wiki/Bhote_Koshi_Power_Plant",
     "https://www.renewableenergyworld.com/energy-business/surviving-three-natural-disasters-lessons-learned-at-upper-bhote-koshi-in-nepal/"
@@ -408,6 +416,7 @@
      "authority": "network",
      "disagreement": 1.8185414549573766,
      "judgeCms": null,
+     "judgeKind": null,
      "networkCms": null,
      "modelCms": null,
      "note": "the two flow sources agree to within rescaling range"
@@ -466,6 +475,7 @@
      "authority": "network",
      "disagreement": 2.580230552005044,
      "judgeCms": null,
+     "judgeKind": null,
      "networkCms": null,
      "modelCms": null,
      "note": "the two flow sources agree to within rescaling range"
@@ -524,6 +534,7 @@
      "authority": "network",
      "disagreement": 1.4717622908633958,
      "judgeCms": null,
+     "judgeKind": null,
      "networkCms": null,
      "modelCms": null,
      "note": "the two flow sources agree to within rescaling range"
@@ -564,15 +575,15 @@
     "name": "Chilime",
     "ok": true,
     "predicted": {
-     "capacityMW": 151.38756547241744,
-     "energyGwh": 733.3039178073193,
+     "capacityMW": 19.514278592836394,
+     "energyGwh": 94.91246508790967,
      "grossHeadM": 443.2994366309558,
-     "netHeadM": 437.97430777929895,
-     "designFlowCms": 43.95714159292033,
-     "meanFlowCms": 74.66632491891089,
+     "netHeadM": 428.4505026744778,
+     "designFlowCms": 5.557464052071904,
+     "meanFlowCms": 9.439999999999998,
      "waterwayKm": 4.080000000000003,
      "turbine": "Pelton",
-     "plantFactor": 0.5529548786860624
+     "plantFactor": 0.5552219743624832
     },
     "snapKm": {
      "intake": 0.24335388253149248,
@@ -580,12 +591,13 @@
     },
     "reachKm2": 209,
     "flow": {
-     "authority": "model",
+     "authority": "network",
      "disagreement": 7.909568317681239,
-     "judgeCms": 1.580374020058938,
-     "networkCms": 0.49853868733099277,
-     "modelCms": 3.943225806451614,
-     "note": "Nepal's own regression sides with the flood model (3.9 vs its 1.6 m³/s dry-season figure) — the network's discharge is broken on this reach, a known failure of its global water model in high Himalayan valleys"
+     "judgeCms": 7.977895718146055,
+     "judgeKind": "annual",
+     "networkCms": 9.44,
+     "modelCms": 74.66632491891089,
+     "note": "Nepal's own regression sides with the mapped network (9.4 vs its 8.0 m³/s annual-mean figure)"
     },
     "snappedIntake": [
      28.21875,

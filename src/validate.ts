@@ -156,11 +156,16 @@ export async function validatePlant(p: Plant): Promise<PlantResult> {
               totalKm2: reach.uplandKm2,
               below5000Km2: reach.below5000Frac * reach.uplandKm2,
               below3000Km2: reach.below3000Frac * reach.uplandKm2,
+              ...(Number.isFinite(reach.monsoonMm) ? { monsoonMm: reach.monsoonMm } : {}),
             }
           : null,
     });
     const usedPath =
-      flowChoice.authority === 'model' ? path.map((pt) => ({ ...pt, meanCms: 0 })) : path;
+      flowChoice.authority === 'model'
+        ? path.map((pt) => ({ ...pt, meanCms: 0 }))
+        : flowChoice.authority === 'hydest' && flowChoice.targetMeanCms
+          ? path.map((pt) => ({ ...pt, meanCms: flowChoice.targetMeanCms! }))
+          : path;
     const input: SchemeInput = {
       path: usedPath,
       series,
