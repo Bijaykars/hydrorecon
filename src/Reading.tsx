@@ -1630,11 +1630,42 @@ export function Reading(props: {
                 <span className="min-w-0 flex-1 truncate text-faint">
                   {grid.nearestSub.name ?? 'unnamed'}
                   {grid.nearestSub.kv ? ` · ${grid.nearestSub.kv} kV` : ''}
+                  {grid.nearestSub.inferredKv ? '*' : ''}
+                  {grid.nearestSub.kind === 'distribution' ? ' · distribution' : ''}
+                </span>
+              </div>
+            )}
+            {/* The nearest yard this plant could actually connect INTO, which is
+                frequently a different one from the nearest yard. */}
+            {grid.nearestAdequateSub &&
+              grid.nearestAdequateSub.km !== grid.nearestSub?.km && (
+                <div className="flex items-baseline gap-2">
+                  <span className="w-24 shrink-0 text-faint">…able to take it</span>
+                  <span className="num text-ink">{n(grid.nearestAdequateSub.km, 1)} km</span>
+                  <span className="min-w-0 flex-1 truncate text-faint">
+                    {grid.nearestAdequateSub.name ?? 'unnamed'} ·{' '}
+                    {grid.nearestAdequateSub.kv} kV
+                    {grid.nearestAdequateSub.inferredKv ? '*' : ''}
+                  </span>
+                </div>
+              )}
+            {!grid.nearestAdequateSub && (
+              <div className="flex items-baseline gap-2">
+                <span className="w-24 shrink-0 text-faint">…able to take it</span>
+                <span className="text-amber">
+                  no mapped substation at {grid.requiredKv} kV or above
                 </span>
               </div>
             )}
           </div>
           <Fine>
+            {grid.nearestSub?.inferredKv || grid.nearestAdequateSub?.inferredKv ? (
+              <>
+                <b className="text-muted">* voltage inferred</b> from a line terminating in the
+                yard, not read from a tag — OpenStreetMap leaves most of Nepal&apos;s substations
+                untagged, and a yard is defined by what connects to it.{' '}
+              </>
+            ) : null}
             Straight-line distance from the powerhouse — a line is not built straight through this
             terrain, so treat it as a floor. {n(scheme.capacityMW, 1)} MW would typically connect at{' '}
             {grid.requiredKv} kV. OpenStreetMap, © contributors, ODbL, retrieved {GRID_RETRIEVED};

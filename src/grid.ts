@@ -23,7 +23,7 @@ import { haversineKm } from './engine/hydro.ts';
 type RawGrid = {
   _retrieved: string;
   lines: { kv: number; p: number[] }[];
-  subs: { n: string | null; kv: number; y: number; x: number }[];
+  subs: { n: string | null; kv: number; k?: string | null; i?: 1; y: number; x: number }[];
 };
 
 const GRID = gridRaw as unknown as RawGrid;
@@ -37,7 +37,20 @@ export type GridLink = {
   adequateKv: number | null;
   /** The voltage that capacity would typically connect at. */
   requiredKv: number;
-  nearestSub: { name: string | null; kv: number; km: number } | null;
+  nearestSub: {
+    name: string | null;
+    kv: number;
+    km: number;
+    /** OSM's own class: 'transmission' is a grid connection point. */
+    kind: string | null;
+    /** True when the voltage was inferred from a connecting line, not tagged. */
+    inferredKv: boolean;
+  } | null;
+  /**
+   * Nearest yard that is BOTH a transmission substation and rated for this
+   * plant. Null when none is in range — which is itself the finding.
+   */
+  nearestAdequateSub: GridLink['nearestSub'];
 };
 
 /**
@@ -110,10 +123,34 @@ export function gridLink(lat: number, lon: number, capacityMW: number): GridLink
     }
   }
 
+  /**
+   * Two different questions, answered separately.
+   *
+   * The nearest substation is a landmark. The nearest one a plant this size
+   * could actually connect INTO is the engineering answer, and they are often
+   * not the same yard: OSM labels 79 of Nepal's 224 substations as
+   * transmission, and the rest are distribution — an 11/33 kV yard feeding a
+   * bazaar cannot take a hydropower plant however close it sits.
+   */
+  const mk = (s: (typeof GRID.subs)[number], km: number): GridLink['nearestSub'] => ({
+    name: s.n,
+    kv: s.kv,
+    km,
+    kind: s.k ?? null,
+    inferredKv: s.i === 1,
+  });
+
   let nearestSub: GridLink['nearestSub'] = null;
+  let nearestAdequateSub: GridLink['nearestSub'] = null;
   for (const s of GRID.subs) {
     const d = haversineKm([lat, lon], [s.y, s.x]);
-    if (!nearestSub || d < nearestSub.km) nearestSub = { name: s.n, kv: s.kv, km: d };
+    if (!nearestSub || d < nearestSub.km) nearestSub = mk(s, d);
+    // Distribution yards are excluded outright; an unclassified yard is allowed
+    // through on voltage alone, since most of Nepal's are simply untagged.
+    const isTransmission = s.k === 'transmission' || s.k == null;
+    if (isTransmission && s.kv >= need && (!nearestAdequateSub || d < nearestAdequateSub.km)) {
+      nearestAdequateSub = mk(s, d);
+    }
   }
 
   return {
@@ -123,6 +160,7 @@ export function gridLink(lat: number, lon: number, capacityMW: number): GridLink
     adequateKv: adequateKv || null,
     requiredKv: need,
     nearestSub,
+    nearestAdequateSub,
   };
 }
 
