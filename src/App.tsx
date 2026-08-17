@@ -38,6 +38,7 @@ import {
   protectedAt,
   protectedNear,
 } from './protected.ts';
+import { localContextAt, type LocalContext } from './local-gis.ts';
 import { auditHead, auditShape, type HeadAudit, type ShapeAudit } from './audit.ts';
 import { benchFit, desander, sedimentSource, type BenchFit } from './engine/sediment.ts';
 import {
@@ -1393,6 +1394,34 @@ export default function App() {
   }, [scheme, isNepal]);
 
   /**
+   * The private Nepali layers, when they are installed.
+   *
+   * Survey sheet number, Nepal's own annual rainfall, buffer zone and
+   * municipality — none of which any open global dataset carries. Fetched
+   * rather than imported so their absence is a 404 and not a build failure:
+   * public/local/ is gitignored, so a clone simply has none of this and the
+   * section below never renders. See src/local-gis.ts.
+   */
+  const [localGis, setLocalGis] = useState<LocalContext | null>(null);
+  useEffect(() => {
+    if (!scheme || !isNepal) {
+      setLocalGis(null);
+      return;
+    }
+    let dead = false;
+    localContextAt(scheme.intake.lat, scheme.intake.lon)
+      .then((c) => {
+        if (!dead) setLocalGis(c);
+      })
+      .catch(() => {
+        if (!dead) setLocalGis(null);
+      });
+    return () => {
+      dead = true;
+    };
+  }, [scheme, isNepal]);
+
+  /**
    * Sediment: the desanding basin this duty point needs, and what the catchment
    * is going to throw at it.
    *
@@ -2063,6 +2092,7 @@ export default function App() {
         hydest={hydest}
         grid={grid}
         conservation={conservation}
+        localGis={localGis}
         flowChoice={flowChoice}
         sediment={sediment}
         bench={bench}

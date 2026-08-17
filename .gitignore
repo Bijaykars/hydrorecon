@@ -25,3 +25,7 @@ npm-debug.log*
 
 release/
 pipeline/.cache/
+
+# Private GIS layers — supplied through a private channel, licences unverified,
+# HERMES local units are explicitly non-redistributable. Local use only.
+public/local/

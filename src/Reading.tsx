@@ -15,6 +15,7 @@ import type { BenchFit, Desander, SedimentSource } from './engine/sediment.ts';
 import type { FlowChoice } from './engine/flowchoice.ts';
 import type { HeadAudit, ShapeAudit } from './audit.ts';
 import { PROTECTED_RETRIEVED, type ProtectedHit } from './protected.ts';
+import type { LocalContext } from './local-gis.ts';
 import type { MeasuredSeries } from './measured.ts';
 import {
   DISCHARGE_GAUGE_COUNT,
@@ -285,6 +286,7 @@ export function Reading(props: {
   hydest: HydestScreen | null;
   grid: GridLink | null;
   conservation: { inside: ProtectedHit[]; near: ProtectedHit[]; hard: boolean } | null;
+  localGis: LocalContext | null;
   flowChoice: FlowChoice | null;
   sediment: { basin: Desander; source: SedimentSource | null } | null;
   bench: BenchFit | null;
@@ -338,6 +340,7 @@ export function Reading(props: {
     hydest,
     grid,
     conservation,
+    localGis,
     flowChoice,
     sediment,
     bench,
@@ -1439,6 +1442,55 @@ export function Reading(props: {
               No usable directed project screen was produced{cascadeError ? `: ${cascadeError}` : '. The selected layout may not match the bundled river network'}. Confirm upstream/downstream projects from current licence maps and surveyed component coordinates.
             </div>
           )}
+        </div>
+      )}
+
+      {/* ---- private Nepali layers, when installed (src/local-gis.ts) ---- */}
+      {localGis && (
+        <div className="border-b border-line px-4 py-3.5">
+          <H right={<span className="text-faint">private layer</span>}>Nepal survey context</H>
+          {localGis.inBufferZone && (
+            <div className="mb-2 text-[12px] leading-relaxed text-amber">
+              <b>Inside a protected-area buffer zone.</b> A distinct permitting regime from the
+              park itself, and one the OpenStreetMap layer above does not carry.
+            </div>
+          )}
+          <div className="space-y-1 text-[11px]">
+            {localGis.sheet && (
+              <div className="flex items-baseline gap-2">
+                <span className="w-24 shrink-0 text-faint">survey sheet</span>
+                <span className="num text-ink">{localGis.sheet}</span>
+                <span className="text-faint">
+                  1:25,000{localGis.sheetRegion ? ` · ${localGis.sheetRegion}` : ''}
+                </span>
+              </div>
+            )}
+            {localGis.annualRainMm !== null && (
+              <div className="flex items-baseline gap-2">
+                <span className="w-24 shrink-0 text-faint">annual rain</span>
+                <span className="num text-ink">{n(localGis.annualRainMm, 0)} mm</span>
+                <span className="text-faint">Nepal&apos;s own isohyet map</span>
+              </div>
+            )}
+            {localGis.unit && (
+              <div className="flex items-baseline gap-2">
+                <span className="w-24 shrink-0 text-faint">apply to</span>
+                <span className="min-w-0 flex-1 text-ink">
+                  {localGis.unit.name}
+                  <span className="text-faint">
+                    {' '}
+                    {localGis.unit.kind} · {localGis.unit.district}
+                  </span>
+                </span>
+              </div>
+            )}
+          </div>
+          <Fine>
+            The survey sheet is the one to order: Nepal&apos;s 1:25,000 sheets carry surveyed
+            contours and spot heights, which is how you replace the ±15 m of error in the global
+            terrain above with a measurement. These layers are installed locally and are not part
+            of this repository.
+          </Fine>
         </div>
       )}
 
