@@ -287,6 +287,9 @@ export function Reading(props: {
   grid: GridLink | null;
   conservation: { inside: ProtectedHit[]; near: ProtectedHit[]; hard: boolean } | null;
   localGis: LocalContext | null;
+  topoCount: number;
+  topoOn: boolean;
+  onTopo: (v: boolean) => void;
   flowChoice: FlowChoice | null;
   sediment: { basin: Desander; source: SedimentSource | null } | null;
   bench: BenchFit | null;
@@ -341,6 +344,9 @@ export function Reading(props: {
     grid,
     conservation,
     localGis,
+    topoCount,
+    topoOn,
+    onTopo,
     flowChoice,
     sediment,
     bench,
@@ -1485,6 +1491,30 @@ export function Reading(props: {
               </div>
             )}
           </div>
+          {topoCount > 0 && (
+            <button
+              type="button"
+              onClick={() => onTopo(!topoOn)}
+              className={`mt-2.5 w-full rounded-lg border px-3 py-2 text-left text-[11px] leading-relaxed ${
+                topoOn
+                  ? 'border-river/50 bg-[color-mix(in_srgb,var(--color-river)_8%,transparent)] text-ink'
+                  : 'border-line bg-panel-2 text-muted hover:border-line-strong hover:text-ink'
+              }`}
+            >
+              {topoOn ? (
+                <>
+                  <b className="text-river">Survey sheet shown under the map.</b> Zoom past 12 to
+                  see it. Surveyed contours and spot heights, at about 2 m per pixel.
+                </>
+              ) : (
+                <>
+                  <b className="text-ink">Show the surveyed sheet under the map.</b>{' '}
+                  {topoCount} of 691 scans are georeferenced, so it appears only where one covers
+                  the view.
+                </>
+              )}
+            </button>
+          )}
           <Fine>
             The survey sheet is the one to order: Nepal&apos;s 1:25,000 sheets carry surveyed
             contours and spot heights, which is how you replace the ±15 m of error in the global

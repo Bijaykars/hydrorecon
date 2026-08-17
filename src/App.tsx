@@ -39,6 +39,7 @@ import {
   protectedNear,
 } from './protected.ts';
 import { localContextAt, type LocalContext } from './local-gis.ts';
+import { syncTopoOverlay, topoAvailable } from './topo-overlay.ts';
 import { auditHead, auditShape, type HeadAudit, type ShapeAudit } from './audit.ts';
 import { benchFit, desander, sedimentSource, type BenchFit } from './engine/sediment.ts';
 import {
@@ -1422,6 +1423,30 @@ export default function App() {
   }, [scheme, isNepal]);
 
   /**
+   * Nepal's surveyed 1:25,000 sheets, drawn under the scheme.
+   *
+   * Off by default: each scan is about 10 MB and only 40 of them are
+   * georeferenced, so this is a deliberate act, not something that happens to
+   * you. `topoCount` is 0 when the private layer is not installed, and the
+   * control never appears. See src/topo-overlay.ts.
+   */
+  const [topoCount, setTopoCount] = useState(0);
+  const [topoOn, setTopoOn] = useState(false);
+  useEffect(() => {
+    topoAvailable().then(setTopoCount).catch(() => setTopoCount(0));
+  }, []);
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    const sync = () => void syncTopoOverlay(m, topoOn);
+    sync();
+    m.on('moveend', sync);
+    return () => {
+      m.off('moveend', sync);
+    };
+  }, [topoOn]);
+
+  /**
    * Sediment: the desanding basin this duty point needs, and what the catchment
    * is going to throw at it.
    *
@@ -2093,6 +2118,9 @@ export default function App() {
         grid={grid}
         conservation={conservation}
         localGis={localGis}
+        topoCount={topoCount}
+        topoOn={topoOn}
+        onTopo={setTopoOn}
         flowChoice={flowChoice}
         sediment={sediment}
         bench={bench}
