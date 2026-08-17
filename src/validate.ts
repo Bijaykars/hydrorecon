@@ -17,10 +17,15 @@ import { downstreamPath, nearestReach } from './rivers.ts';
 import { fetchDischarge, fetchPathProfile, meanOf } from './api.ts';
 import { evaluate, type SchemeInput } from './engine/discover.ts';
 import { chooseFlowMagnitude, type FlowChoice } from './engine/flowchoice.ts';
-import { haversineKm, minMonthlyMean } from './engine/hydro.ts';
+import { NEPAL_EFLOW_POLICY, haversineKm, minMonthlyMean } from './engine/hydro.ts';
 
 /** The app's shipped defaults — what a user gets before touching any slider. */
-const DEFAULTS = { exceedance: 0.4, efficiency: 0.96, headLossFrac: 0.05, residualFrac: 0.1 };
+const DEFAULTS = {
+  exceedance: 0.4,
+  efficiency: 0.96,
+  headLossFrac: 0.05,
+  residualFrac: NEPAL_EFLOW_POLICY.minimumFractionOfLowestMonthlyMean,
+};
 const MIN_FLOW_FRAC = 0.2;
 
 /**

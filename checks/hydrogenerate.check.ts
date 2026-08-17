@@ -12,7 +12,7 @@
  * asserted too, so it can never happen by accident.
  */
 import assert from 'node:assert/strict';
-import { selectTurbine, turbineCurve } from '../src/engine/turbine.ts';
+import { explainTurbineSelection, selectTurbine, turbineCurve } from '../src/engine/turbine.ts';
 
 let passed = 0;
 const ok = (name: string, fn: () => void) => {
@@ -86,6 +86,18 @@ for (const g of GOLDEN) {
     assert.equal(ts, g.turbine, `${g.plant}: library said ${g.turbine}, port said ${ts}`);
   });
 }
+
+ok('selection evidence names the duty point and published basis', () => {
+  const pelton = explainTurbineSelection(7.5, 337.46);
+  assert.equal(pelton?.type, 'Pelton');
+  assert.equal(pelton?.method, 'HydroGenerate duty-point envelope');
+  assert.match(pelton?.reason ?? '', /337 m/);
+  assert.match(pelton?.reason ?? '', /7\.50 m³\/s/);
+
+  const largePlant = explainTurbineSelection(66, 780.9);
+  assert.equal(largePlant?.type, 'Pelton');
+  assert.equal(largePlant?.method, 'ESHA head-range fallback');
+});
 
 /** Points where the port must reproduce the library exactly. */
 const EXACT: Record<string, string[]> = {

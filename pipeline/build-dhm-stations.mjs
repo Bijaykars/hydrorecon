@@ -43,8 +43,20 @@ const ALLOWED_META = {
 
 console.log(`fetching ${SRC} (~45 MB, expect ~10 s)…`);
 const t0 = Date.now();
-const res = await fetch(SRC);
-if (!res.ok) throw new Error(`DHM: HTTP ${res.status}`);
+let res = null;
+let last = '';
+for (let attempt = 1; attempt <= 4; attempt++) {
+  try {
+    const candidate = await fetch(SRC, { signal: AbortSignal.timeout(120_000) });
+    if (!candidate.ok) throw new Error(`HTTP ${candidate.status}`);
+    res = candidate;
+    break;
+  } catch (e) {
+    last = e.message;
+    if (attempt < 4) await new Promise((resolve) => setTimeout(resolve, attempt * 3000));
+  }
+}
+if (!res) throw new Error(`DHM: ${last}`);
 const raw = await res.json();
 console.log(`  got ${raw.length} records in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 
@@ -132,7 +144,14 @@ const stations = raw
   })
   .sort((a, b) => a.n.localeCompare(b.n));
 
-const json = JSON.stringify(stations);
+const bundle = {
+  _source: SRC,
+  _retrieved: new Date().toISOString().slice(0, 10),
+  _note:
+    'Station metadata only. Observation values require DHM authorisation/API keys. Personal observer and banking fields are excluded by allow-list.',
+  stations,
+};
+const json = JSON.stringify(bundle);
 writeFileSync(OUT, json);
 
 const rivers = stations.filter((s) => s.r);

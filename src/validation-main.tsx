@@ -245,7 +245,8 @@ function PlantCard({ r }: { r: Row }) {
             <div className="text-amber">
               <b>Trans-Himalayan catchment.</b> Most of this river&apos;s water comes from north of
               the border, where the global flow products can agree with each other and still be
-              wrong together — and HYDEST, fitted to Nepali catchments, cannot judge them.
+              wrong together — and a WECS/DHM regression fitted to Nepali catchments is outside
+              its intended evidence base there.
             </div>
           )}
           {r.result.flow && r.result.flow.disagreement > 3 && (
@@ -370,8 +371,8 @@ function Page() {
           Rivers draining the arid Tibetan plateau defeat the flow sources this app can reach —
           sometimes loudly, with the two global products a factor of eight apart, sometimes
           quietly, with them agreeing with each other and still running three times low together,
-          as at Upper Tamakoshi. Loud disagreements are arbitrated by Nepal&apos;s own HYDEST
-          regression, now completed with monsoon rainfall over every catchment — the upgrade that
+          as at Upper Tamakoshi. Loud disagreements are compared with the legacy WECS/DHM regional
+          regression, now completed with monsoon rainfall where the catchment layer covers — the upgrade that
           moved Chilime from a ×6.9 miss into the clean set above. The quiet kind no regression
           fitted to Nepali catchments can fix, because the water comes from outside them. There
           the band goes wide and the advice on screen is the one these plants&apos; own

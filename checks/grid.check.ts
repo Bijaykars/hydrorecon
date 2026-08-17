@@ -8,7 +8,15 @@
  */
 import assert from 'node:assert/strict';
 import gridRaw from '../src/data/nepal-grid.json' with { type: 'json' };
-import { connectionVerdict, gridLink, requiredKv, GRID_LINE_COUNT, GRID_SUB_COUNT } from '../src/grid.ts';
+import {
+  connectionVerdict,
+  gridLinesGeoJson,
+  gridLink,
+  gridSubstationsGeoJson,
+  requiredKv,
+  GRID_LINE_COUNT,
+  GRID_SUB_COUNT,
+} from '../src/grid.ts';
 
 let passed = 0;
 const ok = (name: string, fn: () => void) => {
@@ -19,6 +27,7 @@ const ok = (name: string, fn: () => void) => {
 
 const raw = gridRaw as unknown as {
   _source: string;
+  _retrieved: string;
   lines: { kv: number; p: number[] }[];
   subs: { n: string | null; kv: number; y: number; x: number }[];
 };
@@ -28,6 +37,7 @@ console.log('\ngrid: the bundled OSM extract');
 ok('the extract is inside Nepal and carries its licence', () => {
   assert.match(raw._source, /OpenStreetMap/, 'attribution must travel with the data');
   assert.match(raw._source, /ODbL/, 'the licence must be stated on the file');
+  assert.match(raw._retrieved, /^\d{4}-\d{2}-\d{2}$/, 'snapshot needs a retrieval date');
   assert.equal(raw.lines.length, GRID_LINE_COUNT);
   assert.equal(raw.subs.length, GRID_SUB_COUNT);
   assert.ok(raw.lines.length > 100, `only ${raw.lines.length} lines`);
@@ -45,6 +55,21 @@ ok('local distribution is excluded, so no site looks falsely well connected', ()
   for (const l of raw.lines) {
     assert.ok(l.kv === 0 || l.kv >= 30, `a ${l.kv} kV line survived the filter`);
   }
+});
+
+ok('map geometry preserves every backbone line and substation in lon/lat order', () => {
+  const lines = gridLinesGeoJson();
+  const substations = gridSubstationsGeoJson();
+  assert.equal(lines.features.length, raw.lines.length);
+  assert.equal(substations.features.length, raw.subs.length);
+
+  const firstLine = lines.features[0].geometry;
+  assert.equal(firstLine.type, 'LineString');
+  assert.deepEqual(firstLine.coordinates[0], [raw.lines[0].p[1], raw.lines[0].p[0]]);
+
+  const firstSub = substations.features[0].geometry;
+  assert.equal(firstSub.type, 'Point');
+  assert.deepEqual(firstSub.coordinates, [raw.subs[0].x, raw.subs[0].y]);
 });
 
 console.log('\ngrid: what counts as a connection');

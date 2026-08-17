@@ -38,17 +38,20 @@ const MIN_AREA_KM2 = 5;
 
 const ask = async (ql) => {
   let last = '';
-  for (const url of ENDPOINTS) {
-    try {
-      const r = await fetch(url, {
-        method: 'POST',
-        body: 'data=' + encodeURIComponent(ql),
-        headers: { 'user-agent': UA, 'content-type': 'application/x-www-form-urlencoded' },
-      });
-      if (r.ok) return (await r.json()).elements ?? [];
-      last = `HTTP ${r.status} from ${new URL(url).host}`;
-    } catch (e) {
-      last = `${new URL(url).host}: ${e.message}`;
+  for (let pass = 0; pass < 2; pass++) {
+    for (const url of ENDPOINTS) {
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          body: 'data=' + encodeURIComponent(ql),
+          headers: { 'user-agent': UA, 'content-type': 'application/x-www-form-urlencoded' },
+          signal: AbortSignal.timeout(180_000),
+        });
+        if (r.ok) return (await r.json()).elements ?? [];
+        last = `HTTP ${r.status} from ${new URL(url).host}`;
+      } catch (e) {
+        last = `${new URL(url).host}: ${e.message}`;
+      }
     }
   }
   throw new Error(`Overpass: ${last}`);
@@ -272,6 +275,7 @@ areas.sort((a, b) => b.a - a.a);
 
 const out = {
   _source: 'OpenStreetMap via Overpass, © OpenStreetMap contributors, ODbL 1.0',
+  _retrieved: new Date().toISOString().slice(0, 10),
   _note: 'Derived database. Redistribution governed by ODbL, not the MIT licence on the code.',
   areas,
 };

@@ -35,7 +35,7 @@ export function Fdc({
   fdc,
   designCms,
   residualCms,
-  height = 132,
+  height = 106,
 }: {
   fdc: FdcPoint[];
   designCms: number;
@@ -43,9 +43,11 @@ export function Fdc({
   height?: number;
 }) {
   if (fdc.length === 0) return null;
-  const W = 320;
+  // A wide, shallow viewport keeps the curve readable inside the desktop
+  // workbench without letting one chart consume most of the screen.
+  const W = 480;
   const H = height;
-  const m = { l: 34, r: 8, t: 8, b: 18 };
+  const m = { l: 34, r: 8, t: 6, b: 17 };
 
   const positive = fdc.filter((p) => p.q > 0);
   const hi = positive.length ? positive[0].q : 1;
@@ -81,13 +83,13 @@ export function Fdc({
           </text>
         </g>
       ))}
-      {[0, 0.25, 0.5, 0.75, 1].map((p) => (
+      {[0, 0.5, 1].map((p) => (
         <text key={p} x={x(p)} y={H - 5} textAnchor="middle" fontSize="9" fontFamily={MONO} fill={FAINT}>
           {p * 100}%
         </text>
       ))}
 
-      <path d={d} fill="none" stroke={RIVER} strokeWidth="1.8" />
+      <path d={d} fill="none" stroke={RIVER} strokeWidth="2" />
 
       {residualCms > 0 && residualCms >= yMin && (
         <line
@@ -112,7 +114,7 @@ export function Fdc({
         />
       )}
       <text x={W - m.r} y={y(designCms) - 3} textAnchor="end" fontSize="8.5" fill={GREEN}>
-        design
+        Q design
       </text>
     </svg>
   );

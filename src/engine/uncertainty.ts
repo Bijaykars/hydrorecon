@@ -99,7 +99,13 @@ export function uncertaintyFor(
    */
   measuredSpreadFrac?: number,
   /** Which flow source won the magnitude (engine/flowchoice.ts) — wording only. */
-  authority?: 'network' | 'model' | 'hydest'
+  authority?: 'network' | 'model' | 'hydest',
+  /**
+   * Per-site head error, m, when the site audit has measured one by comparing
+   * the two terrain products at this exact reach. Replaces the global ±15 m
+   * assumption in whichever direction the measurement points.
+   */
+  headErrM: number = DEM_HEAD_ERROR_M
 ): Uncertainty | null {
   const best = evaluate(input, scheme.i, scheme.j);
   if (!best || best.capacityMW <= 0) return null;
@@ -135,8 +141,8 @@ export function uncertaintyFor(
 
   const flowLow = withFlow(1 - Math.min(0.95, flowSpread));
   const flowHigh = withFlow(1 + flowSpread);
-  const headLow = withHead(-DEM_HEAD_ERROR_M);
-  const headHigh = withHead(+DEM_HEAD_ERROR_M);
+  const headLow = withHead(-headErrM);
+  const headHigh = withHead(+headErrM);
 
   const swing = (a: Scheme | null, b: Scheme | null, key: 'capacityMW' | 'energyGwh') =>
     a && b ? Math.abs(a[key] - b[key]) : 0;
@@ -173,7 +179,10 @@ export function uncertaintyFor(
     {
       name: 'Head from terrain',
       swingPct: best.capacityMW > 0 ? (headSwing / best.capacityMW) * 100 : 0,
-      note: `±${DEM_HEAD_ERROR_M} m of DEM error on a ${scheme.grossHeadM.toFixed(0)} m drop`,
+      note:
+        headErrM !== DEM_HEAD_ERROR_M
+          ? `±${headErrM.toFixed(0)} m, measured at this site by comparing two terrain products`
+          : `±${DEM_HEAD_ERROR_M} m of DEM error on a ${scheme.grossHeadM.toFixed(0)} m drop`,
     },
   ].sort((a, b) => b.swingPct - a.swingPct);
 
@@ -182,7 +191,7 @@ export function uncertaintyFor(
     energyGwh: combine('energyGwh'),
     drivers,
     flowSpreadPct: flowSpread * 100,
-    headSpreadM: DEM_HEAD_ERROR_M,
+    headSpreadM: headErrM,
   };
 }
 

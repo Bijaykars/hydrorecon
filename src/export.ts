@@ -10,13 +10,39 @@
  * file still explains itself a year later when nobody remembers what produced it.
  */
 import type { Scheme } from './engine/discover.ts';
-import type { Licence } from './context.ts';
-import { recordKind, transferAdvice, type Gauge } from './gauges.ts';
-import type { GridLink } from './grid.ts';
+import { DOED_RETRIEVED, DOED_UPDATED, type Licence } from './context.ts';
+import { DHM_STATIONS_RETRIEVED, recordKind, transferAdvice, type Gauge } from './gauges.ts';
+import { GRID_RETRIEVED, type GridLink } from './grid.ts';
+import { PROTECTED_RETRIEVED } from './protected.ts';
 import { desander, type BenchFit, type SedimentSource } from './engine/sediment.ts';
+import type { EngineeringReadiness } from './readiness.ts';
+import type { HazardScreen } from './hazards.ts';
+import type { FaultScreen } from './faults.ts';
+import type { GeologyScreen } from './geology.ts';
+import type { UpstreamConnectivityScreen } from './connectivity.ts';
+import { isAdvancedDoedStage, type CascadeScreen } from './cascade.ts';
+import type { RegionMode } from './region.ts';
+import type { HydestScreen } from './engine/hydest.ts';
+import { UNIT_SENSITIVITY_GUIDANCE } from './engine/units.ts';
+import type { FlowChoice } from './engine/flowchoice.ts';
+import {
+  NEA_ROR_PPA,
+  NEPAL_EFLOW_POLICY,
+  POWER_DURATION_GUIDANCE,
+} from './engine/hydro.ts';
 
 export type ExportContext = {
   at: { lat: number; lon: number };
+  region: RegionMode;
+  boundaryDistanceKm: number | null;
+  readiness: EngineeringReadiness;
+  hazards: HazardScreen | null;
+  upstreamConnectivity: UpstreamConnectivityScreen | null;
+  cascade: CascadeScreen | null;
+  faults: FaultScreen | null;
+  geology: GeologyScreen | null;
+  hydest: HydestScreen | null;
+  flowChoice: FlowChoice | null;
   schemes: Scheme[];
   selected: Scheme | null;
   path: { km: number; lat: number; lon: number; elevationM: number; meanCms: number }[];
@@ -69,6 +95,10 @@ function provenance(c: ExportContext): string[] {
     'https://github.com/Bijaykars  ·  MIT licence',
     `generated: ${stamp()}`,
     `study point: ${c.at.lat.toFixed(5)}, ${c.at.lon.toFixed(5)}`,
+    `mode: ${c.region === 'nepal' ? 'NEPAL â€” national datasets and rules enabled' : 'GLOBAL â€” physical open-data screening only'}`,
+    ...(c.boundaryDistanceKm !== null && c.boundaryDistanceKm <= 10
+      ? [`border warning: ${c.boundaryDistanceKm.toFixed(1)} km from the generalized country outline; verify jurisdiction from authoritative survey/control points`]
+      : []),
     '',
     'THIS IS SCREENING, NOT A FEASIBILITY STUDY.',
     'No waterway has been routed, no geotechnics done, nothing costed.',
@@ -82,6 +112,36 @@ function provenance(c: ExportContext): string[] {
     `terrain: ${c.demSource}, ~${Math.round(c.demResolutionM)} m sample spacing`,
     'terrain error: global DEMs carry roughly +/-10-16 m vertically in steep ground,',
     '  which propagates directly into head and therefore into capacity',
+    ...(c.region === 'nepal'
+      ? [
+          `Nepal context: DoED updated ${DOED_UPDATED} (bundled ${DOED_RETRIEVED}); ` +
+            `DHM stations ${DHM_STATIONS_RETRIEVED}; OSM grid ${GRID_RETRIEVED}; ` +
+            `OSM protected areas ${PROTECTED_RETRIEVED}`,
+          ...(c.hazards
+            ? [
+                `BIPAD incidents: approved + verified records ${c.hazards.period.from} to ${c.hazards.period.to}; bundled ${c.hazards.retrieved}`,
+              ]
+            : []),
+          ...(c.upstreamConnectivity
+            ? [
+                `upstream channel screen: GLO lakes ${c.upstreamConnectivity.lakes.length}; BIPAD reports ${c.upstreamConnectivity.incidents.length}; HydroRIVERS v${c.upstreamConnectivity.network.version}`,
+              ]
+            : []),
+          ...(c.cascade
+            ? [
+                `DoED directed project screen: ${c.cascade.upstream.length} upstream and ${c.cascade.downstream.length} downstream midpoint candidate(s); ${c.cascade.registry.canonicalRecords} canonical geolocated records`,
+              ]
+            : []),
+          ...(c.faults
+            ? [
+                `GEM active faults: ${c.faults.regionalFaultSources} Nepal-plus-buffer source traces; bundled ${c.faults.retrieved}; ${c.faults.license}`,
+              ]
+            : []),
+        ]
+      : [
+          'country context: not assessed â€” Nepal-only DoED, DHM, grid, protected-area and PPA rules are disabled',
+          'global inputs are limited to easily available open terrain, flow, river and basemap data',
+        ]),
     ...(c.measured
       ? [
           `flow: MEASURED — imported from ${c.measured.name}`,
@@ -92,16 +152,43 @@ function provenance(c: ExportContext): string[] {
           ...c.measured.notes.map((nn) => `  note: ${nn}`),
         ]
       : [
-          `flow: GloFAS v4 reanalysis via Open-Meteo, ${c.flowYears.toFixed(0)} years, modelled not gauged`,
+          `flow: GloFAS v4 consolidated history via Open-Meteo, ${c.flowYears.toFixed(0)} complete calendar years, modelled not gauged`,
           `flow mean at the model cell: ${c.flowMeanCms.toFixed(2)} m3/s`,
-        ]),
+      ]),
   ];
+  if (c.geology?.dmg) {
+    lines.push(
+      `DMG geology catalog: ${c.geology.dmg.maps.length} published 1:50,000 map product(s) touch the selected reach; source updated ${c.geology.dmg.updated}; bundled ${c.geology.dmg.retrieved}`,
+      `  availability: ${c.geology.dmg.availability}`,
+      '  catalog footprints are not site geology and the all-rights-reserved map imagery is not bundled'
+    );
+  }
+  if (c.geology?.regional) {
+    lines.push(
+      `regional geology: Macrostrat point samples at intake, mid-reach and powerhouse; ${c.geology.regional.license}`,
+      `  limitation: ${c.geology.regional.limitation}`
+    );
+  }
   if (c.networkMeanCms !== null && !c.measured) {
     const ratio = Math.max(c.networkMeanCms / c.flowMeanCms, c.flowMeanCms / c.networkMeanCms);
     lines.push(
       `mapped network long-term mean here: ${c.networkMeanCms.toFixed(2)} m3/s`,
-      `  the two disagree by ${ratio.toFixed(1)}x; magnitude below is taken from the network,`,
-      '  day-to-day shape from the flood model'
+      `  the two global sources disagree by ${ratio.toFixed(1)}x`,
+      ...(c.flowChoice?.authority === 'model'
+        ? [
+            '  magnitude below is taken from the flood model without network rescaling;',
+            `  WECS/DHM regional comparison: ${c.flowChoice.note}`,
+          ]
+        : c.flowChoice?.authority === 'hydest'
+          ? [
+              `  magnitude below is provisionally rescaled to the WECS/DHM regional annual mean (${c.flowChoice.targetMeanCms?.toFixed(2) ?? 'unknown'} m3/s);`,
+              '  day-to-day shape remains from the flood model; this is a screening fallback, not an observation',
+              `  regional comparison: ${c.flowChoice.note}`,
+            ]
+          : [
+              '  magnitude below is taken from the mapped network; day-to-day shape comes from the flood model',
+              ...(c.flowChoice ? [`  comparison: ${c.flowChoice.note}`] : []),
+            ])
     );
   }
   lines.push(
@@ -117,6 +204,17 @@ function provenance(c: ExportContext): string[] {
     '    5 m/s, Darcy-Weisbach with Swamee-Jain friction, Manning headrace, plus',
     '    rack/entrance/bend/valve local losses). See the per-scheme columns below.',
     `  residual flow: ${(c.assumptions.residualFrac * 100).toFixed(0)}% of the lowest monthly mean`,
+    ...(c.region === 'nepal'
+      ? [
+          `  Nepal environmental-release policy floor: at least ${(NEPAL_EFLOW_POLICY.minimumFractionOfLowestMonthlyMean * 100).toFixed(0)}% of minimum monthly average discharge OR the higher EIA-required minimum`,
+          `  source: ${NEPAL_EFLOW_POLICY.source}; reviewed ${NEPAL_EFLOW_POLICY.reviewed}`,
+          '  the calculated release is a policy-floor screen, not an approved ecological-flow determination',
+        ]
+      : []),
+    `  daily power-duration outputs: P90/P95 across usable record days; ${POWER_DURATION_GUIDANCE.interpretation}`,
+    `  power-duration method: ${POWER_DURATION_GUIDANCE.reference}; ${POWER_DURATION_GUIDANCE.source}`,
+    `  unit-count sensitivity: ${UNIT_SENSITIVITY_GUIDANCE.method}`,
+    `  ${UNIT_SENSITIVITY_GUIDANCE.interpretation}`,
     '',
     `${c.evaluated} intake/powerhouse pairs evaluated; ${c.schemes.length} kept as non-dominated`
   );
@@ -129,6 +227,154 @@ function provenance(c: ExportContext): string[] {
       `  energy:   ${c.band.energyLow.toFixed(0)} - ${c.band.energyHigh.toFixed(0)} GWh/yr ` +
         `(reported ${c.selected.energyGwh.toFixed(0)})`,
       '  the single figures in the table below are midpoints, not measurements'
+    );
+  }
+  if (c.hazards) {
+    const found = c.hazards.categories.filter((category) => category.count > 0);
+    lines.push(
+      '',
+      `RECORDED NATURAL HAZARDS: ${c.hazards.total} approved, verified BIPAD report(s) within ${c.hazards.radiusKm} km of the selected reach`,
+      found.length
+        ? `  breakdown: ${found.map((category) => `${category.title} ${category.count}`).join(', ')}`
+        : '  no mapped report was found in the screened categories; this does not clear the site',
+      `  inventory: ${c.hazards.period.from} to ${c.hazards.period.to}; bundled ${c.hazards.retrieved}`,
+      `  source: ${c.hazards.source}`,
+      `  limitation: ${c.hazards.limitation}`
+    );
+  }
+  if (c.upstreamConnectivity) {
+    const expanding = c.upstreamConnectivity.lakes.filter((lake) =>
+      lake.expansionSignificant === true &&
+      (lake.expansionRateKm2Yr ?? 0) > 0 &&
+      lake.timeSeriesOutlier !== true
+    );
+    lines.push(
+      '',
+      `UPSTREAM CHANNEL-CONNECTIVITY CANDIDATES: ${c.upstreamConnectivity.lakes.length} glacial-lake centroid(s); ${c.upstreamConnectivity.incidents.length} BIPAD report point(s)`,
+      `  lake inventory: ${c.upstreamConnectivity.lakeInventory.total} unique Sentinel-2 centroids, ${c.upstreamConnectivity.lakeInventory.observations.from}-${c.upstreamConnectivity.lakeInventory.observations.to}; published ${c.upstreamConnectivity.lakeInventory.published}; bundled ${c.upstreamConnectivity.lakeInventory.retrieved}`,
+      `  unflagged significant positive expansion signals among connected lakes: ${expanding.length}; expansion is not breach likelihood`,
+      ...c.upstreamConnectivity.lakes.slice(0, 8).map((lake) =>
+        `  lake: ${lake.id}, ${lake.basin}/${lake.country}, ${lake.routeKm.toFixed(1)} km directed route, ${lake.snapKm.toFixed(2)} km snap, ${lake.elevationM.toFixed(0)} m${lake.expansionRateKm2Yr == null ? '' : `, trend ${lake.expansionRateKm2Yr.toFixed(4)} km2/yr${lake.expansionSignificant === true ? ' significant' : ''}${lake.timeSeriesOutlier === true ? ' OUTLIER-FLAGGED' : ''}`}`
+      ),
+      ...c.upstreamConnectivity.incidents.slice(0, 8).map((incident) =>
+        `  report: BIPAD ${incident.id}, ${incident.title}, ${incident.date}, ${incident.routeKm.toFixed(1)} km directed route, ${incident.snapKm.toFixed(2)} km snap`
+      ),
+      `  method: ${c.upstreamConnectivity.method}`,
+      `  network: ${c.upstreamConnectivity.network.source} v${c.upstreamConnectivity.network.version}, ${c.upstreamConnectivity.network.resolution}; ${c.upstreamConnectivity.network.streamThreshold}`,
+      `  lake source: ${c.upstreamConnectivity.lakeInventory.source}; ${c.upstreamConnectivity.lakeInventory.license}`,
+      `  limitation: ${c.upstreamConnectivity.limitation}`
+    );
+  }
+  if (c.faults) {
+    const nearest = c.faults.nearest;
+    lines.push(
+      '',
+      `REGIONAL ACTIVE-FAULT CONTEXT: ${c.faults.nearby.length} GEM trace(s) within ${c.faults.radiusKm} km; ${c.faults.crossings} mapped river-reach intersection(s)`,
+      nearest
+        ? `  nearest: ${nearest.name ?? nearest.sourceId} (${nearest.type}), ${nearest.distanceKm.toFixed(2)} km from the reach${nearest.intersectsReach ? ` near chainage ${nearest.chainageKm.toFixed(2)} km` : ''}`
+        : '  no nearest trace result is available',
+      `  source: ${c.faults.sourceUrl} @ ${c.faults.commit}`,
+      `  data licence: ${c.faults.license}; ${c.faults.licenseUrl}`,
+      `  limitation: ${c.faults.limitation}`
+    );
+  }
+  if (c.geology) {
+    lines.push('', 'ENGINEERING GEOLOGY SOURCES:');
+    if (c.geology.dmg) {
+      lines.push(
+        c.geology.dmg.maps.length
+          ? `  official DMG 1:50,000 publications: ${c.geology.dmg.maps.map((map) => `${map.sheets.map((sheet) => sheet.code).join('/')}—${map.title}`).join('; ')}`
+          : `  ${c.geology.dmg.limitation}`,
+        `  rights: ${c.geology.dmg.rights}`,
+        `  source: ${c.geology.dmg.sourceUrl}`
+      );
+    }
+    if (c.geology.regional) {
+      lines.push(
+        ...c.geology.regional.samples.map((sample) =>
+          `  ${sample.role}: ${sample.units.length ? sample.units.map((unit) => `${unit.name} (${unit.lithology})`).join('; ') : 'no mapped regional unit returned'}`
+        ),
+        `  original references: ${Object.entries(c.geology.regional.references).map(([id, reference]) => `${id}: ${reference}`).join('; ') || 'none returned'}`,
+        `  source: ${c.geology.regional.sourceUrl}; ${c.geology.regional.license}`
+      );
+    } else if (c.geology.regionalError) {
+      lines.push(`  regional source unavailable: ${c.geology.regionalError}`);
+    }
+  }
+  if (c.hydest) {
+    const h = c.hydest;
+    lines.push(
+      '',
+      'WECS/DHM REGIONAL HYDROLOGY SCREEN — NOT A PROJECT DESIGN-FLOOD SELECTION:',
+      `  inputs: total catchment ${h.input.totalKm2.toFixed(3)} km2; below 5000 m ${h.input.below5000Km2.toFixed(3)} km2; below 3000 m ${h.input.below3000Km2.toFixed(3)} km2; monsoon precipitation ${h.input.monsoonMm == null ? 'unavailable' : `${h.input.monsoonMm.toFixed(0)} mm`}`,
+      `  lowest regional monthly mean: month ${h.driest.month + 1}, ${h.driest.cms.toFixed(3)} m3/s`,
+      `  regional monthly means: ${h.months.map((month) => `${month.month + 1}=${month.cms.toFixed(3)}`).join('; ')} m3/s`,
+      `  regional return-period estimates: ${h.floods.map((flood) => `Q${flood.t}=${flood.cms.toFixed(3)}`).join('; ')} m3/s`,
+      ...(h.agreement
+        ? [`  dry-season model comparison: ${h.agreement.ratio.toFixed(3)}x; ${h.agreement.agree ? 'consistent for screening' : 'material disagreement — prioritize gauge transfer and measurement'}`]
+        : ['  dry-season model comparison: unavailable']),
+      `  monthly equation: ${h.provenance.equations.monthly}`,
+      `  flood anchors: ${h.provenance.equations.q2}; ${h.provenance.equations.q100}`,
+      `  interpolation: ${h.provenance.equations.interpolation}`,
+      `  method: ${h.provenance.primaryCitation.title}, ${h.provenance.primaryCitation.publisher} (${h.provenance.primaryCitation.year})`,
+      `  method catalogue: ${h.provenance.primaryCitation.catalogue}`,
+      `  current guidance: ${h.provenance.guidance.headworks}; ${h.provenance.guidance.floodManual}`,
+      `  rainfall input: ${h.provenance.rainfall.product}, ${h.provenance.rainfall.resolution}; ${h.provenance.rainfall.productUrl}`,
+      ...h.provenance.rainfall.files.map((file) => `  rainfall source month ${file.month}: ${file.url}; ${file.bytes} bytes; SHA-256 ${file.sha256}`),
+      `  rainfall rights: ${h.provenance.rainfall.rights}`,
+      `  catchment source: ${h.provenance.hydrobasins.product}; ${h.provenance.hydrobasins.url}; SHA-256 ${h.provenance.hydrobasins.sha256}`,
+      `  hypsometry source: ${h.provenance.hypsometry.terrain}, zoom ${h.provenance.hypsometry.terrainZoom}, ${h.provenance.hypsometry.rasterStepDegrees}° raster; ${h.provenance.hypsometry.terrainUrl}`,
+      `  reach bundle: built ${h.provenance.bundle.built}; SHA-256 ${h.provenance.bundle.output.sha256}`,
+      ...h.provenance.limitations.map((limitation) => `  limitation: ${limitation}`)
+    );
+  }
+  if (c.readiness.gates.length) {
+    lines.push(
+      '',
+      `ENGINEERING READINESS: ${c.readiness.label}`,
+      '  No aggregate score is reported; one fatal gate must not be averaged away.',
+      ...c.readiness.gates.flatMap((g) => [
+        `  [${g.level.toUpperCase()}] ${g.title}: ${g.summary}`,
+        `    next: ${g.next}`,
+      ]),
+      '',
+      `FIELD INVESTIGATION CAMPAIGN (${c.readiness.tasks.length} work packages):`,
+      ...c.readiness.tasks.flatMap((t, i) => [
+        `  ${i + 1}. [${t.priority}] ${t.discipline} â€” ${t.title}`,
+        `     why: ${t.reason}`,
+        `     deliverable: ${t.deliverable}`,
+      ])
+    );
+  }
+  if (c.selected?.reliability) {
+    const r = c.selected.reliability;
+    lines.push(
+      '',
+      `INTERANNUAL ENERGY (${r.annual.length} complete dispatched years):`,
+      `  P50: ${r.p50Gwh.toFixed(1)} GWh/yr`,
+      `  P90: ${r.p90Gwh.toFixed(1)} GWh/yr (equalled or exceeded in 90% of modelled years)`,
+      `  observed model-year range: ${r.worstGwh.toFixed(1)}-${r.bestGwh.toFixed(1)} GWh/yr`,
+      ...(c.region === 'nepal'
+        ? [
+            `  NEA ROR PPA 6+6 option: ${(r.ppaSixSix.dryShare * 100).toFixed(1)}% dry energy ` +
+              `(${r.ppaSixSix.meets ? 'meets' : 'below'} 30%)`,
+            `  NEA ROR PPA 8+4 option: ${(r.ppaEightFour.dryShare * 100).toFixed(1)}% dry energy ` +
+              `(${r.ppaEightFour.meets ? 'meets' : 'below'} 15%)`,
+            `  gross published-base-rate reference, 6+6: NPR ${r.ppaSixSix.grossReferenceValueMillionNpr.toFixed(1)} million/year; blended ${r.ppaSixSix.blendedBaseRateNprPerKwh.toFixed(3)} NPR/kWh`,
+            `  gross published-base-rate reference, 8+4: NPR ${r.ppaEightFour.grossReferenceValueMillionNpr.toFixed(1)} million/year; blended ${r.ppaEightFour.blendedBaseRateNprPerKwh.toFixed(3)} NPR/kWh`,
+            `  rates: wet ${NEA_ROR_PPA.wetNprPerKwh.toFixed(2)}, dry ${NEA_ROR_PPA.dryNprPerKwh.toFixed(2)} NPR/kWh; effective ${NEA_ROR_PPA.effectiveBs} BS (${NEA_ROR_PPA.effectiveAd} AD); reviewed ${NEA_ROR_PPA.reviewed}`,
+            `  source: ${NEA_ROR_PPA.decisionPdf}`,
+            `  ${NEA_ROR_PPA.interpretation}`,
+            `  escalation: ${NEA_ROR_PPA.escalation}`,
+            ...(c.selected && c.selected.capacityMW > NEA_ROR_PPA.postedRateCapacityUpToMW
+              ? [`  ABOVE POSTED-RATE CAPACITY BOUNDARY: ${c.selected.capacityMW.toFixed(1)} MW; ${NEA_ROR_PPA.above100MW}`]
+              : []),
+          ]
+        : []),
+      '  P90 describes interannual hydrology, not contractual firm capacity.',
+      ...(c.region === 'nepal'
+        ? ['  Bikram Sambat PPA season boundaries are approximated to the nearest Gregorian day.']
+        : [])
     );
   }
   if (c.grid) {
@@ -172,8 +418,14 @@ function provenance(c: ExportContext): string[] {
     lines.push(
       '  Basin sizes in the table are screening estimates: Zanke settling velocity for',
       '  quartz, ideal basin x2 for turbulence, gravity-fed bench within 20 m of the river.',
-      '  Nepal publishes no suspended-sediment record, so the load is inferred from',
-      '  catchment altitude, not measured. A real design needs a sampling programme.'
+      ...(c.region === 'nepal'
+        ? [
+            '  No open Nepal suspended-sediment series is bundled, so source conditions are',
+            '  inferred from catchment altitude, not measured. A real design needs sampling.',
+          ]
+        : [
+            '  No site sediment series is used. A real design needs a local sampling programme.',
+          ])
     );
   }
   if (c.gauges.length > 0) {
@@ -195,16 +447,41 @@ function provenance(c: ExportContext): string[] {
     );
   }
   if (c.licences.length > 0) {
+    const hard = c.licences.filter(
+      (l) => l.stage === 'Operating' || l.stage === 'Construction licence'
+    ).length;
     lines.push(
       '',
-      `WARNING: ${c.licences.length} licensed project(s) already within 6 km of this reach:`,
+      `WARNING — DOED CONFLICT SCREEN: ${c.licences.length} official project record(s) within 6 km of this reach; ${hard} operating/construction licence record(s):`,
       ...c.licences
         .slice(0, 8)
         .map(
           (l) =>
-            `  ${l.name} — ${l.stage}${l.capacityMW ? `, ${l.capacityMW} MW` : ''}, ${l.distanceKm.toFixed(1)} km away`
+            `  ${l.name} — ${l.stage}${l.capacityMW ? `, ${l.capacityMW} MW` : ''}, ` +
+            (l.distanceKm < 0.05
+              ? 'published coordinate range overlaps the reach'
+              : `${l.distanceKm.toFixed(1)} km from the published coordinate range`)
         ),
-      '  source: Nepal DoED registry via Open Data Nepal; the public snapshot lags the live register'
+      `  source: official Nepal DoED registers, updated ${DOED_UPDATED}; bundled ${DOED_RETRIEVED}`,
+      '  DoED publishes coordinate ranges, not project alignments. Verify legal status and geometry live.'
+    );
+  }
+  if (c.cascade) {
+    const projects = [...c.cascade.upstream, ...c.cascade.downstream];
+    const advanced = projects.filter((project) => isAdvancedDoedStage(project.stage)).length;
+    lines.push(
+      '',
+      `DOED DIRECTED PROJECT-INTERACTION SCREEN: ${c.cascade.upstream.length} upstream and ${c.cascade.downstream.length} downstream candidate(s); ${advanced} operating/construction-stage record(s).`,
+      ...(projects.length
+        ? projects.slice(0, 16).map(
+            (project) =>
+              `  ${project.name} — candidate ${project.direction}; ${project.stage}${project.capacityMW != null ? `, ${project.capacityMW} MW` : ''}; ${project.routeKm.toFixed(1)} km directed route; ${project.snapKm.toFixed(2)} km midpoint snap; DoED published-range diagonal ${project.publishedRangeDiagonalKm.toFixed(1)} km`
+          )
+        : ['  No midpoint passed the guarded directed-network thresholds. This is not cascade clearance.']),
+      `  method: ${c.cascade.method}`,
+      `  limitation: ${c.cascade.limitation}`,
+      `  sources: ${c.cascade.registry.source}; ${c.cascade.network.sourceUrl}`,
+      `  official guidance: ${c.cascade.guidance.study}; ${c.cascade.guidance.optimization}`
     );
   }
   return lines;
@@ -224,9 +501,32 @@ export function schemesToCsv(c: ExportContext): string {
     'selected',
     'capacity_MW',
     'annual_energy_GWh',
+    'P50_annual_energy_GWh',
+    'P90_annual_energy_GWh',
+    'daily_P90_hydrological_power_MW',
+    'daily_P95_hydrological_power_MW',
+    'zero_output_days_fraction',
+    'power_duration_basis_days',
+    ...UNIT_SENSITIVITY_GUIDANCE.unitCounts.flatMap((units) => [
+      `${units}_unit_turbine`,
+      `${units}_unit_capacity_MW`,
+      `${units}_unit_energy_GWh`,
+      `${units}_unit_daily_P90_MW`,
+      `${units}_unit_daily_P95_MW`,
+      `${units}_unit_zero_output_fraction`,
+    ]),
+    'NEA_6plus6_dry_energy_share',
+    'NEA_6plus6_meets_30pct',
+    'NEA_8plus4_dry_energy_share',
+    'NEA_8plus4_meets_15pct',
+    'NEA_6plus6_gross_base_rate_reference_million_NPR_per_year',
+    'NEA_6plus6_blended_base_rate_NPR_per_kWh',
+    'NEA_8plus4_gross_base_rate_reference_million_NPR_per_year',
+    'NEA_8plus4_blended_base_rate_NPR_per_kWh',
     'gross_head_m',
     'net_head_m',
     'design_flow_m3s',
+    'source_record_scale_to_intake',
     'residual_flow_m3s',
     'waterway_km',
     'drop_rate_m_per_km',
@@ -255,9 +555,37 @@ export function schemesToCsv(c: ExportContext): string {
       c.selected && s.i === c.selected.i && s.j === c.selected.j ? 'yes' : '',
       s.capacityMW.toFixed(3),
       s.energyGwh.toFixed(2),
+      s.reliability?.p50Gwh.toFixed(2) ?? '',
+      s.reliability?.p90Gwh.toFixed(2) ?? '',
+      s.powerDuration?.p90MW.toFixed(3) ?? '',
+      s.powerDuration?.p95MW.toFixed(3) ?? '',
+      s.powerDuration?.zeroOutputFraction.toFixed(4) ?? '',
+      s.powerDuration?.days ?? '',
+      ...UNIT_SENSITIVITY_GUIDANCE.unitCounts.flatMap((units) => {
+        const scenario = s.unitSensitivity?.find((item) => item.units === units);
+        return scenario
+          ? [
+              scenario.turbine ?? 'review',
+              scenario.capacityMW.toFixed(3),
+              scenario.energyGwh.toFixed(2),
+              scenario.dailyP90MW.toFixed(3),
+              scenario.dailyP95MW.toFixed(3),
+              scenario.zeroOutputFraction.toFixed(4),
+            ]
+          : ['', '', '', '', '', ''];
+      }),
+      c.region === 'nepal' ? (s.reliability?.ppaSixSix.dryShare.toFixed(4) ?? '') : '',
+      c.region === 'nepal' && s.reliability ? (s.reliability.ppaSixSix.meets ? 'yes' : 'no') : '',
+      c.region === 'nepal' ? (s.reliability?.ppaEightFour.dryShare.toFixed(4) ?? '') : '',
+      c.region === 'nepal' && s.reliability ? (s.reliability.ppaEightFour.meets ? 'yes' : 'no') : '',
+      c.region === 'nepal' ? (s.reliability?.ppaSixSix.grossReferenceValueMillionNpr.toFixed(3) ?? '') : '',
+      c.region === 'nepal' ? (s.reliability?.ppaSixSix.blendedBaseRateNprPerKwh.toFixed(4) ?? '') : '',
+      c.region === 'nepal' ? (s.reliability?.ppaEightFour.grossReferenceValueMillionNpr.toFixed(3) ?? '') : '',
+      c.region === 'nepal' ? (s.reliability?.ppaEightFour.blendedBaseRateNprPerKwh.toFixed(4) ?? '') : '',
       s.grossHeadM.toFixed(1),
       s.netHeadM.toFixed(1),
       s.designFlowCms.toFixed(3),
+      s.flowScale.toFixed(5),
       s.residualCms.toFixed(3),
       s.waterwayKm.toFixed(3),
       s.slopeMPerKm.toFixed(1),
@@ -285,6 +613,49 @@ export function schemesToCsv(c: ExportContext): string {
   return [...head, '', cols.join(','), ...rows].join('\n') + '\n';
 }
 
+/** A field-ready work package register that can be assigned and costed. */
+export function fieldPlanToCsv(c: ExportContext): string {
+  const head = [
+    '# Ghatta engineering field investigation plan',
+    `# generated: ${stamp()}`,
+    `# study point: ${c.at.lat.toFixed(5)}, ${c.at.lon.toFixed(5)}`,
+    `# mode: ${c.region}`,
+    `# decision: ${c.readiness.label}`,
+    '# This is a pre-feasibility investigation brief, not a design or permit clearance.',
+    ...(c.hydest
+      ? [
+          `# WECS/DHM regional comparator: Q100 ${c.hydest.floods.find((flood) => flood.t === 100)?.cms.toFixed(0) ?? 'unavailable'} m3/s; not a selected design flood.`,
+          `# Flood guidance: ${c.hydest.provenance.guidance.headworks}`,
+        ]
+      : []),
+    ...(c.region === 'nepal'
+      ? [
+          `# Environmental-release screen: ${(c.assumptions.residualFrac * 100).toFixed(0)}% of lowest monthly mean; EIA-required minimum governs when higher.`,
+          `# Policy source: ${NEPAL_EFLOW_POLICY.source}`,
+        ]
+      : []),
+  ];
+  const cols = [
+    'record_type',
+    'priority_or_level',
+    'discipline',
+    'work_package_or_gate',
+    'finding_or_reason',
+    'deliverable_or_next_action',
+  ];
+  const gateRows = c.readiness.gates.map((g) =>
+    ['gate', g.level, g.title, g.title, `${g.summary} Evidence: ${g.evidence.join(' ')}`, g.next]
+      .map(cell)
+      .join(',')
+  );
+  const taskRows = c.readiness.tasks.map((t) =>
+    ['field_task', t.priority, t.discipline, t.title, t.reason, t.deliverable]
+      .map(cell)
+      .join(',')
+  );
+  return [...head, '', cols.join(','), ...gateRows, ...taskRows].join('\n') + '\n';
+}
+
 /**
  * Scheme geometry for a GIS. The diverted reach as a line, the intake and
  * powerhouse as points, every attribute carried along so the file stands alone.
@@ -300,9 +671,50 @@ export function schemesToGeoJson(c: ExportContext): string {
       selected: chosen,
       capacity_MW: Number(s.capacityMW.toFixed(3)),
       annual_energy_GWh: Number(s.energyGwh.toFixed(2)),
+      P50_annual_energy_GWh: s.reliability ? Number(s.reliability.p50Gwh.toFixed(2)) : null,
+      P90_annual_energy_GWh: s.reliability ? Number(s.reliability.p90Gwh.toFixed(2)) : null,
+      daily_P90_hydrological_power_MW: s.powerDuration
+        ? Number(s.powerDuration.p90MW.toFixed(3))
+        : null,
+      daily_P95_hydrological_power_MW: s.powerDuration
+        ? Number(s.powerDuration.p95MW.toFixed(3))
+        : null,
+      zero_output_days_fraction: s.powerDuration
+        ? Number(s.powerDuration.zeroOutputFraction.toFixed(4))
+        : null,
+      power_duration_basis_days: s.powerDuration?.days ?? null,
+      unit_count_sensitivity: s.unitSensitivity ?? null,
+      NEA_6plus6_dry_energy_share: c.region === 'nepal' && s.reliability
+        ? Number(s.reliability.ppaSixSix.dryShare.toFixed(4))
+        : null,
+      NEA_6plus6_meets_30pct:
+        c.region === 'nepal' ? (s.reliability?.ppaSixSix.meets ?? null) : null,
+      NEA_8plus4_dry_energy_share: c.region === 'nepal' && s.reliability
+        ? Number(s.reliability.ppaEightFour.dryShare.toFixed(4))
+        : null,
+      NEA_8plus4_meets_15pct:
+        c.region === 'nepal' ? (s.reliability?.ppaEightFour.meets ?? null) : null,
+      NEA_6plus6_gross_base_rate_reference_million_NPR_per_year:
+        c.region === 'nepal' && s.reliability
+          ? Number(s.reliability.ppaSixSix.grossReferenceValueMillionNpr.toFixed(3))
+          : null,
+      NEA_6plus6_blended_base_rate_NPR_per_kWh:
+        c.region === 'nepal' && s.reliability
+          ? Number(s.reliability.ppaSixSix.blendedBaseRateNprPerKwh.toFixed(4))
+          : null,
+      NEA_8plus4_gross_base_rate_reference_million_NPR_per_year:
+        c.region === 'nepal' && s.reliability
+          ? Number(s.reliability.ppaEightFour.grossReferenceValueMillionNpr.toFixed(3))
+          : null,
+      NEA_8plus4_blended_base_rate_NPR_per_kWh:
+        c.region === 'nepal' && s.reliability
+          ? Number(s.reliability.ppaEightFour.blendedBaseRateNprPerKwh.toFixed(4))
+          : null,
       gross_head_m: Number(s.grossHeadM.toFixed(1)),
       net_head_m: Number(s.netHeadM.toFixed(1)),
       design_flow_m3s: Number(s.designFlowCms.toFixed(3)),
+      source_record_scale_to_intake: Number(s.flowScale.toFixed(5)),
+      residual_flow_m3s: Number(s.residualCms.toFixed(3)),
       waterway_km: Number(s.waterwayKm.toFixed(3)),
       drop_rate_m_per_km: Number(s.slopeMPerKm.toFixed(1)),
       plant_factor: Number(s.plantFactor.toFixed(3)),
@@ -333,23 +745,354 @@ export function schemesToGeoJson(c: ExportContext): string {
     features.push({
       type: 'Feature',
       properties: {
-        part: 'existing licence',
+        part: 'DoED project record',
         name: l.name,
         stage: l.stage,
         capacity_MW: l.capacityMW,
         promoter: l.promoter,
         river: l.river,
         distance_km: Number(l.distanceKm.toFixed(2)),
-        source: 'Nepal DoED registry via Open Data Nepal',
+        coordinate_range_south: l.bounds[0],
+        coordinate_range_west: l.bounds[1],
+        coordinate_range_north: l.bounds[2],
+        coordinate_range_east: l.bounds[3],
+        source: l.source,
+        source_updated: DOED_UPDATED,
+        bundled: DOED_RETRIEVED,
       },
       geometry: { type: 'Point', coordinates: [l.lon, l.lat] },
     });
   }
 
+  for (const project of [
+    ...(c.cascade?.upstream ?? []),
+    ...(c.cascade?.downstream ?? []),
+  ]) {
+    const common = {
+      project_key: `${project.name}|${project.capacityMW ?? 'na'}`,
+      name: project.name,
+      river: project.river,
+      district: project.district,
+      capacity_MW: project.capacityMW,
+      promoter: project.promoter,
+      stage: project.stage,
+      licence_number: project.licenceNo,
+      issued: project.issued,
+      candidate_direction: project.direction,
+      directed_route_km: Number(project.routeKm.toFixed(3)),
+      midpoint_snap_to_HydroRIVERS_vertex_km: Number(project.snapKm.toFixed(3)),
+      published_coordinate_range_diagonal_km: Number(project.publishedRangeDiagonalKm.toFixed(3)),
+      coordinate_range_south: project.bounds[0],
+      coordinate_range_west: project.bounds[1],
+      coordinate_range_north: project.bounds[2],
+      coordinate_range_east: project.bounds[3],
+      route_geometry_included: project.routeGeometryIncluded,
+      registry_source: c.cascade?.registry.source,
+      registry_updated: c.cascade?.registry.updated,
+      registry_retrieved: c.cascade?.registry.retrieved,
+      network_source: c.cascade?.network.sourceUrl,
+      interpretation:
+        'directed river-network candidate only; not a confirmed cascade, component location, shared-water finding, legal overlap, operating interface, release effect, tailwater/backwater effect, sediment interaction or cumulative-impact conclusion',
+    };
+    features.push({
+      type: 'Feature',
+      properties: { ...common, part: 'DoED project coordinate-range midpoint interaction candidate' },
+      geometry: { type: 'Point', coordinates: [project.lon, project.lat] },
+    });
+    if (project.routeGeometryIncluded && project.route.length > 1) {
+      features.push({
+        type: 'Feature',
+        properties: { ...common, part: 'generalized directed HydroRIVERS route to or from project candidate' },
+        geometry: { type: 'LineString', coordinates: project.route },
+      });
+    }
+  }
+
+  for (const record of c.hazards?.records ?? []) {
+    features.push({
+      type: 'Feature',
+      properties: {
+        part: 'BIPAD incident report',
+        incident_id: record.id,
+        hazard: record.title,
+        hazard_code: record.kind,
+        incident_date: record.date,
+        approved: true,
+        verified: true,
+        distance_to_selected_reach_km: Number(record.distanceKm.toFixed(3)),
+        source: record.url,
+        inventory_retrieved: c.hazards?.retrieved,
+        interpretation: 'historical report, not hazard probability',
+      },
+      geometry: { type: 'Point', coordinates: [record.lon, record.lat] },
+    });
+  }
+
+  for (const lake of c.upstreamConnectivity?.lakes ?? []) {
+    const common = {
+      source_id: lake.id,
+      basin: lake.basin,
+      country: lake.country,
+      lake_connectivity_class: lake.connectivity,
+      elevation_m: Number(lake.elevationM.toFixed(1)),
+      expansion_rate_km2_per_year: lake.expansionRateKm2Yr,
+      expansion_uncertainty_km2_per_year: lake.expansionUncertaintyKm2Yr,
+      expansion_significant: lake.expansionSignificant,
+      time_series_outlier: lake.timeSeriesOutlier,
+      snap_to_HydroRIVERS_vertex_km: Number(lake.snapKm.toFixed(3)),
+      directed_route_to_intake_km: Number(lake.routeKm.toFixed(3)),
+      route_geometry_included: lake.routeGeometryIncluded,
+      source: c.upstreamConnectivity?.lakeInventory.source,
+      source_published: c.upstreamConnectivity?.lakeInventory.published,
+      inventory_retrieved: c.upstreamConnectivity?.lakeInventory.retrieved,
+      data_licence: c.upstreamConnectivity?.lakeInventory.license,
+      interpretation:
+        'upstream channel-connectivity candidate; not dangerous-lake classification, dam stability, breach probability, GLOF hydrograph, runout or project exposure',
+    };
+    features.push({
+      type: 'Feature',
+      properties: { ...common, part: 'GLO glacial-lake centroid connectivity candidate' },
+      geometry: { type: 'Point', coordinates: [lake.lon, lake.lat] },
+    });
+    if (lake.route.length > 1) {
+      features.push({
+        type: 'Feature',
+        properties: { ...common, part: 'generalized directed HydroRIVERS route from lake candidate' },
+        geometry: { type: 'LineString', coordinates: lake.route },
+      });
+    }
+  }
+
+  for (const incident of c.upstreamConnectivity?.incidents ?? []) {
+    const common = {
+      incident_id: incident.id,
+      hazard: incident.title,
+      hazard_code: incident.kind,
+      incident_date: incident.date,
+      approved: true,
+      verified: true,
+      snap_to_HydroRIVERS_vertex_km: Number(incident.snapKm.toFixed(3)),
+      directed_route_to_intake_km: Number(incident.routeKm.toFixed(3)),
+      route_geometry_included: incident.routeGeometryIncluded,
+      source: incident.url,
+      inventory_retrieved: c.upstreamConnectivity?.incidentInventory.retrieved,
+      interpretation:
+        'historical report channel-connectivity candidate; report may not be physical source and connection does not prove channel entry, runout, flood wave, recurrence or design action',
+    };
+    features.push({
+      type: 'Feature',
+      properties: { ...common, part: 'upstream-connected BIPAD report candidate' },
+      geometry: { type: 'Point', coordinates: [incident.lon, incident.lat] },
+    });
+    if (incident.route.length > 1) {
+      features.push({
+        type: 'Feature',
+        properties: { ...common, part: 'generalized directed HydroRIVERS route from BIPAD candidate' },
+        geometry: { type: 'LineString', coordinates: incident.route },
+      });
+    }
+  }
+
+  for (const fault of c.faults?.nearby ?? []) {
+    features.push({
+      type: 'Feature',
+      properties: {
+        part: 'GEM regional active-fault trace',
+        trace_id: fault.id,
+        source_id: fault.sourceId,
+        name: fault.name,
+        slip_type: fault.type,
+        reference: fault.reference,
+        distance_to_selected_reach_km: Number(fault.distanceKm.toFixed(3)),
+        intersects_selected_mapped_river_reach: fault.intersectsReach,
+        nearest_reach_chainage_km: Number(fault.chainageKm.toFixed(3)),
+        source: c.faults?.sourceUrl,
+        source_commit: c.faults?.commit,
+        inventory_retrieved: c.faults?.retrieved,
+        data_licence: c.faults?.license,
+        interpretation:
+          'regional mapped trace, not surveyed location, waterway crossing, site clearance or seismic design action',
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: fault.points.map(([lon, lat]) => [lon, lat]),
+      },
+    });
+  }
+
+  for (const publication of c.geology?.dmg?.maps ?? []) {
+    for (const sheet of publication.sheets) {
+      const [west, south, east, north] = sheet.bounds;
+      features.push({
+        type: 'Feature',
+        properties: {
+          part: 'DMG published 1:50,000 geology sheet footprint',
+          catalog_id: publication.id,
+          title: publication.title,
+          sheet_code: sheet.code,
+          published: publication.published,
+          official_preview: publication.previewUrl,
+          source: c.geology?.dmg?.sourceUrl,
+          source_updated: c.geology?.dmg?.updated,
+          catalog_retrieved: c.geology?.dmg?.retrieved,
+          rights: c.geology?.dmg?.rights,
+          interpretation: 'derived publication-availability footprint, not site geology, ground truth or permission to redistribute map imagery',
+        },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[[west, south], [east, south], [east, north], [west, north], [west, south]]],
+        },
+      });
+    }
+  }
+
+  for (const sample of c.geology?.regional?.samples ?? []) {
+    for (const unit of sample.units) {
+      features.push({
+        type: 'Feature',
+        properties: {
+          part: 'Macrostrat regional geology sample',
+          sample_role: sample.role,
+          map_id: unit.mapId,
+          source_id: unit.sourceId,
+          unit_name: unit.name,
+          lithology: unit.lithology,
+          top_interval: unit.topInterval,
+          bottom_interval: unit.bottomInterval,
+          top_age_Ma: unit.topAgeMa,
+          bottom_age_Ma: unit.bottomAgeMa,
+          original_reference: c.geology?.regional?.references[String(unit.sourceId)] ?? null,
+          source: c.geology?.regional?.sourceUrl,
+          data_licence: c.geology?.regional?.license,
+          interpretation: 'small-scale regional point sample, not a surveyed contact, site lithology, foundation or tunnel condition',
+        },
+        geometry: { type: 'Point', coordinates: [sample.lon, sample.lat] },
+      });
+    }
+  }
+
   // GeoJSON has no comment syntax, so provenance rides as a member of the
   // FeatureCollection. QGIS ignores it; a human reading the file does not.
   return JSON.stringify(
-    { type: 'FeatureCollection', ghatta: provenance(c), features },
+    {
+      type: 'FeatureCollection',
+      ghatta: provenance(c),
+      ghatta_readiness: c.readiness,
+      ghatta_hydest: c.hydest,
+      ghatta_flow_choice: c.flowChoice,
+      ghatta_nea_ror_ppa: c.region === 'nepal' ? NEA_ROR_PPA : null,
+      ghatta_power_duration: POWER_DURATION_GUIDANCE,
+      ghatta_unit_count_sensitivity: UNIT_SENSITIVITY_GUIDANCE,
+      ghatta_nepal_environmental_flow: c.region === 'nepal'
+        ? {
+            ...NEPAL_EFLOW_POLICY,
+            selectedFractionOfLowestMonthlyMean: c.assumptions.residualFrac,
+            selectedReleaseCms: c.selected?.residualCms ?? null,
+          }
+        : null,
+      ghatta_hazards: c.hazards
+        ? {
+            radiusKm: c.hazards.radiusKm,
+            total: c.hazards.total,
+            categories: c.hazards.categories,
+            source: c.hazards.source,
+            fetchedFrom: c.hazards.fetchedFrom,
+            retrieved: c.hazards.retrieved,
+            period: c.hazards.period,
+            crs: c.hazards.crs,
+            limitation: c.hazards.limitation,
+          }
+        : null,
+      ghatta_upstream_connectivity: c.upstreamConnectivity
+        ? {
+            target: c.upstreamConnectivity.target,
+            lakeCandidates: c.upstreamConnectivity.lakes.length,
+            incidentCandidates: c.upstreamConnectivity.incidents.length,
+            lakeRoutesIncluded: c.upstreamConnectivity.lakes.filter((lake) => lake.routeGeometryIncluded).length,
+            incidentRoutesIncluded: c.upstreamConnectivity.incidents.filter((incident) => incident.routeGeometryIncluded).length,
+            lakeInventory: c.upstreamConnectivity.lakeInventory,
+            incidentInventory: c.upstreamConnectivity.incidentInventory,
+            network: c.upstreamConnectivity.network,
+            method: c.upstreamConnectivity.method,
+            limitation: c.upstreamConnectivity.limitation,
+          }
+        : null,
+      ghatta_cascade: c.cascade
+        ? {
+            upstreamCandidates: c.cascade.upstream.length,
+            downstreamCandidates: c.cascade.downstream.length,
+            directReachRecords: c.cascade.directReachRecords,
+            directAdvancedRecords: c.cascade.directAdvancedRecords,
+            upstreamRoutesIncluded: c.cascade.upstream.filter((project) => project.routeGeometryIncluded).length,
+            downstreamRoutesIncluded: c.cascade.downstream.filter((project) => project.routeGeometryIncluded).length,
+            registry: c.cascade.registry,
+            network: c.cascade.network,
+            thresholds: c.cascade.thresholds,
+            method: c.cascade.method,
+            limitation: c.cascade.limitation,
+            guidance: c.cascade.guidance,
+          }
+        : null,
+      ghatta_faults: c.faults
+        ? {
+            radiusKm: c.faults.radiusKm,
+            nearby: c.faults.nearby.length,
+            crossings: c.faults.crossings,
+            nearest: c.faults.nearest
+              ? {
+                  sourceId: c.faults.nearest.sourceId,
+                  name: c.faults.nearest.name,
+                  type: c.faults.nearest.type,
+                  distanceKm: c.faults.nearest.distanceKm,
+                  intersectsReach: c.faults.nearest.intersectsReach,
+                  chainageKm: c.faults.nearest.chainageKm,
+                }
+              : null,
+            source: c.faults.source,
+            sourceUrl: c.faults.sourceUrl,
+            commit: c.faults.commit,
+            retrieved: c.faults.retrieved,
+            crs: c.faults.crs,
+            license: c.faults.license,
+            licenseUrl: c.faults.licenseUrl,
+            attribution: c.faults.attribution,
+            citation: c.faults.citation,
+            limitation: c.faults.limitation,
+          }
+        : null,
+      ghatta_geology: c.geology
+        ? {
+            dmg: c.geology.dmg
+              ? {
+                  matches: c.geology.dmg.maps.length,
+                  catalogMaps: c.geology.dmg.catalogMaps,
+                  source: c.geology.dmg.source,
+                  sourceUrl: c.geology.dmg.sourceUrl,
+                  updated: c.geology.dmg.updated,
+                  retrieved: c.geology.dmg.retrieved,
+                  scale: c.geology.dmg.scale,
+                  crs: c.geology.dmg.crs,
+                  rights: c.geology.dmg.rights,
+                  availability: c.geology.dmg.availability,
+                  geometryMethod: c.geology.dmg.geometryMethod,
+                  limitation: c.geology.dmg.limitation,
+                }
+              : null,
+            regional: c.geology.regional
+              ? {
+                  samples: c.geology.regional.samples,
+                  references: c.geology.regional.references,
+                  source: c.geology.regional.source,
+                  sourceUrl: c.geology.regional.sourceUrl,
+                  license: c.geology.regional.license,
+                  limitation: c.geology.regional.limitation,
+                }
+              : null,
+            regionalError: c.geology.regionalError,
+          }
+        : null,
+      features,
+    },
     null,
     1
   );

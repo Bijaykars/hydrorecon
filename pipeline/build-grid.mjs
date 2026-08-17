@@ -21,7 +21,10 @@
  */
 import { writeFileSync } from 'node:fs';
 
-const ENDPOINT = 'https://overpass-api.de/api/interpreter';
+const ENDPOINTS = [
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
+];
 const UA = 'Ghatta/0.2 (open-source hydropower screening; github.com/Bijaykars)';
 const OUT = 'src/data/nepal-grid.json';
 
@@ -33,13 +36,24 @@ const OUT = 'src/data/nepal-grid.json';
 const MIN_KV = 30;
 
 const ask = async (ql) => {
-  const r = await fetch(ENDPOINT, {
-    method: 'POST',
-    body: 'data=' + encodeURIComponent(ql),
-    headers: { 'user-agent': UA, 'content-type': 'application/x-www-form-urlencoded' },
-  });
-  if (!r.ok) throw new Error(`Overpass: HTTP ${r.status} — ${(await r.text()).slice(0, 120)}`);
-  return (await r.json()).elements ?? [];
+  let last = '';
+  for (let pass = 0; pass < 2; pass++) {
+    for (const url of ENDPOINTS) {
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          body: 'data=' + encodeURIComponent(ql),
+          headers: { 'user-agent': UA, 'content-type': 'application/x-www-form-urlencoded' },
+          signal: AbortSignal.timeout(180_000),
+        });
+        if (r.ok) return (await r.json()).elements ?? [];
+        last = `HTTP ${r.status} from ${new URL(url).host}: ${(await r.text()).slice(0, 80)}`;
+      } catch (e) {
+        last = `${new URL(url).host}: ${e.message}`;
+      }
+    }
+  }
+  throw new Error(`Overpass: ${last}`);
 };
 
 /**
@@ -148,6 +162,7 @@ for (const e of subEls) {
 
 const out = {
   _source: 'OpenStreetMap via Overpass, © OpenStreetMap contributors, ODbL 1.0',
+  _retrieved: new Date().toISOString().slice(0, 10),
   _note: 'Derived database. Redistribution of this file is governed by ODbL, not the MIT licence on the code.',
   lines,
   subs,

@@ -1,16 +1,16 @@
 /**
- * HYDEST — Nepal's own ungauged-flow method (WECS/DHM 1990).
+ * WECS/DHM 1990 regional hydrology screening for ungauged locations in Nepal.
  *
  * Every flow number in this app so far comes from a global model: GloFAS, whose
  * cell is often not even on the right channel, and HydroRIVERS, whose long-term
  * mean comes from a global water balance. Neither is calibrated to Nepal, which
  * is why the app reports a +/-50% band on flow and says so.
  *
- * HYDEST is different in kind. It is a regression fitted to Nepal's own gauged
- * records, published by the Water and Energy Commission Secretariat with DHM,
- * and it is the method every Nepali feasibility study actually uses for an
- * ungauged site. It is not better than a gauge. It is a genuinely independent
- * third opinion, from data that was measured in these rivers.
+ * The regression was fitted to Nepal's gauged records and published by the
+ * Water and Energy Commission Secretariat with DHM. It is a useful independent
+ * regional cross-check, but current DoED headworks guidance requires comparison
+ * with other applicable methods and site evidence. It is not a gauge-frequency
+ * analysis and its flood peaks are not selected design floods.
  *
  * WHAT IS IMPLEMENTED, AND WHAT IS NOT
  *
@@ -28,14 +28,56 @@
  *   firm power, that Nepal's PPA pays 8.40 NPR/kWh for against 4.80 in the wet
  *   season, and that decide whether a scheme can be financed.
  *
- *   DESIGN FLOODS, which depend only on the area below 3000 m. Spillway and
- *   diversion sizing, and the single number most likely to be asked for after
- *   capacity.
+ *   REGIONAL FLOOD ESTIMATES, which depend only on the area below 3000 m. They
+ *   are screening comparators for a later flood study, not spillway, diversion,
+ *   check-flood or PMF/PMP selections.
  *
  * Coefficients are from WECS/DHM 1990 via DoED's "Guidelines for Study of
  * Hydropower Projects" (2006), recovered in docs/research/2026-08-12-data-hunt.md
  * §9 and cross-checked against a second published source.
  */
+import hydestBundle from '../data/nepal-hydest-provenance.json' with { type: 'json' };
+
+/** Stable, exportable provenance for every regional-hydrology result. */
+export const HYDEST_PROVENANCE = {
+  method: hydestBundle._method,
+  primaryCitation: hydestBundle._primaryCitation,
+  guidance: hydestBundle._guidance,
+  equations: {
+    monthly: 'Qmonth = C × Atotal^a1 × (Abelow5000 + 1)^a2 × MMP^a3',
+    q2: 'Q2 = 1.8767 × (Abelow3000 + 1)^0.8737',
+    q100: 'Q100 = 14.63 × (Abelow3000 + 1)^0.7342',
+    interpolation: 'QT = exp(ln(Q2) + S(T) × ln(Q100/Q2) / 2.326)',
+  },
+  rainfall: {
+    product: hydestBundle._chpclim.product,
+    productUrl: hydestBundle._chpclim.productUrl,
+    resolution: hydestBundle._chpclim.resolution,
+    months: hydestBundle._chpclim.months,
+    interpretation: hydestBundle._chpclim.interpretation,
+    rights: hydestBundle._chpclim.rights,
+    files: hydestBundle._chpclim.files,
+  },
+  hydrobasins: hydestBundle._hydrobasins,
+  hypsometry: hydestBundle._hypsometry,
+  bundle: {
+    built: hydestBundle._built,
+    output: hydestBundle._output,
+  },
+  limitations: hydestBundle._limitations,
+  interpretation:
+    'Legacy national regional-regression cross-check for screening. Monthly means are not a project flow series, and regional flood estimates are not selected design floods.',
+} as const;
+
+export type HydestScreen = {
+  input: HydestInput;
+  driest: { month: number; cms: number };
+  months: { month: number; cms: number }[];
+  modelledCms: number;
+  agreement: { ratio: number; agree: boolean } | null;
+  floods: { t: number; cms: number }[];
+  provenance: typeof HYDEST_PROVENANCE;
+};
 
 /** Mean monthly flow coefficients. Index 0 = January. */
 type MonthCoef = { C: number; a1: number; a2: number; a3: number };
@@ -146,7 +188,7 @@ export function driestMonthFlow(input: HydestInput): { month: number; cms: numbe
 }
 
 // ---------------------------------------------------------------------------
-// Design floods — WECS/DHM 1990, on the area below 3000 m
+// Regional flood estimates — WECS/DHM 1990, on area below 3000 m
 // ---------------------------------------------------------------------------
 
 /**
@@ -167,14 +209,13 @@ const FLOOD_S: Record<number, number> = {
 export const RETURN_PERIODS = [2, 10, 20, 50, 100, 200, 500] as const;
 
 /**
- * Design flood peak, m³/s, for a return period in years.
+ * Regional flood estimate, m³/s, for a return period in years.
  *
- * Sizing a spillway or a diversion needs this, and it depends only on the
- * catchment below 3000 m — no rainfall term at all. Above that elevation the
- * catchment is snow and ice, and contributes to the annual volume without
- * contributing much to a rainfall flood peak, which is why WECS excludes it.
+ * The published regional equation depends only on catchment area below 3000 m.
+ * It is suitable for comparing screening methods; it does not select a design,
+ * diversion, spillway check flood or PMF/PMP case.
  */
-export function designFlood(input: HydestInput, returnPeriodYears: number): number | null {
+export function regionalFloodEstimate(input: HydestInput, returnPeriodYears: number): number | null {
   const s = FLOOD_S[returnPeriodYears];
   if (s === undefined || !(input.below3000Km2 >= 0)) return null;
   const a = input.below3000Km2;

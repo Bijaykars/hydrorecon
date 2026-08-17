@@ -30,11 +30,18 @@ type RawStation = {
   n: string; y: number; x: number; e: number | null; r: number;
   q?: number; qs?: number; rv?: string; b?: string; d?: string; w?: number; g?: number;
 };
-const stations = stationsRaw as RawStation[];
+const bundle = stationsRaw as unknown as {
+  _source: string;
+  _retrieved: string;
+  stations: RawStation[];
+};
+const stations = bundle.stations;
 
 console.log('\ngauges: the bundled DHM inventory');
 
 ok('river gauges are separated from rainfall stations', () => {
+  assert.match(bundle._source, /hydrology\.gov\.np/, 'official source must travel with the data');
+  assert.match(bundle._retrieved, /^\d{4}-\d{2}-\d{2}$/, 'snapshot needs a retrieval date');
   const rivers = stations.filter((s) => s.r === 1);
   const rain = stations.filter((s) => s.r === 0);
   assert.equal(rivers.length, RIVER_GAUGE_COUNT, 'exported count must match the file');

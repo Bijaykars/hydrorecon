@@ -75,8 +75,8 @@ ok('the Marsyangdi failure stays fixed: an off-channel cell loses to the network
   assert.equal(c.authority, 'network', 'the off-channel cell must not win');
 });
 
-ok('when both global sources fail an annual-capable judge, the regression takes over', () => {
-  // With MMP the judge states a full annual mean. Make the model 6x above it
+ok('when both global sources are far from the annual regional estimate, it becomes a declared screening fallback', () => {
+  // With MMP the comparison states a full annual mean. Make the model 6x above it
   // and the network 8x below it — the Chilime pattern — and neither deserves
   // to win. The record keeps its shape, rescaled onto the regression.
   const WET = { ...HYDEST, monsoonMm: 1500 };
@@ -91,7 +91,8 @@ ok('when both global sources fail an annual-capable judge, the regression takes 
   assert.equal(c.authority, 'hydest', 'neither broken source should carry the magnitude');
   assert.equal(c.judgeKind, 'annual');
   assert.ok(Math.abs(c.targetMeanCms! - annualMeanCms(WET)!) < 1e-9, 'target must be the regression mean');
-  assert.match(c.note, /both global sources fail/);
+  assert.match(c.note, /both global sources sit far from the WECS\/DHM regional estimate/);
+  assert.match(c.note, /screening and needs a gauge record/);
 });
 
 ok('a candidate that satisfies the annual judge still wins normally', () => {

@@ -6,8 +6,8 @@
  * models with nothing gauged at the site. No amount of better arithmetic fixes
  * that. One real record does.
  *
- * Nepal's DHM operates 199 river gauging stations, and their locations were
- * already bundled and going unused. This turns them into the answer to "so what
+ * Nepal's DHM publishes a national station inventory, and its river-station
+ * locations were already bundled and going unused. This turns them into the answer to "so what
  * would I have to do to trust this number?": name the specific station whose
  * record transfers to this site, say how it relates hydrologically, and give the
  * factor to scale it by.
@@ -98,7 +98,14 @@ export type Gauge = {
   trustworthy: boolean;
 };
 
-const STATIONS = stationsRaw as RawStation[];
+const STATION_BUNDLE = stationsRaw as unknown as {
+  _source: string;
+  _retrieved: string;
+  stations: RawStation[];
+};
+const STATIONS = STATION_BUNDLE.stations;
+
+export const DHM_STATIONS_RETRIEVED = STATION_BUNDLE._retrieved;
 
 /** River gauges only — the file also carries 916 rainfall stations. */
 const RIVER_GAUGES = STATIONS.filter((s) => s.r === 1);

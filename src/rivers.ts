@@ -42,6 +42,10 @@ export type Reach = {
    * predates MMP or the catchment falls outside the coverage.
    */
   monsoonMm: number;
+  /** Stable index in the bundled, directed HydroRIVERS extract. */
+  networkIndex: number;
+  /** Nearest stored centreline vertex within that reach. */
+  networkVertex: number;
 };
 
 type RiverNet = {
@@ -79,7 +83,8 @@ let net: Promise<RiverNet> | null = null;
 function load(): Promise<RiverNet> {
   if (net) return net;
   net = (async () => {
-    const res = await fetch(`${import.meta.env.BASE_URL}nepal-rivers.dat`);
+    const baseUrl = import.meta.env?.BASE_URL ?? '/';
+    const res = await fetch(`${baseUrl}nepal-rivers.dat`);
     if (!res.ok) throw new Error(`river network: HTTP ${res.status}`);
     const buf = await res.arrayBuffer();
     // A 204 or truncated body would otherwise surface as an opaque
@@ -159,7 +164,7 @@ function load(): Promise<RiverNet> {
     let hypso: Uint8Array | null = null;
     let hypsoStride = 2;
     try {
-      const hr = await fetch(`${import.meta.env.BASE_URL}nepal-hypso.dat`);
+      const hr = await fetch(`${baseUrl}nepal-hypso.dat`);
       if (hr.ok) {
         const hb = new Uint8Array(await hr.arrayBuffer());
         // Two generations of the file: 2 bytes/reach (hypsometry only) and
@@ -197,18 +202,23 @@ const MAIN_STEM_RATIO = 5;
 
 export type ReachHit = { nearest: Reach; mainStem: Reach | null };
 
-export async function nearestReach(lat: number, lon: number): Promise<ReachHit | null> {
-  if (!hasReachData(lat, lon)) return null;
-  const n = await load();
+type ReachCandidate = {
+  distanceKm: number;
+  point: { lat: number; lon: number };
+  vertex: number;
+};
+
+/** Candidate reaches and their closest stored vertex around one WGS84 point. */
+function reachCandidates(n: RiverNet, lat: number, lon: number): Map<number, ReachCandidate> {
   const s = n.scale;
   const cosLat = Math.cos((lat * Math.PI) / 180);
   const degToKm = 111.32;
-
-  const seen = new Map<number, { distanceKm: number; point: { lat: number; lon: number } }>();
+  const seen = new Map<number, ReachCandidate>();
   const consider = (i: number) => {
     const a = n.start[i];
     let d2 = Infinity;
     let point = { lat, lon };
+    let vertex = 0;
     for (let k = 0; k < n.len[i]; k++) {
       const rLon = n.xy[(a + k) * 2] / s;
       const rLat = n.xy[(a + k) * 2 + 1] / s;
@@ -218,9 +228,10 @@ export async function nearestReach(lat: number, lon: number): Promise<ReachHit |
       if (d < d2) {
         d2 = d;
         point = { lat: rLat, lon: rLon };
+        vertex = k;
       }
     }
-    seen.set(i, { distanceKm: Math.sqrt(d2) * degToKm, point });
+    seen.set(i, { distanceKm: Math.sqrt(d2) * degToKm, point, vertex });
   };
 
   for (let ring = 0; ring <= 6; ring++) {
@@ -234,9 +245,34 @@ export async function nearestReach(lat: number, lon: number): Promise<ReachHit |
     }
     if (seen.size > 0 && ring >= 1) break;
   }
+  return seen;
+}
+
+/** Resolve shared confluence vertices the same way everywhere in the app. */
+function nearestCandidateIndex(n: RiverNet, seen: ReadonlyMap<number, ReachCandidate>): number {
+  // A junction vertex belongs to every reach that meets there. Within about
+  // 30 m, prefer the larger upstream area so file order cannot select a rivulet.
+  const TIE_KM = 0.03;
+  let nearestI = -1;
+  let nearestKm = Infinity;
+  for (const [i, hit] of seen) {
+    const closer = hit.distanceKm < nearestKm - TIE_KM;
+    const tied = nearestI >= 0 && Math.abs(hit.distanceKm - nearestKm) <= TIE_KM;
+    if (nearestI < 0 || closer || (tied && n.upland[i] > n.upland[nearestI])) {
+      nearestKm = Math.min(nearestKm, hit.distanceKm);
+      nearestI = i;
+    }
+  }
+  return nearestI;
+}
+
+export async function nearestReach(lat: number, lon: number): Promise<ReachHit | null> {
+  if (!hasReachData(lat, lon)) return null;
+  const n = await load();
+  const seen = reachCandidates(n, lat, lon);
   if (seen.size === 0) return null;
 
-  const mk = (i: number, hit: { distanceKm: number; point: { lat: number; lon: number } }): Reach => ({
+  const mk = (i: number, hit: ReachCandidate): Reach => ({
     uplandKm2: n.upland[i] / 10,
     meanDischargeCms: n.dis[i] / 1000,
     strahler: n.ord[i],
@@ -252,6 +288,8 @@ export async function nearestReach(lat: number, lon: number): Promise<ReachHit |
       const v = n.hypso[i * 4 + 2] | (n.hypso[i * 4 + 3] << 8);
       return v === 0xffff ? NaN : v;
     })(),
+    networkIndex: i,
+    networkVertex: hit.vertex,
   });
 
   /**
@@ -264,20 +302,11 @@ export async function nearestReach(lat: number, lon: number): Promise<ReachHit |
    * tie, the larger river wins; anyone genuinely studying the rivulet clicks a
    * hundred metres up it and the tie disappears.
    */
-  const TIE_KM = 0.03;
-
-  let nearestI = -1;
-  let nearestKm = Infinity;
+  const nearestI = nearestCandidateIndex(n, seen);
   let biggestI = -1;
   let biggestUp = -1;
   let biggestKm = 0;
   for (const [i, hit] of seen) {
-    const closer = hit.distanceKm < nearestKm - TIE_KM;
-    const tied = nearestI >= 0 && Math.abs(hit.distanceKm - nearestKm) <= TIE_KM;
-    if (nearestI < 0 || closer || (tied && n.upland[i] > n.upland[nearestI])) {
-      nearestKm = Math.min(nearestKm, hit.distanceKm);
-      nearestI = i;
-    }
     if (hit.distanceKm <= MAIN_STEM_KM && n.upland[i] > biggestUp) {
       biggestUp = n.upland[i];
       biggestI = i;
@@ -301,6 +330,9 @@ export type PathPoint = {
   uplandKm2: number;
   /** HydroRIVERS long-term mean discharge on this reach, m³/s. */
   meanCms: number;
+  /** Directed HydroRIVERS reach and stored vertex used by topology screens. */
+  networkIndex: number;
+  networkVertex: number;
 };
 
 const haversineKmLocal = (a: [number, number], b: [number, number]) => {
@@ -313,6 +345,225 @@ const haversineKmLocal = (a: [number, number], b: [number, number]) => {
     Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(s));
 };
+
+export type DirectedNetworkAdapter = {
+  pointCount: (reachIndex: number) => number;
+  /** GeoJSON order: longitude, latitude. */
+  point: (reachIndex: number, vertex: number) => [number, number];
+  next: (reachIndex: number, visited: ReadonlySet<number>) => number | null;
+};
+
+export type NetworkPosition = { reachIndex: number; vertex: number };
+export type DirectedTrace = { routeKm: number; coordinates: [number, number][] };
+
+/**
+ * Walk one directed reach graph to a target position.
+ *
+ * Exported as a pure function so topology direction, same-reach ordering,
+ * cycle rejection and route length can be tested without fetching the bundle.
+ */
+export function traceDirectedConnection(
+  adapter: DirectedNetworkAdapter,
+  source: NetworkPosition,
+  target: NetworkPosition,
+  maxRouteKm = 300
+): DirectedTrace | null {
+  if (!Number.isFinite(maxRouteKm) || maxRouteKm <= 0) {
+    throw new Error('maximum directed route must be positive');
+  }
+  const visited = new Set<number>();
+  const coordinates: [number, number][] = [];
+  let routeKm = 0;
+  let reachIndex = source.reachIndex;
+  let from = source.vertex;
+
+  while (!visited.has(reachIndex)) {
+    const count = adapter.pointCount(reachIndex);
+    if (count < 1 || from < 0 || from >= count) return null;
+    if (reachIndex === target.reachIndex && from > target.vertex) return null;
+    const to = reachIndex === target.reachIndex ? target.vertex : count - 1;
+    if (to < from || to >= count) return null;
+    for (let vertex = from; vertex <= to; vertex++) {
+      const point = adapter.point(reachIndex, vertex);
+      const previous = coordinates.at(-1);
+      if (previous && previous[0] === point[0] && previous[1] === point[1]) continue;
+      if (previous) {
+        routeKm += haversineKmLocal([previous[1], previous[0]], [point[1], point[0]]);
+        if (routeKm > maxRouteKm) return null;
+      }
+      coordinates.push(point);
+    }
+    if (reachIndex === target.reachIndex) return { routeKm, coordinates };
+    visited.add(reachIndex);
+    const next = adapter.next(reachIndex, visited);
+    if (next == null) return null;
+    reachIndex = next;
+    from = 0; // duplicate confluence coordinates are removed above
+  }
+  return null;
+}
+
+export type ChannelConnection<T extends { lat: number; lon: number }> = {
+  source: T;
+  snapKm: number;
+  snapped: { lat: number; lon: number };
+  routeKm: number;
+  route: [number, number][];
+};
+
+export type ChannelConnectionScreen<T extends { lat: number; lon: number }> = {
+  target: { lat: number; lon: number; snapKm: number; snapped: { lat: number; lon: number } };
+  connections: ChannelConnection<T>[];
+};
+
+function directedAdapter(n: RiverNet): DirectedNetworkAdapter {
+  return {
+    pointCount: (reachIndex) => n.len[reachIndex] ?? 0,
+    point: (reachIndex, vertex) => {
+      const offset = (n.start[reachIndex] + vertex) * 2;
+      return [n.xy[offset] / n.scale, n.xy[offset + 1] / n.scale];
+    },
+    next: (reachIndex, visited) => {
+      const last = (n.start[reachIndex] + n.len[reachIndex] - 1) * 2;
+      const candidates = (n.byFirst.get(vertexKey(n.xy[last], n.xy[last + 1])) ?? []).filter(
+        (candidate) => candidate !== reachIndex && !visited.has(candidate)
+      );
+      if (candidates.length === 0) return null;
+      return candidates.reduce((a, b) => (n.upland[b] > n.upland[a] ? b : a));
+    },
+  };
+}
+
+/**
+ * Find source points whose snapped, directed HydroRIVERS path reaches an intake.
+ *
+ * This is deliberately a channel-topology screen. A source-to-channel snap can
+ * cross a ridge, and HydroRIVERS omits streams below its mapping threshold, so
+ * every returned connection remains a candidate for DEM/catchment validation.
+ */
+export async function connectUpstreamSources<T extends { lat: number; lon: number }>(
+  target: { lat: number; lon: number },
+  sources: readonly T[],
+  options: { maxSnapKm?: number; maxRouteKm?: number; targetSnapKm?: number } = {}
+): Promise<ChannelConnectionScreen<T> | null> {
+  if (!hasReachData(target.lat, target.lon)) return null;
+  const maxSnapKm = options.maxSnapKm ?? 1.5;
+  const maxRouteKm = options.maxRouteKm ?? 300;
+  const targetSnapKm = options.targetSnapKm ?? SNAP_KM;
+  if (maxSnapKm <= 0 || maxRouteKm <= 0 || targetSnapKm <= 0) {
+    throw new Error('channel-connectivity distances must be positive');
+  }
+  const n = await load();
+  const targetCandidates = reachCandidates(n, target.lat, target.lon);
+  const targetI = nearestCandidateIndex(n, targetCandidates);
+  if (targetI < 0) return null;
+  const targetHit = targetCandidates.get(targetI)!;
+  if (targetHit.distanceKm > targetSnapKm) return null;
+  const targetPosition = { reachIndex: targetI, vertex: targetHit.vertex };
+  const adapter = directedAdapter(n);
+
+  const connections: ChannelConnection<T>[] = [];
+  for (const source of sources) {
+    if (!hasReachData(source.lat, source.lon)) continue;
+    // Great-circle distance is a safe lower bound on a channel route and avoids
+    // visiting the network for sources that cannot meet the declared cap.
+    const directKm = haversineKmLocal([source.lat, source.lon], [target.lat, target.lon]);
+    if (directKm > maxRouteKm + maxSnapKm + targetSnapKm) continue;
+    const candidates = reachCandidates(n, source.lat, source.lon);
+    const sourceI = nearestCandidateIndex(n, candidates);
+    if (sourceI < 0) continue;
+    const sourceHit = candidates.get(sourceI)!;
+    if (sourceHit.distanceKm > maxSnapKm) continue;
+    const trace = traceDirectedConnection(
+      adapter,
+      { reachIndex: sourceI, vertex: sourceHit.vertex },
+      targetPosition,
+      maxRouteKm
+    );
+    if (!trace) continue;
+    connections.push({
+      source,
+      snapKm: sourceHit.distanceKm,
+      snapped: sourceHit.point,
+      routeKm: trace.routeKm,
+      route: trace.coordinates,
+    });
+  }
+  connections.sort((a, b) => a.routeKm - b.routeKm || a.snapKm - b.snapKm);
+  return {
+    target: {
+      ...target,
+      snapKm: targetHit.distanceKm,
+      snapped: targetHit.point,
+    },
+    connections,
+  };
+}
+
+/**
+ * Find target points reached by walking downstream from an anchor.
+ *
+ * This is the inverse question to `connectUpstreamSources`. It is useful for
+ * identifying downstream infrastructure that may receive releases, sediment
+ * flushing or flood waves from the selected site. It remains a coarse network
+ * candidate screen with the same snap and mapping limitations.
+ */
+export async function connectDownstreamTargets<T extends { lat: number; lon: number }>(
+  anchor: { lat: number; lon: number },
+  targets: readonly T[],
+  options: { maxSnapKm?: number; maxRouteKm?: number; anchorSnapKm?: number } = {}
+): Promise<ChannelConnectionScreen<T> | null> {
+  if (!hasReachData(anchor.lat, anchor.lon)) return null;
+  const maxSnapKm = options.maxSnapKm ?? 1.5;
+  const maxRouteKm = options.maxRouteKm ?? 300;
+  const anchorSnapKm = options.anchorSnapKm ?? SNAP_KM;
+  if (maxSnapKm <= 0 || maxRouteKm <= 0 || anchorSnapKm <= 0) {
+    throw new Error('downstream-connectivity distances must be positive');
+  }
+  const n = await load();
+  const anchorCandidates = reachCandidates(n, anchor.lat, anchor.lon);
+  const anchorI = nearestCandidateIndex(n, anchorCandidates);
+  if (anchorI < 0) return null;
+  const anchorHit = anchorCandidates.get(anchorI)!;
+  if (anchorHit.distanceKm > anchorSnapKm) return null;
+  const anchorPosition = { reachIndex: anchorI, vertex: anchorHit.vertex };
+  const adapter = directedAdapter(n);
+  const connections: ChannelConnection<T>[] = [];
+
+  for (const target of targets) {
+    if (!hasReachData(target.lat, target.lon)) continue;
+    const directKm = haversineKmLocal([anchor.lat, anchor.lon], [target.lat, target.lon]);
+    if (directKm > maxRouteKm + maxSnapKm + anchorSnapKm) continue;
+    const candidates = reachCandidates(n, target.lat, target.lon);
+    const targetI = nearestCandidateIndex(n, candidates);
+    if (targetI < 0) continue;
+    const targetHit = candidates.get(targetI)!;
+    if (targetHit.distanceKm > maxSnapKm) continue;
+    const trace = traceDirectedConnection(
+      adapter,
+      anchorPosition,
+      { reachIndex: targetI, vertex: targetHit.vertex },
+      maxRouteKm
+    );
+    if (!trace) continue;
+    connections.push({
+      source: target,
+      snapKm: targetHit.distanceKm,
+      snapped: targetHit.point,
+      routeKm: trace.routeKm,
+      route: trace.coordinates,
+    });
+  }
+  connections.sort((a, b) => a.routeKm - b.routeKm || a.snapKm - b.snapKm);
+  return {
+    target: {
+      ...anchor,
+      snapKm: anchorHit.distanceKm,
+      snapped: anchorHit.point,
+    },
+    connections,
+  };
+}
 
 /**
  * Follow the river downstream from a point, returning an evenly-sampled path.
@@ -335,42 +586,18 @@ export async function downstreamPath(
 
   // Which reach did we land on, and where along it?
   const s = n.scale;
-  const cosLat = Math.cos((lat * Math.PI) / 180);
-  let bestI = -1;
-  let bestK = 0;
-  let bestD = Infinity;
-  const target = hit.nearest.point;
-  for (let ring = 0; ring <= 3 && bestI < 0; ring++) {
-    for (let gx = -ring; gx <= ring; gx++) {
-      for (let gy = -ring; gy <= ring; gy++) {
-        const bucket = n.grid.get(cellKey(target.lon + gx * GRID_DEG, target.lat + gy * GRID_DEG));
-        if (!bucket) continue;
-        for (const i of bucket) {
-          for (let k = 0; k < n.len[i]; k++) {
-            const vx = n.xy[(n.start[i] + k) * 2] / s;
-            const vy = n.xy[(n.start[i] + k) * 2 + 1] / s;
-            const dx = (vx - target.lon) * cosLat;
-            const dy = vy - target.lat;
-            const d = dx * dx + dy * dy;
-            // Same confluence tie-break as nearestReach: a junction vertex
-            // belongs to every reach that meets there, and the walk must start
-            // down the river, not down the first-listed rivulet. ~35 m.
-            const TIE_D2 = 1e-7;
-            const tied = bestI >= 0 && Math.abs(d - bestD) <= TIE_D2;
-            if (d < bestD - TIE_D2 || (bestI < 0 && d < bestD) || (tied && n.upland[i] > n.upland[bestI])) {
-              bestD = Math.min(bestD, d);
-              bestI = i;
-              bestK = k;
-            }
-          }
-        }
-      }
-    }
-  }
-  if (bestI < 0) return null;
+  const bestI = hit.nearest.networkIndex;
+  const bestK = hit.nearest.networkVertex;
 
   // Collect raw vertices downstream, starting mid-reach where the user clicked.
-  const raw: { lat: number; lon: number; uplandKm2: number; meanCms: number }[] = [];
+  const raw: {
+    lat: number;
+    lon: number;
+    uplandKm2: number;
+    meanCms: number;
+    networkIndex: number;
+    networkVertex: number;
+  }[] = [];
   const visited = new Set<number>();
   let cur = bestI;
   let from = bestK;
@@ -383,6 +610,8 @@ export async function downstreamPath(
         lon: n.xy[(n.start[cur] + k) * 2] / s,
         uplandKm2: n.upland[cur] / 10,
         meanCms: n.dis[cur] / 1000,
+        networkIndex: cur,
+        networkVertex: k,
       };
       if (raw.length > 0) {
         const prev = raw[raw.length - 1];
@@ -417,6 +646,8 @@ export async function downstreamPath(
         km: out[out.length - 1].km + spacingKm,
         uplandKm2: raw[i].uplandKm2,
         meanCms: raw[i].meanCms,
+        networkIndex: raw[i].networkIndex,
+        networkVertex: raw[i].networkVertex,
       });
       t += spacingKm;
     }

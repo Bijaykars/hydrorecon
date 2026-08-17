@@ -1,23 +1,54 @@
 import type { DischargeSeries } from './api.ts';
 import type { Assumptions, Pt, Study } from './App.tsx';
 import type { DiscoverResult, Scheme } from './engine/discover.ts';
+import { UNIT_SENSITIVITY_GUIDANCE } from './engine/units.ts';
 import type { Uncertainty } from './engine/uncertainty.ts';
-import type { Licence } from './context.ts';
-import { MONTH_NAMES } from './engine/hydest.ts';
-import { connectionVerdict, type GridLink } from './grid.ts';
+import {
+  DOED_REGISTER_URL,
+  DOED_RETRIEVED,
+  DOED_UPDATED,
+  type Licence,
+} from './context.ts';
+import { MONTH_NAMES, type HydestScreen } from './engine/hydest.ts';
+import { connectionVerdict, GRID_RETRIEVED, type GridLink } from './grid.ts';
 import type { BenchFit, Desander, SedimentSource } from './engine/sediment.ts';
 import type { FlowChoice } from './engine/flowchoice.ts';
-import type { ProtectedHit } from './protected.ts';
+import type { HeadAudit, ShapeAudit } from './audit.ts';
+import { PROTECTED_RETRIEVED, type ProtectedHit } from './protected.ts';
 import type { MeasuredSeries } from './measured.ts';
 import {
   DISCHARGE_GAUGE_COUNT,
+  DHM_STATIONS_RETRIEVED,
   RIVER_GAUGE_COUNT,
   recordKind,
   transferAdvice,
   type Gauge,
 } from './gauges.ts';
 import { Fdc, RiverProfile } from './charts.tsx';
-import { buildFdc } from './engine/hydro.ts';
+import {
+  buildFdc,
+  NEA_ROR_PPA,
+  NEPAL_EFLOW_POLICY,
+  POWER_DURATION_GUIDANCE,
+} from './engine/hydro.ts';
+import { explainTurbineSelection } from './engine/turbine.ts';
+import type { EngineeringReadiness, EvidenceLevel } from './readiness.ts';
+import { HAZARD_COLORS, type HazardScreen } from './hazards.ts';
+import { FAULT_COLOR, type FaultScreen } from './faults.ts';
+import type { GeologyScreen } from './geology.ts';
+import type { RegionMode } from './region.ts';
+import {
+  ICIMOD_GLOF_DATABASE,
+  ICIMOD_KOSHI_LANDSLIDES,
+  ICIMOD_POTENTIALLY_DANGEROUS_LAKES,
+  inKoshiLandslideInventory,
+  type UpstreamConnectivityScreen,
+} from './connectivity.ts';
+import {
+  isAdvancedDoedStage,
+  type CascadeProject,
+  type CascadeScreen,
+} from './cascade.ts';
 
 const n = (v: number, d = 1) =>
   !Number.isFinite(v)
@@ -40,8 +71,70 @@ function H({ children, right }: { children: React.ReactNode; right?: React.React
 
 /** The small print. Legible small, not decorative small. */
 function Fine({ children }: { children: React.ReactNode }) {
-  return <p className="mt-2 text-[10.5px] leading-relaxed text-faint">{children}</p>;
+  return (
+    <details className="group mt-2 text-[10.5px] leading-relaxed text-faint">
+      <summary className="cursor-pointer list-none text-muted hover:text-ink">
+        <span className="mr-1 inline-block transition-transform group-open:rotate-45">+</span>
+        method &amp; limits
+      </summary>
+      <div className="mt-1.5 border-l border-line pl-2.5">{children}</div>
+    </details>
+  );
 }
+
+function CascadeProjectList({
+  direction,
+  projects,
+}: {
+  direction: 'upstream' | 'downstream';
+  projects: CascadeProject[];
+}) {
+  const color = direction === 'upstream' ? '#c58af9' : '#65c8a3';
+  return (
+    <div>
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">
+        {direction} · {projects.length}
+      </div>
+      {projects.length > 0 ? (
+        <div className="space-y-1.5">
+          {projects.slice(0, 5).map((project) => (
+            <div key={`${direction}-${project.licenceNo}-${project.name}`} className="flex gap-2 text-[11.5px]">
+              <span className="mt-1.5 size-2 shrink-0 rounded-full" style={{ background: color }} />
+              <span className="min-w-0 leading-snug text-ink">
+                {project.name}
+                {project.capacityMW != null ? (
+                  <span className="num text-muted"> · {n(project.capacityMW, 1)} MW</span>
+                ) : null}
+                <span className="block text-[10.5px] leading-relaxed text-faint">
+                  {project.stage} · {n(project.routeKm, 1)} km directed route · {n(project.snapKm, 2)} km midpoint snap
+                  {project.publishedRangeDiagonalKm > 10
+                    ? ` · wide ${n(project.publishedRangeDiagonalKm, 1)} km published range`
+                    : ''}
+                </span>
+              </span>
+            </div>
+          ))}
+          {projects.length > 5 ? (
+            <div className="pl-4 text-[10.5px] text-faint">+ {projects.length - 5} more in the export</div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="text-[11px] leading-relaxed text-muted">
+          No project midpoint passed this direction's guarded snap and route thresholds. This is not cascade clearance.
+        </div>
+      )}
+    </div>
+  );
+}
+
+const evidenceTone = (level: EvidenceLevel): string => {
+  if (level === 'stop') return 'border-red/30 bg-[color-mix(in_srgb,var(--color-red)_9%,transparent)] text-red';
+  if (level === 'measured' || level === 'corroborated')
+    return 'border-green/30 bg-[color-mix(in_srgb,var(--color-green)_9%,transparent)] text-green';
+  if (level === 'screened')
+    return 'border-river/30 bg-[color-mix(in_srgb,var(--color-river)_8%,transparent)] text-river';
+  return 'border-amber/30 bg-[color-mix(in_srgb,var(--color-amber)_8%,transparent)] text-amber';
+};
 
 /** A value with its provenance stated underneath, always visible. */
 function Fact({
@@ -67,6 +160,40 @@ function Fact({
         {unit && <span className="ml-1 font-sans text-[10.5px] tracking-normal text-muted">{unit}</span>}
       </div>
       <div className="mt-0.5 text-[10px] leading-snug text-faint">{from}</div>
+    </div>
+  );
+}
+
+/** Dense operating numbers used below the flow-duration curve. */
+function FlowMetric({
+  label,
+  value,
+  unit,
+  short,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: string;
+  unit: string;
+  short: string;
+  detail: string;
+  tone?: 'good' | 'warn';
+}) {
+  return (
+    <div className="min-w-0 border-t border-line pt-2" title={detail}>
+      <div className="truncate text-[9px] font-semibold uppercase tracking-[0.09em] text-faint">
+        {label}
+      </div>
+      <div
+        className={`num mt-0.5 truncate text-[15px] leading-tight ${
+          tone === 'good' ? 'text-green' : tone === 'warn' ? 'text-amber' : 'text-ink'
+        }`}
+      >
+        {value}
+        <span className="ml-1 font-sans text-[9px] text-muted">{unit}</span>
+      </div>
+      <div className="mt-0.5 truncate text-[9px] text-faint">{short}</div>
     </div>
   );
 }
@@ -132,11 +259,22 @@ function Slider({
 
 export function Reading(props: {
   at: Pt | null;
+  region: RegionMode;
+  borderKm: number | null;
+  readiness: EngineeringReadiness;
+  hazards: HazardScreen | null;
+  upstreamConnectivity: UpstreamConnectivityScreen | null;
+  connectivityBusy: boolean;
+  connectivityError: string | null;
+  cascade: CascadeScreen | null;
+  cascadeBusy: boolean;
+  cascadeError: string | null;
+  faults: FaultScreen | null;
+  geology: GeologyScreen | null;
   study: Study | null;
   flowOnly: DischargeSeries | null;
   found: DiscoverResult | null;
   scheme: Scheme | null;
-  seasons: { wetGwh: number; dryGwh: number } | null;
   uncertainty: Uncertainty | null;
   pick: { i: number; j: number } | null;
   onPick: (s: Scheme) => void;
@@ -144,26 +282,27 @@ export function Reading(props: {
   setAssume: (a: Assumptions) => void;
   licences: Licence[] | null;
   gauges: Gauge[] | null;
-  hydest: {
-    input: { totalKm2: number; below5000Km2: number; below3000Km2: number; monsoonMm?: number };
-    driest: { month: number; cms: number };
-    months: { month: number; cms: number }[];
-    modelledCms: number;
-    agreement: { ratio: number; agree: boolean } | null;
-    floods: { t: number; cms: number }[];
-  } | null;
+  hydest: HydestScreen | null;
   grid: GridLink | null;
   conservation: { inside: ProtectedHit[]; near: ProtectedHit[]; hard: boolean } | null;
   flowChoice: FlowChoice | null;
   sediment: { basin: Desander; source: SedimentSource | null } | null;
   bench: BenchFit | null;
   measured: { series: MeasuredSeries; ratio: number; name: string } | null;
+  audit: {
+    head: HeadAudit | null;
+    shape: ShapeAudit | null;
+    years: number | null;
+    error: string | null;
+  } | null;
+  auditBusy: string | null;
+  onAudit: () => void;
   onImport: (file: File) => void;
   onClearMeasured: () => void;
   wideSearch: boolean;
   onWideSearch: (v: boolean) => void;
   canExport: boolean;
-  onExport: (kind: 'csv' | 'geojson') => void;
+  onExport: (kind: 'csv' | 'geojson' | 'field-plan') => void;
   busy: string | null;
   error: string | null;
   neighbours: { lat: number; lon: number; meanCms: number }[] | null;
@@ -173,11 +312,22 @@ export function Reading(props: {
 }) {
   const {
     at,
+    region,
+    borderKm,
+    readiness,
+    hazards,
+    upstreamConnectivity,
+    connectivityBusy,
+    connectivityError,
+    cascade,
+    cascadeBusy,
+    cascadeError,
+    faults,
+    geology,
     study,
     flowOnly,
     found,
     scheme,
-    seasons,
     uncertainty,
     pick,
     onPick,
@@ -192,6 +342,9 @@ export function Reading(props: {
     sediment,
     bench,
     measured,
+    audit,
+    auditBusy,
+    onAudit,
     onImport,
     onClearMeasured,
     wideSearch,
@@ -210,9 +363,21 @@ export function Reading(props: {
     setAssume({ ...assume, [k]: v });
 
   const flow = study?.flow ?? flowOnly;
-  const fdc = study ? buildFdc(study.flow.values) : flowOnly ? buildFdc(flowOnly.values) : [];
+  const sourceValues = measured?.series.values ?? flow?.values ?? [];
+  const flowScale = scheme?.flowScale ?? 1;
+  const shownValues = flowScale === 1 ? sourceValues : sourceValues.map((v) => v * flowScale);
+  const shownDates = measured?.series.dates ?? flow?.dates ?? [];
+  const fdc = buildFdc(shownValues);
   const meanCms = flow ? flow.values.reduce((a, b) => a + b, 0) / flow.values.length : 0;
-  const years = flow ? flow.dates.length / 365.25 : 0;
+  const shownMeanCms = shownValues.length
+    ? shownValues.reduce((a, b) => a + b, 0) / shownValues.length
+    : 0;
+  const years = new Set(
+    shownDates.map((d) => Number(d.slice(0, 4))).filter((y) => Number.isInteger(y))
+  ).size;
+  const modelYears = new Set(
+    (flow?.dates ?? []).map((d) => Number(d.slice(0, 4))).filter((y) => Number.isInteger(y))
+  ).size;
 
   // Two independent models of the same quantity. When they diverge, the ~5 km
   // grid cell is probably not even on this channel.
@@ -223,9 +388,12 @@ export function Reading(props: {
   const verdict = grid ? connectionVerdict(grid) : null;
 
   const alternatives = found?.schemes ?? [];
+  const turbineEvidence = scheme
+    ? explainTurbineSelection(scheme.designFlowCms, scheme.netHeadM)
+    : null;
 
   return (
-    <aside className="z-10 flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-line bg-panel lg:absolute lg:right-3 lg:top-3 lg:max-h-[calc(100%-1.5rem)] lg:w-[400px] lg:flex-none lg:rounded-2xl lg:border lg:shadow-[0_24px_70px_rgba(0,0,0,0.55)] xl:w-[440px]">
+    <aside className="reading-panel z-10 flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-line bg-panel lg:absolute lg:left-3 lg:top-3 lg:max-h-[calc(100%-1.5rem)] lg:w-[calc(50vw-18px)] lg:flex-none lg:rounded-2xl lg:border lg:shadow-[0_24px_70px_rgba(0,0,0,0.55)]">
       <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-panel/90 px-4 py-2.5 backdrop-blur-md lg:rounded-t-2xl">
         <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
           {!at ? 'Pick a river' : scheme ? 'Best scheme found' : 'Studying'}
@@ -250,26 +418,34 @@ export function Reading(props: {
       {!at && (
         <div className="px-4 pb-4 pt-5">
           <p className="text-[15px] font-medium leading-snug text-ink [text-wrap:balance]">
-            Click once on a river, get the schemes worth studying.
+            Click a river. Ghatta maps the strongest scheme and the constraints around it.
           </p>
-          <div className="mt-3.5 space-y-2.5">
-            {[
-              ['1', 'Ghatta walks 22 km downstream along the real channel.'],
-              ['2', 'It reads the terrain and twenty years of daily flow.'],
-              ['3', 'It searches hundreds of intake and powerhouse positions.'],
-            ].map(([k, t]) => (
-              <div key={k} className="flex items-start gap-2.5">
-                <span className="num mt-px flex size-5 shrink-0 items-center justify-center rounded-full bg-panel-2 text-[10.5px] text-muted">
-                  {k}
-                </span>
-                <span className="text-[12.5px] leading-relaxed text-muted">{t}</span>
-              </div>
-            ))}
-          </div>
-          <p className="mt-3.5 text-[11.5px] leading-relaxed text-faint">
-            You get alternatives to compare, not one number. Drag either marker to slide it along
-            the river.
+          <p className="mt-2 text-[12px] leading-relaxed text-muted">
+            Blue is the river. Drag the intake or powerhouse marker to test another position.
           </p>
+        </div>
+      )}
+
+      {at && (
+        <div className="border-b border-line px-4 py-2 text-[10.5px] leading-relaxed text-faint">
+          <span
+            className={`mr-2 inline-block rounded-full px-2 py-0.5 font-semibold uppercase tracking-[0.08em] ${
+              region === 'nepal'
+                ? 'bg-[color-mix(in_srgb,var(--color-river)_12%,transparent)] text-river'
+                : 'bg-panel-2 text-muted'
+            }`}
+          >
+            {region === 'nepal' ? 'Nepal mode' : 'Global mode'}
+          </span>
+          {region === 'nepal'
+            ? 'Nepal engineering and map layers are active.'
+            : 'Global terrain, river and flow screening.'}
+          {borderKm !== null && borderKm <= 10 && (
+            <span className="mt-1 block text-amber">
+              Only {n(borderKm, 1)} km from the generalized country outline — verify jurisdiction
+              against authoritative border control before relying on the mode.
+            </span>
+          )}
         </div>
       )}
 
@@ -322,7 +498,8 @@ export function Reading(props: {
             </div>
           ))}
           <Fine>
-            Boundaries from OpenStreetMap, © contributors, ODbL, simplified to ~200 m. Nepal&apos;s
+            Boundaries from OpenStreetMap, © contributors, ODbL, retrieved {PROTECTED_RETRIEVED}
+            and simplified to ~200 m. Nepal&apos;s
             conservation areas do host licensed hydropower; national parks and reserves effectively
             do not. The permission question is DNPWC&apos;s, not this tool&apos;s.
           </Fine>
@@ -330,23 +507,37 @@ export function Reading(props: {
       )}
 
       {disagreement && disagreement > 2 && (
-        <div className="border-b border-line px-4 py-2.5 text-[11px] leading-relaxed text-muted">
-          {flowChoice?.authority === 'hydest' ? (
+        <details className="group border-b border-line px-4 py-2.5 text-[11px] leading-relaxed text-muted">
+          <summary className="flex cursor-pointer list-none items-center gap-2 text-[10.5px] uppercase tracking-[0.06em] text-faint">
+            <span>flow source</span>
+            <b className="normal-case tracking-normal text-ink">
+              {flowChoice?.authority === 'hydest'
+                ? 'Nepal regression fallback'
+                : flowChoice?.authority === 'model'
+                  ? 'global flow model'
+                  : 'mapped river network'}
+            </b>
+            <span className="ml-auto num normal-case tracking-normal text-amber">
+              {n(disagreement, 1)}× mismatch&nbsp; +
+            </span>
+          </summary>
+          <div className="mt-2">
+            {flowChoice?.authority === 'hydest' ? (
             <>
               The mapped network claims {n(rival!, 1)} m³/s for this reach and the flood model{' '}
-              {n(meanCms, 1)} — {n(disagreement, 1)}× apart, and <b className="text-ink">both fail
-              Nepal&apos;s own regression</b>, which puts the annual mean at{' '}
+              {n(meanCms, 1)} — {n(disagreement, 1)}× apart, and <b className="text-ink">both sit
+              far from the legacy WECS/DHM regional estimate</b>, which puts the annual mean at{' '}
               <b className="num text-ink">{n(flowChoice.judgeCms ?? NaN, 1)} m³/s</b> from this
               catchment&apos;s area, hypsometry and monsoon rainfall. Flows below keep the flood
-              model&apos;s day-to-day shape rescaled onto the regression — a fitted method with
-              real scatter, so treat the band seriously and gauge this river before believing
-              anyone.
+              model&apos;s day-to-day shape provisionally rescaled onto the regression. This is a
+              screening fallback with shared catchment geography and real regression scatter—not
+              an observation—so treat the band seriously and gauge this river.
             </>
-          ) : flowChoice?.authority === 'model' ? (
+            ) : flowChoice?.authority === 'model' ? (
             <>
               The mapped network claims {n(rival!, 1)} m³/s for this reach against the flood
-              model&apos;s {n(meanCms, 1)} — {n(disagreement, 1)}× apart, and Nepal&apos;s own
-              regression sides with the flood model
+              model&apos;s {n(meanCms, 1)} — {n(disagreement, 1)}× apart, and the WECS/DHM regional
+              comparison is closer to the flood model
               {flowChoice.judgeCms !== null && (
                 <>
                   {' '}
@@ -358,7 +549,7 @@ export function Reading(props: {
               global water model in high Himalayan valleys — so flows below use the flood model
               as-is.
             </>
-          ) : (
+            ) : (
             <>
               The flood model&apos;s ~5 km cell reads {n(meanCms, 1)} m³/s here,{' '}
               {n(disagreement, 1)}× off the {n(rival!, 1)} m³/s the mapped river network gives for
@@ -373,8 +564,9 @@ export function Reading(props: {
               )}
               .
             </>
-          )}
-        </div>
+            )}
+          </div>
+        </details>
       )}
 
       {/* ---- the answer ---- */}
@@ -436,6 +628,59 @@ export function Reading(props: {
                     The single figure above is the midpoint, not a measurement. Narrowing this needs
                     a gauge record and a survey, which is what screening is for deciding.
                   </div>
+
+                  {/* The site audit: replace assumptions with measurements, on request. */}
+                  {auditBusy ? (
+                    <div className="mt-2 flex items-center gap-1.5 border-t border-line pt-2 text-[11px] text-river">
+                      <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-river" />
+                      <span>{auditBusy}</span>
+                    </div>
+                  ) : !audit ? (
+                    <button
+                      type="button"
+                      onClick={onAudit}
+                      className="mt-2 w-full rounded-md border border-line bg-panel px-2.5 py-2 text-left text-[11px] leading-relaxed text-muted hover:border-river/60 hover:text-ink"
+                    >
+                      <b className="text-ink">Audit this site</b> — re-measure the head on a second
+                      terrain product{region === 'nepal' ? ', score all nine flow cells against Nepal’s seasonal regime,' : ''}
+                      {' '}and request up to 40 years, keeping only complete local years. It uses
+                      several requests to free public services, so it runs only when you ask.
+                      Nothing is interpolated: every step replaces an assumption with evidence.
+                    </button>
+                  ) : (
+                    <div className="mt-2 space-y-1.5 border-t border-line pt-2 text-[10.5px] leading-relaxed">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">
+                        audited at this site
+                      </div>
+                      {audit.head ? (
+                        <div className="text-muted">
+                          <b className="text-ink">Head, measured twice:</b> the two terrain
+                          products disagree by{' '}
+                          <span className="num text-ink">{n(audit.head.deltaM, 1)} m</span> here (
+                          {n(audit.head.primaryM, 0)} vs {n(audit.head.secondM, 0)} m), so the band
+                          uses <span className="num text-ink">±{n(audit.head.errM, 0)} m</span>{' '}
+                          measured, not ±15 assumed.
+                        </div>
+                      ) : (
+                        <div className="text-faint">
+                          Head cross-check unavailable — the second terrain product has no coverage
+                          here.
+                        </div>
+                      )}
+                      {audit.shape && (
+                        <div className="text-muted">
+                          <b className="text-ink">Flow cells:</b> {audit.shape.note}.
+                        </div>
+                      )}
+                      {audit.years !== null && (
+                        <div className="text-muted">
+                          <b className="text-ink">Record:</b> extended to {audit.years} years —
+                          deeper droughts and rarer floods now shape the curve.
+                        </div>
+                      )}
+                      {audit.error && <div className="text-amber">{audit.error}</div>}
+                    </div>
+                  )}
                 </div>
               )}
               <p className="mt-3 text-[12.5px] leading-relaxed text-muted">
@@ -482,12 +727,28 @@ export function Reading(props: {
                 </div>
               )}
               {scheme.turbine ? (
-                <div className="mt-2 text-[11px] leading-relaxed text-faint">
-                  <b className="text-muted">{scheme.turbine}</b> selected for this duty point — best
-                  point {n(scheme.turbinePeak * 100, 1)}%, times {n(assume.efficiency * 100, 0)}%
-                  generator. Every day of the record is dispatched on its part-load curve, so low
-                  flows are not credited with best-point efficiency.
-                </div>
+                <details className="group mt-2 rounded-lg border border-line bg-panel-2 px-3 py-2.5 text-[11px] leading-relaxed">
+                  <summary className="cursor-pointer list-none text-ink">
+                    <b>Why {scheme.turbine}?</b>
+                    <span className="ml-2 text-muted">
+                      {n(scheme.netHeadM, 0)} m head · {n(scheme.designFlowCms, 2)} m³/s
+                    </span>
+                    <span className="float-right text-faint group-open:rotate-45">+</span>
+                  </summary>
+                  <div className="mt-2 border-t border-line pt-2 text-muted">
+                    {turbineEvidence?.reason}{' '}
+                    <span className="text-faint">Basis: {turbineEvidence?.method}.</span>
+                    <div className="num mt-1.5 text-ink">
+                      P = 1000 × 9.81 × {n(scheme.designFlowCms, 2)} × {n(scheme.netHeadM, 0)} ×{' '}
+                      {n(scheme.turbinePeak * assume.efficiency, 3)} = {n(scheme.capacityMW, 2)} MW
+                    </div>
+                    <div className="mt-1 text-faint">
+                      Peak turbine efficiency {n(scheme.turbinePeak * 100, 1)}%; generator and
+                      transformer {n(assume.efficiency * 100, 0)}%. Daily energy uses the machine&apos;s
+                      part-load curve, not the peak on every day.
+                    </div>
+                  </div>
+                </details>
               ) : (
                 <div className="mt-2 text-[11px] leading-relaxed text-amber">
                   This duty point falls outside every standard turbine envelope — the flat
@@ -496,6 +757,453 @@ export function Reading(props: {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* ---- source-led geology: products to obtain, not a ground model ---- */}
+      {scheme && geology && (geology.dmg || geology.regional || geology.regionalError) && (
+        <div className="border-b border-line px-4 py-3.5">
+          <H right={geology.dmg ? `DMG ${geology.dmg.scale}` : 'open regional context'}>
+            engineering geology sources
+          </H>
+          <div className="rounded-lg border border-line bg-panel-2 px-3 py-2.5">
+            {geology.dmg && (
+              <div>
+                <div className="text-[11.5px] leading-snug text-ink">
+                  <b>
+                    {geology.dmg.maps.length
+                      ? `${geology.dmg.maps.length} official map publication${geology.dmg.maps.length === 1 ? '' : 's'} cover this reach`
+                      : 'No 1:50,000 publication matched this reach in the online catalog'}
+                  </b>
+                </div>
+                {geology.dmg.maps.length > 0 ? (
+                  <div className="mt-2 space-y-1 border-t border-line pt-2">
+                    {geology.dmg.maps.map((map) => (
+                      <a
+                        key={map.id}
+                        href={map.previewUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block text-[10.5px] leading-relaxed text-muted hover:text-ink"
+                      >
+                        <b className="text-ink">{map.sheets.map((sheet) => sheet.code).join(', ')}</b>
+                        {' · '}{map.published.slice(0, 4)} · {map.title} ↗
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-1 text-[10.5px] leading-relaxed text-muted">
+                    {geology.dmg.limitation}
+                  </div>
+                )}
+                <div className="mt-2 text-[10px] leading-relaxed text-faint">
+                  {geology.dmg.availability} Footprints are derived catalog extents; DMG map imagery is not bundled.{' '}
+                  <a href={geology.dmg.sourceUrl} target="_blank" rel="noreferrer" className="text-river hover:underline">
+                    official catalog ↗
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {geology.regional && (
+              <div className={`${geology.dmg ? 'mt-2.5 border-t border-line pt-2.5' : ''}`}>
+                <div className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-faint">
+                  small-scale regional samples
+                </div>
+                <div className="mt-1.5 space-y-1">
+                  {geology.regional.samples.map((sample) => (
+                    <div key={sample.role} className="flex items-start gap-2 text-[10.5px] leading-relaxed">
+                      <span className="w-[72px] shrink-0 capitalize text-faint">{sample.role}</span>
+                      <span className="min-w-0 text-muted">
+                        {sample.units.length
+                          ? sample.units.map((unit) => `${unit.name} · ${unit.lithology}`).join('; ')
+                          : 'no mapped regional unit returned'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-[10px] leading-relaxed text-faint">
+                  {geology.regional.limitation}{' '}
+                  <a href={geology.regional.sourceUrl} target="_blank" rel="noreferrer" className="text-river hover:underline">
+                    Macrostrat · {geology.regional.license} ↗
+                  </a>
+                  {Object.values(geology.regional.references).length > 0 && (
+                    <span title={Object.values(geology.regional.references).join('\n')}> · original source reference retained in export</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {geology.regionalError && (
+              <div className={`${geology.dmg ? 'mt-2 border-t border-line pt-2' : ''} text-[10.5px] leading-relaxed text-amber`}>
+                Open regional geology unavailable: {geology.regionalError}
+              </div>
+            )}
+
+            {region === 'nepal' && (
+              <div className="mt-2 border-t border-line pt-2 text-[10px] leading-relaxed text-faint">
+                Rainfall-induced landslide susceptibility is a separate official evidence source; it is linked, not imported, because an explicit reusable data licence/export was not identified.{' '}
+                <a
+                  href="https://wrerc.gov.np/content/39/rainfall-induced-landslide-susceptibility-map-of-nepal/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-river hover:underline"
+                >
+                  WRRDC Nepal susceptibility app ↗
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ---- regional active-fault context near this exact layout ---- */}
+      {scheme && region === 'nepal' && faults && (
+        <div className="border-b border-line px-4 py-3.5">
+          <H right={`GEM · bundled ${faults.retrieved}`}>active fault context</H>
+          <div className="rounded-lg border border-line bg-panel-2 px-3 py-2.5">
+            <div className="flex items-start gap-2 text-[12px] leading-snug">
+              <span
+                className="mt-1 h-0 w-5 shrink-0 border-t-2 border-dashed"
+                style={{ borderColor: FAULT_COLOR }}
+              />
+              <div>
+                {faults.crossings > 0 ? (
+                  <>
+                    <b className="text-amber">
+                      {faults.crossings} regional mapped trace{faults.crossings === 1 ? '' : 's'} intersect{faults.crossings === 1 ? 's' : ''} this river reach
+                    </b>
+                    <span className="mt-0.5 block text-[10.5px] text-muted">
+                      This is not a surveyed canal, tunnel or penstock crossing.
+                    </span>
+                  </>
+                ) : faults.nearest ? (
+                  <>
+                    <b className="text-ink">Nearest regional mapped trace {n(faults.nearest.distanceKm, 1)} km away</b>
+                    <span className="mt-0.5 block text-[10.5px] text-muted">
+                      {faults.nearest.name ?? `GEM ${faults.nearest.sourceId}`} · {faults.nearest.type}
+                    </span>
+                  </>
+                ) : (
+                  <b className="text-muted">No regional mapped trace result</b>
+                )}
+              </div>
+            </div>
+
+            {faults.nearby.length > 0 && (
+              <div className="mt-2 space-y-1 border-t border-line pt-2">
+                {faults.nearby.slice(0, 4).map((fault) => (
+                  <div key={fault.id} className="flex items-baseline gap-2 text-[10.5px] leading-relaxed text-muted">
+                    <span className="min-w-0 flex-1 truncate" title={fault.reference ?? undefined}>
+                      {fault.name ?? `GEM ${fault.sourceId}`} · {fault.type}
+                    </span>
+                    <span className="num shrink-0 text-faint">
+                      {fault.intersectsReach ? `reach km ${n(fault.chainageKm, 1)}` : `${n(fault.distanceKm, 1)} km`}
+                    </span>
+                  </div>
+                ))}
+                {faults.nearby.length > 4 && (
+                  <div className="text-[10px] text-faint">
+                    +{faults.nearby.length - 4} more regional traces are shown on the map and included in GeoJSON.
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="mt-2 text-[10px] leading-relaxed text-faint">
+              {faults.limitation}{' '}
+              <a href={faults.sourceUrl} target="_blank" rel="noreferrer" className="text-river hover:underline">
+                GEM source ↗
+              </a>{' '}
+              <a href={faults.licenseUrl} target="_blank" rel="noreferrer" className="text-river hover:underline">
+                CC BY-SA 4.0 ↗
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---- government incident history near this exact layout ---- */}
+      {scheme && region === 'nepal' && hazards && (
+        <div className="border-b border-line px-4 py-3.5">
+          <H right={`BIPAD · bundled ${hazards.retrieved}`}>recorded natural hazards</H>
+          <div className="rounded-lg border border-line bg-panel-2 px-3 py-2.5">
+            <div className="text-[12px] leading-snug text-ink">
+              <b>
+                {hazards.total > 0
+                  ? `${hazards.total} approved, verified report${hazards.total === 1 ? '' : 's'}`
+                  : 'No approved, verified reports found'}
+              </b>{' '}
+              <span className="text-muted">within {n(hazards.radiusKm, 0)} km of this reach</span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {hazards.categories.map((category) => (
+                <span
+                  key={category.kind}
+                  className="inline-flex items-center gap-1 rounded border border-line px-1.5 py-0.5 text-[10px] text-muted"
+                  title={`${category.nationwideRecords.toLocaleString('en-US')} approved, verified records nationwide in the bundled inventory`}
+                >
+                  <span
+                    className="size-1.5 rounded-full"
+                    style={{ backgroundColor: HAZARD_COLORS[category.kind] }}
+                  />
+                  {category.title === 'Glacial lake outburst' ? 'GLOF' : category.title}{' '}
+                  <b className="num text-ink">{category.count}</b>
+                </span>
+              ))}
+            </div>
+
+            {hazards.records.length > 0 && (
+              <div className="mt-2 space-y-1 border-t border-line pt-2">
+                {hazards.records.slice(0, 5).map((record) => (
+                  <a
+                    key={record.id}
+                    href={record.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-baseline gap-2 text-[10.5px] leading-relaxed text-muted hover:text-ink"
+                  >
+                    <span
+                      className="size-1.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: HAZARD_COLORS[record.kind] }}
+                    />
+                    <span className="min-w-0 flex-1">
+                      {record.title} · {record.date}
+                    </span>
+                    <span className="num shrink-0 text-faint">{n(record.distanceKm, 1)} km ↗</span>
+                  </a>
+                ))}
+                {hazards.records.length > 5 && (
+                  <div className="pl-3.5 text-[10px] text-faint">
+                    +{hazards.records.length - 5} more points are shown on the map and included in GeoJSON.
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="mt-2 text-[10px] leading-relaxed text-faint">
+              Inventory {hazards.period.from} to {hazards.period.to}. {hazards.limitation}{' '}
+              <a href={hazards.source} target="_blank" rel="noreferrer" className="text-river hover:underline">
+                Government API ↗
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---- candidates whose directed mapped channel reaches the intake ---- */}
+      {scheme && region === 'nepal' && (connectivityBusy || connectivityError || upstreamConnectivity) && (
+        <div className="border-b border-line px-4 py-3.5">
+          <H right={connectivityBusy ? 'tracing network…' : 'GLO + BIPAD · HydroRIVERS'}>
+            upstream channel screen
+          </H>
+          <div className="rounded-lg border border-line bg-panel-2 px-3 py-2.5">
+            {connectivityBusy && (
+              <div className="text-[11px] leading-relaxed text-muted">
+                Walking open lake centroids and historical reports down the directed river network…
+              </div>
+            )}
+            {connectivityError && (
+              <div className="text-[10.5px] leading-relaxed text-amber">
+                Upstream topology unavailable: {connectivityError}. This is missing evidence, not a clear screen.
+              </div>
+            )}
+            {upstreamConnectivity && (
+              <>
+                <div className="text-[12px] leading-snug text-ink">
+                  <b>
+                    {upstreamConnectivity.lakes.length} mapped lake centroid{upstreamConnectivity.lakes.length === 1 ? '' : 's'} ·{' '}
+                    {upstreamConnectivity.incidents.length} historical report{upstreamConnectivity.incidents.length === 1 ? '' : 's'}
+                  </b>
+                  <span className="mt-0.5 block text-[10.5px] text-muted">
+                    have a candidate directed HydroRIVERS path to the selected intake
+                  </span>
+                </div>
+                <div className="mt-1.5 text-[10.5px] leading-relaxed text-faint">
+                  Channel-connectivity candidates only—not lake danger, landslide runout, GLOF exposure or a design flood.
+                </div>
+
+                {upstreamConnectivity.lakes.length > 0 ? (
+                  <div className="mt-2 space-y-1 border-t border-line pt-2">
+                    <div className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-faint">
+                      glacial-lake candidates
+                    </div>
+                    {upstreamConnectivity.lakes.slice(0, 5).map((lake) => {
+                      const growing = lake.expansionSignificant === true &&
+                        (lake.expansionRateKm2Yr ?? 0) > 0 && lake.timeSeriesOutlier !== true;
+                      return (
+                        <a
+                          key={lake.id}
+                          href={upstreamConnectivity.lakeInventory.source}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block rounded border border-line/70 px-2 py-1.5 text-[10.5px] leading-relaxed hover:border-river/40"
+                        >
+                          <span className="flex items-baseline justify-between gap-2">
+                            <b className="min-w-0 truncate text-ink">
+                              {lake.basin} · {lake.country} · {n(lake.elevationM, 0)} m
+                            </b>
+                            <span className="num shrink-0 text-faint">{n(lake.routeKm, 1)} km ↗</span>
+                          </span>
+                          <span className="block text-faint">
+                            {lake.connectivity} · vertex snap {n(lake.snapKm, 2)} km
+                            {lake.expansionRateKm2Yr != null
+                              ? ` · ${(lake.expansionRateKm2Yr >= 0 ? '+' : '')}${lake.expansionRateKm2Yr.toFixed(4)} km²/yr`
+                              : ' · trend unavailable'}
+                          </span>
+                          {(growing || lake.timeSeriesOutlier === true) && (
+                            <span className={`block ${growing ? 'text-amber' : 'text-faint'}`}>
+                              {growing
+                                ? 'published significant positive expansion signal—not breach likelihood'
+                                : 'time-series outlier flag—inspect before using the trend'}
+                            </span>
+                          )}
+                        </a>
+                      );
+                    })}
+                    {upstreamConnectivity.lakes.length > 5 && (
+                      <div className="text-[10px] text-faint">
+                        +{upstreamConnectivity.lakes.length - 5} more candidate centroids are on the map and in GeoJSON.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-2 border-t border-line pt-2 text-[10.5px] leading-relaxed text-faint">
+                    No GLO centroid met the snap and directed-route tests. Small omitted streams, centroid-to-outlet error and network breaks mean this is not GLOF clearance.
+                  </div>
+                )}
+
+                {upstreamConnectivity.incidents.length > 0 && (
+                  <div className="mt-2 space-y-1 border-t border-line pt-2">
+                    <div className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-faint">
+                      upstream report candidates
+                    </div>
+                    {upstreamConnectivity.incidents.slice(0, 5).map((incident) => (
+                      <a
+                        key={incident.id}
+                        href={incident.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-baseline gap-2 text-[10.5px] leading-relaxed text-muted hover:text-ink"
+                      >
+                        <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: HAZARD_COLORS[incident.kind] }} />
+                        <span className="min-w-0 flex-1">{incident.title} · {incident.date}</span>
+                        <span className="num shrink-0 text-faint">{n(incident.routeKm, 1)} km ↗</span>
+                      </a>
+                    ))}
+                    {upstreamConnectivity.incidents.length > 5 && (
+                      <div className="pl-3.5 text-[10px] text-faint">
+                        +{upstreamConnectivity.incidents.length - 5} more report candidates are on the map and in GeoJSON.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <details className="mt-2 border-t border-line pt-2 text-[10px] leading-relaxed text-faint">
+                  <summary className="cursor-pointer text-river">method, sources and required follow-up</summary>
+                  <div className="mt-1.5 space-y-1.5">
+                    <p>{upstreamConnectivity.method}</p>
+                    <p>{upstreamConnectivity.limitation}</p>
+                    <p>
+                      GLO inventory {upstreamConnectivity.lakeInventory.observations.from}–{upstreamConnectivity.lakeInventory.observations.to},{' '}
+                      {upstreamConnectivity.lakeInventory.license}. {upstreamConnectivity.lakeInventory.quality}
+                    </p>
+                    <div className="flex flex-wrap gap-x-2 gap-y-1">
+                      <a href={upstreamConnectivity.lakeInventory.source} target="_blank" rel="noreferrer" className="text-river hover:underline">GLO dataset ↗</a>
+                      <a href={ICIMOD_POTENTIALLY_DANGEROUS_LAKES} target="_blank" rel="noreferrer" className="text-river hover:underline">ICIMOD dangerous-lake assessment ↗</a>
+                      <a href={ICIMOD_GLOF_DATABASE} target="_blank" rel="noreferrer" className="text-river hover:underline">ICIMOD GLOF event database ↗</a>
+                      {inKoshiLandslideInventory(scheme.intake) && (
+                        <a href={ICIMOD_KOSHI_LANDSLIDES} target="_blank" rel="noreferrer" className="text-river hover:underline">ICIMOD 2026 Koshi landslides ↗</a>
+                      )}
+                      <a href={upstreamConnectivity.network.sourceUrl} target="_blank" rel="noreferrer" className="text-river hover:underline">HydroRIVERS v1 ↗</a>
+                    </div>
+                  </div>
+                </details>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ---- evidence gates and the work needed to advance the site ---- */}
+      {false && scheme && readiness.gates.length > 0 && (
+        <div className="border-b border-line px-4 py-3.5">
+          <H right={region === 'nepal' ? 'DoED / PFS basis' : 'country rules open'}>
+            engineering readiness
+          </H>
+          <div
+            className={`rounded-lg border px-3 py-2.5 text-[12px] leading-snug ${
+              readiness.decision === 'hold'
+                ? 'border-red/30 bg-[color-mix(in_srgb,var(--color-red)_7%,transparent)] text-red'
+                : 'border-amber/30 bg-[color-mix(in_srgb,var(--color-amber)_6%,transparent)] text-amber'
+            }`}
+          >
+            <b>{readiness.label}</b>
+            <span className="mt-1 block text-[10.5px] leading-relaxed text-muted">
+              No combined score: a fatal legal, siting or hazard gate cannot be averaged away by
+              good energy.
+            </span>
+          </div>
+
+          <div className="mt-2 space-y-1.5">
+            {readiness.gates.map((g) => (
+              <details key={g.id} className="group rounded-lg border border-line bg-panel-2 px-2.5 py-2">
+                <summary className="flex cursor-pointer list-none items-start gap-2">
+                  <span
+                    className={`mt-px shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] ${evidenceTone(g.level)}`}
+                  >
+                    {g.level.replace('-', ' ')}
+                  </span>
+                  <span className="min-w-0 flex-1 text-[11.5px] leading-snug text-ink">
+                    <b>{g.title}</b>
+                    <span className="mt-0.5 block text-[10.5px] font-normal leading-relaxed text-muted">
+                      {g.summary}
+                    </span>
+                  </span>
+                  <span className="text-[11px] text-faint group-open:rotate-45">+</span>
+                </summary>
+                <div className="mt-2 border-t border-line pt-2 text-[10.5px] leading-relaxed text-faint">
+                  {g.evidence.map((e) => (
+                    <div key={e}>â€¢ {e}</div>
+                  ))}
+                  <div className="mt-1.5 text-muted">
+                    <b className="text-ink">Advance this gate:</b> {g.next}
+                  </div>
+                </div>
+              </details>
+            ))}
+          </div>
+
+          <details className="mt-2.5 rounded-lg border border-river/30 bg-[color-mix(in_srgb,var(--color-river)_5%,transparent)] px-3 py-2.5">
+            <summary className="cursor-pointer list-none text-[11.5px] font-medium text-river">
+              Field investigation campaign Â· {readiness.tasks.filter((t) => t.priority === 'P1').length}{' '}
+              priority-1 packages
+              <span className="ml-1 text-faint">({readiness.tasks.length} total)</span>
+            </summary>
+            <div className="mt-2 space-y-2.5 border-t border-line pt-2">
+              {readiness.tasks.map((t, i) => (
+                <div key={`${t.discipline}-${t.title}`} className="text-[10.5px] leading-relaxed">
+                  <div className="flex items-baseline gap-2">
+                    <span className={`num font-semibold ${t.priority === 'P1' ? 'text-amber' : 'text-river'}`}>
+                      {t.priority}
+                    </span>
+                    <b className="text-ink">{i + 1}. {t.title}</b>
+                  </div>
+                  <div className="text-faint">{t.discipline} Â· {t.reason}</div>
+                  <div className="mt-0.5 text-muted">
+                    <b>Deliver:</b> {t.deliverable}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </details>
+          <Fine>
+            {region === 'nepal'
+              ? 'Gates follow Nepal’s hydropower study/design guidance and '
+              : 'Country rules remain open; gates use '}
+            the World Bank pre-feasibility scope: hydrology, survey/layout, sediment/headworks,
+            geology and hazards, grid, safeguards, costs, schedule and risk.
+          </Fine>
         </div>
       )}
 
@@ -619,22 +1327,24 @@ export function Reading(props: {
         </div>
       )}
 
-      {/* ---- who already holds this river ---- */}
-      {licences && licences.length > 0 && (
+      {/* ---- who already holds or has applied for this river ---- */}
+      {licences && (
         <div className="border-b border-line px-4 py-3.5">
           <H>
-            {licences.length} licensed project{licences.length > 1 ? 's' : ''} on this reach
+            {licences.length > 0
+              ? `${licences.length} DoED project record${licences.length > 1 ? 's' : ''} on this reach`
+              : 'DoED conflict screen · clear within 6 km'}
           </H>
-          <div className="space-y-2">
+          {licences.length > 0 ? <div className="space-y-2">
             {licences.slice(0, 6).map((l) => (
               <div key={l.licenceNo + l.name} className="flex items-baseline gap-2.5 text-[12px]">
                 <span
                   className="mt-1 size-2 shrink-0 rounded-full"
                   style={{
                     background:
-                      l.stage === 'Operation'
+                      l.stage === 'Operating'
                         ? 'var(--color-red)'
-                        : l.stage === 'Generation'
+                        : l.stage === 'Construction licence'
                           ? 'var(--color-amber)'
                           : 'var(--color-muted)',
                   }}
@@ -646,19 +1356,89 @@ export function Reading(props: {
                   ) : null}
                   <span className="block text-[10.5px] leading-relaxed text-faint">
                     {l.stage}
-                    {l.river ? ` · ${l.river}` : ''} · {n(l.distanceKm, 1)} km away
+                    {l.river ? ` · ${l.river}` : ''} ·{' '}
+                    {l.distanceKm < 0.05
+                      ? 'published coordinate range overlaps the reach'
+                      : `${n(l.distanceKm, 1)} km from its published coordinate range`}
                   </span>
                 </span>
               </div>
             ))}
-          </div>
+          </div> : (
+            <div className="text-[12px] leading-relaxed text-ink">
+              No geolocated operating plant, licence or application in the official register has a
+              published coordinate range within 6 km of this studied reach.
+            </div>
+          )}
           <Fine>
-            Department of Electricity Development registry.{' '}
+            Official Department of Electricity Development register, updated {DOED_UPDATED} and
+            bundled {DOED_RETRIEVED}.{' '}
             <span className="text-red">Operating</span> and{' '}
-            <span className="text-amber">construction</span> licences are a hard constraint on this
-            water; a survey licence means someone is already studying it. The public snapshot lags,
-            so check the current register before relying on this.
+            <span className="text-amber">construction licence</span> records are a hard constraint;
+            survey records and applications mean someone is already studying the water. DoED
+            publishes coordinate ranges rather than alignments, so proximity is conservative.{' '}
+            <a
+              className="underline decoration-line underline-offset-2 hover:text-ink"
+              href={DOED_REGISTER_URL}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Check the live register
+            </a>{' '}
+            before relying on legal status.
           </Fine>
+        </div>
+      )}
+
+      {/* ---- directed project interaction and cascade discovery ---- */}
+      {scheme && region === 'nepal' && licences && (
+        <div className="border-b border-line px-4 py-3.5">
+          <H>
+            {cascade
+              ? `project interaction · ${cascade.upstream.length} upstream · ${cascade.downstream.length} downstream`
+              : 'project interaction · directed network'}
+          </H>
+          {cascadeBusy ? (
+            <div className="flex items-center gap-2 text-[11.5px] text-muted">
+              <span className="size-1.5 animate-pulse rounded-full bg-river" />
+              Walking official DoED project midpoints through the directed river network…
+            </div>
+          ) : cascade ? (
+            <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <CascadeProjectList direction="upstream" projects={cascade.upstream} />
+                <CascadeProjectList direction="downstream" projects={cascade.downstream} />
+              </div>
+              <div className="mt-2.5 rounded-md border border-amber/30 bg-[color-mix(in_srgb,var(--color-amber)_6%,transparent)] px-2.5 py-2 text-[10.5px] leading-relaxed text-amber">
+                Network candidates only—not a confirmed cascade, shared-water finding, legal overlap or operating interface.{' '}
+                {[
+                  ...cascade.upstream,
+                  ...cascade.downstream,
+                ].filter((project) => isAdvancedDoedStage(project.stage)).length}{' '}
+                operating/construction-stage candidate(s) must be checked first.
+              </div>
+              <details className="mt-2 text-[10.5px] leading-relaxed text-faint">
+                <summary className="cursor-pointer text-river">method, official guidance and required confirmation</summary>
+                <div className="mt-1.5 space-y-1.5">
+                  <p>{cascade.method}</p>
+                  <p>{cascade.limitation}</p>
+                  <p>
+                    DoED registry updated {cascade.registry.updated}, bundled {cascade.registry.retrieved}: {cascade.registry.canonicalRecords.toLocaleString('en-US')} canonical geolocated projects after collapsing {cascade.registry.duplicateRowsCollapsed} duplicate lifecycle row(s). Retained route geometry is capped at {cascade.thresholds.routeGeometryLimit} candidates for responsive maps and exports.
+                  </p>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    <a href={cascade.registry.source} target="_blank" rel="noreferrer" className="text-river hover:underline">live DoED register ↗</a>
+                    <a href={cascade.guidance.study} target="_blank" rel="noreferrer" className="text-river hover:underline">DoED study guideline ↗</a>
+                    <a href={cascade.guidance.optimization} target="_blank" rel="noreferrer" className="text-river hover:underline">DoED system optimization guideline ↗</a>
+                    <a href={cascade.network.sourceUrl} target="_blank" rel="noreferrer" className="text-river hover:underline">HydroRIVERS v{cascade.network.version} ↗</a>
+                  </div>
+                </div>
+              </details>
+            </>
+          ) : (
+            <div className="text-[11.5px] leading-relaxed text-amber">
+              No usable directed project screen was produced{cascadeError ? `: ${cascadeError}` : '. The selected layout may not match the bundled river network'}. Confirm upstream/downstream projects from current licence maps and surveyed component coordinates.
+            </div>
+          )}
         </div>
       )}
 
@@ -775,19 +1555,20 @@ export function Reading(props: {
           <Fine>
             Straight-line distance from the powerhouse — a line is not built straight through this
             terrain, so treat it as a floor. {n(scheme.capacityMW, 1)} MW would typically connect at{' '}
-            {grid.requiredKv} kV. OpenStreetMap, © contributors, ODbL; coverage is good on the
+            {grid.requiredKv} kV. OpenStreetMap, © contributors, ODbL, retrieved {GRID_RETRIEVED};
+            coverage is good on the
             transmission backbone and patchy below 66 kV, so an absent line means unmapped, not
             absent.
           </Fine>
         </div>
       )}
 
-      {/* ---- Nepal's own regression, as an independent third opinion ---- */}
+      {/* ---- Nepal's regional regression, as an independent screening comparator ---- */}
       {hydest && (
         <div className="border-b border-line px-4 py-3.5">
-          <H>HYDEST · Nepal&apos;s national method</H>
+          <H>WECS/DHM · regional hydrology screen</H>
           <div className="flex items-baseline gap-2 text-[12px]">
-            <span className="text-muted">driest month</span>
+            <span className="text-muted">lowest monthly mean</span>
             <span className="num text-[13.5px] font-medium text-ink">
               {n(hydest.driest.cms, 2)} m³/s
             </span>
@@ -802,15 +1583,15 @@ export function Reading(props: {
               {hydest.agreement.agree ? (
                 <>
                   The global model gives {n(hydest.modelledCms, 2)} m³/s for the same month — within{' '}
-                  {n(hydest.agreement.ratio, 1)}×. Two methods built from different data agree,
-                  which is the strongest corroboration available without a gauge.
+                  {n(hydest.agreement.ratio, 1)}×. Independent regional and global methods agree
+                  on screening magnitude; this is not gauge validation.
                 </>
               ) : (
                 <>
                   The global model gives {n(hydest.modelledCms, 2)} m³/s for the same month —{' '}
-                  {n(hydest.agreement.ratio, 1)}× apart. Nepal&apos;s own regression and the flood
-                  model disagree about the dry season here, and the dry season is what sets firm
-                  power.
+                  {n(hydest.agreement.ratio, 1)}× apart. The regional regression and global model
+                  disagree about the dry season here, so gauge transfer and measurement are a P1
+                  hydrology task.
                 </>
               )}
             </div>
@@ -832,7 +1613,7 @@ export function Reading(props: {
           {hydest.floods.length > 0 && (
             <div className="mt-2.5 border-t border-line pt-2.5">
               <div className="mb-1 text-[10.5px] uppercase tracking-[0.1em] text-faint">
-                design flood, m³/s
+                regional flood estimates, m³/s
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
                 {hydest.floods
@@ -846,9 +1627,15 @@ export function Reading(props: {
               </div>
             </div>
           )}
+          <div className="mt-2.5 rounded-lg border border-amber/25 bg-[color-mix(in_srgb,var(--color-amber)_7%,transparent)] px-2 py-1.5 text-[10.5px] leading-relaxed text-amber">
+            Screening comparator only—not a selected design, diversion, spillway check flood or
+            PMF/PMP case. DoED guidance calls for applicable-method comparison, gauge-frequency and
+            historical-flood evidence, direct measurement where data are absent, and GLOF/CLOF
+            investigation.
+          </div>
           <Fine>
-            WECS/DHM 1990, fitted to Nepal&apos;s own gauged records — the method a feasibility
-            study would use for an ungauged site. Catchment below 5000 m:{' '}
+            Legacy WECS/DHM 1990 regional regression, fitted to Nepal&apos;s gauged records. Catchment
+            below 5000 m:{' '}
             {n(hydest.input.below5000Km2, 0)} of {n(hydest.input.totalKm2, 0)} km²; below 3000 m:{' '}
             {n(hydest.input.below3000Km2, 0)} km²
             {hydest.months.length > 5 ? (
@@ -862,6 +1649,24 @@ export function Reading(props: {
                 monsoon-rainfall layer, and a guessed monsoon flow would be worse than none.
               </>
             )}
+            {' · '}
+            <a
+              href={hydest.provenance.primaryCitation.catalogue}
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-dotted underline-offset-2 hover:text-ink"
+            >
+              method catalogue
+            </a>
+            {' · '}
+            <a
+              href={hydest.provenance.guidance.headworks}
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-dotted underline-offset-2 hover:text-ink"
+            >
+              current DoED headworks guidance
+            </a>
           </Fine>
         </div>
       )}
@@ -956,7 +1761,8 @@ export function Reading(props: {
           </div>
           <Fine>
             Flow is the largest error in this estimate and a gauged record is the only thing that
-            shrinks it. DHM runs {RIVER_GAUGE_COUNT} river stations, {DISCHARGE_GAUGE_COUNT} of them
+            shrinks it. The DHM inventory retrieved {DHM_STATIONS_RETRIEVED} contains{' '}
+            {RIVER_GAUGE_COUNT} river stations, {DISCHARGE_GAUGE_COUNT} of them
             recording discharge rather than water level alone. The readings are not public — the API
             requires a key, and refuses DHM&apos;s own portal too — so request the record for the
             station above and scale it by catchment area, which is what a feasibility study would do
@@ -967,52 +1773,219 @@ export function Reading(props: {
 
       {/* ---- flow ---- */}
       {flow && fdc.length > 0 && (
-        <div className="border-b border-line px-2.5 pb-3 pt-3">
+        <div className="border-b border-line px-3 pb-3 pt-3">
           <div className="px-1.5">
-            <H>Flow at your click — m³/s vs % of time exceeded</H>
+            <H right="m³/s · time exceeded">flow duration</H>
           </div>
           <Fdc
             fdc={fdc}
             designCms={scheme?.designFlowCms ?? 0}
             residualCms={scheme?.residualCms ?? 0}
           />
-          <div className="grid grid-cols-3 gap-2.5 px-1.5">
-            <Fact
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2 px-1.5 sm:grid-cols-3 xl:grid-cols-5">
+            <FlowMetric
               label="Mean"
-              value={n(meanCms, 2)}
+              value={n(shownMeanCms, 2)}
               unit="m³/s"
-              from={`${n(years, 0)} yr GloFAS record`}
+              short={measured ? 'measured record' : `${n(years, 0)} complete years`}
+              detail={
+                measured
+                  ? `${measured.series.values.length.toLocaleString()} measured values`
+                  : `${n(years, 0)} complete years${flowScale !== 1 ? ' · river-network magnitude' : ' · GloFAS magnitude'}`
+              }
             />
-            <Fact
+            <FlowMetric
               label={`Design Q${Math.round(assume.exceedance * 100)}`}
               value={scheme ? n(scheme.designFlowCms, 2) : '—'}
               unit="m³/s"
-              from="at the intake, after residual"
+              short="after release"
+              detail="At the intake, after residual release"
               tone="good"
             />
-            <Fact
+            <FlowMetric
               label="Residual"
               value={scheme ? n(scheme.residualCms, 2) : '—'}
               unit="m³/s"
-              from={`${n(assume.residualFrac * 100, 0)}% of driest month`}
+              short={region === 'nepal' ? 'policy-floor screen' : 'screening release'}
+              detail={
+                region === 'nepal'
+                  ? `${n(assume.residualFrac * 100, 0)}% of lowest monthly mean · policy-floor screen`
+                  : `${n(assume.residualFrac * 100, 0)}% of lowest monthly mean`
+              }
               tone="warn"
             />
+            {scheme?.powerDuration && (
+              <>
+                <FlowMetric
+                  label="Daily P90"
+                  value={n(scheme.powerDuration.p90MW, 2)}
+                  unit="MW"
+                  short="90% of days"
+                  detail={`Equalled or exceeded on 90% of ${scheme.powerDuration.days.toLocaleString()} record days`}
+                />
+                <FlowMetric
+                  label="Daily P95"
+                  value={n(scheme.powerDuration.p95MW, 2)}
+                  unit="MW"
+                  short="95% of days"
+                  detail={`95% exceedance · ${n(scheme.powerDuration.zeroOutputFraction * 100, 1)}% zero-output days`}
+                  tone="warn"
+                />
+              </>
+            )}
           </div>
-          {seasons && (
-            <div className="mt-2.5 grid grid-cols-2 gap-2.5 px-1.5">
-              <Fact
-                label="Wet half-year"
-                value={n(seasons.wetGwh, 1)}
-                unit="GWh"
-                from="mid-Apr → mid-Dec"
-              />
-              <Fact
-                label="Dry half-year"
-                value={n(seasons.dryGwh, 1)}
-                unit="GWh"
-                from="mid-Dec → mid-Apr, the hard months"
-              />
+          <Fine>
+            <p>
+              Mean flow uses {measured ? `${measured.series.values.length.toLocaleString()} supplied measurements` : `${n(years, 0)} complete years and ${flowScale !== 1 ? 'the mapped river-network magnitude' : 'the GloFAS magnitude'}`}.
+              Design flow is measured at the intake after the residual release; the Nepal release is a policy-floor screen.
+            </p>
+            {scheme?.powerDuration && (
+              <p className="mt-1.5">
+                Daily power-duration screen from the same release, hydraulic loss and part-load
+                dispatch as energy. This assumes one screening unit and hydrology only—no forced
+                outages, station service, curtailment, multi-unit commitment or contract test. It is
+                not firm capacity and is different from P90 annual energy.{' '}
+                <a
+                  href={POWER_DURATION_GUIDANCE.source}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                >
+                  ESHA §3.7 basis
+                </a>
+              </p>
+            )}
+          </Fine>
+          {scheme?.unitSensitivity && scheme.unitSensitivity.length > 1 && (
+            <div className="mx-1.5 mt-3 rounded-lg bg-panel-2 px-2.5 py-2">
+              <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">
+                Equal-rated unit-count sensitivity
+              </div>
+              <div className="grid grid-cols-[2rem_3.8rem_1fr_1fr] gap-x-2 border-b border-line pb-1 text-[9.5px] uppercase tracking-[0.06em] text-faint">
+                <span>Units</span><span>Runner</span><span>Energy</span><span>Daily P90 / P95</span>
+              </div>
+              {scheme.unitSensitivity.map((scenario) => (
+                <div
+                  key={scenario.units}
+                  className="grid grid-cols-[2rem_3.8rem_1fr_1fr] gap-x-2 border-b border-line py-1 text-[10.5px] last:border-0 last:pb-0"
+                >
+                  <span className="num text-ink">{scenario.units}</span>
+                  <span className="truncate text-muted">{scenario.turbine ?? 'review'}</span>
+                  <span className="num text-ink">{n(scenario.energyGwh, 1)} GWh</span>
+                  <span className="num text-ink">
+                    {n(scenario.dailyP90MW, 2)} / {n(scenario.dailyP95MW, 2)} MW
+                  </span>
+                </div>
+              ))}
+              <p className="mt-1.5 text-[10px] leading-relaxed text-faint">
+                Identical units; every feasible running-unit count is dispatched each day. The
+                one-unit row matches the headline. Extra units have no cost or outage credit here,
+                so this is not an equipment recommendation. Confirm unit rating, cavitation,
+                transients, transport, maintenance and grid/PPA availability.{' '}
+                <a
+                  href={UNIT_SENSITIVITY_GUIDANCE.nepalOperatingCase}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                >
+                  Nepal operating example
+                </a>
+              </p>
             </div>
+          )}
+          {scheme?.reliability && (
+            <>
+              <div className="mt-2.5 grid grid-cols-2 gap-2.5 px-1.5">
+                <Fact
+                  label="P50 annual energy"
+                  value={n(scheme.reliability.p50Gwh, 1)}
+                  unit="GWh"
+                  from={`median of ${scheme.reliability.annual.length} dispatched years`}
+                />
+                <Fact
+                  label="P90 annual energy"
+                  value={n(scheme.reliability.p90Gwh, 1)}
+                  unit="GWh"
+                  from="equalled or exceeded in 90% of modelled years"
+                  tone="warn"
+                />
+              </div>
+              {region === 'nepal' && (
+                <>
+              <div className="mx-1.5 mt-3 rounded-lg bg-panel-2 px-2.5 py-2">
+                <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">
+                  Nepal ROR PPA dry-energy tests
+                </div>
+                {[
+                  ['6 + 6 months', scheme.reliability.ppaSixSix, 30],
+                  ['8 + 4 months', scheme.reliability.ppaEightFour, 15],
+                ].map(([label, result, required]) => {
+                  const r = result as typeof scheme.reliability.ppaSixSix;
+                  return (
+                    <div key={String(label)} className="border-t border-line py-1 first:border-0 first:pt-0 last:pb-0">
+                      <div className="flex items-baseline gap-2 text-[11px]">
+                        <span className="w-24 shrink-0 text-muted">{String(label)}</span>
+                        <span className={`num ${r.meets ? 'text-green' : 'text-amber'}`}>
+                          {n(r.dryShare * 100, 1)}% dry
+                        </span>
+                        <span className="text-faint">
+                          {r.meets ? 'meets' : 'below'} {String(required)}%
+                        </span>
+                      </div>
+                      <div className="ml-[6.5rem] text-[10.5px] leading-relaxed text-faint">
+                        <span className="num text-ink">
+                          NPR {n(r.grossReferenceValueMillionNpr, 0)} million/yr
+                        </span>{' '}
+                        gross base-rate reference · {n(r.blendedBaseRateNprPerKwh, 2)} NPR/kWh
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-2.5 grid grid-cols-2 gap-2.5 px-1.5">
+                <Fact
+                  label="NEA wet · 8 months"
+                  value={n(scheme.reliability.ppaEightFour.wetGwh, 1)}
+                  unit="GWh"
+                  from="Baisakh through Mangsir"
+                />
+                <Fact
+                  label="NEA dry · 4 months"
+                  value={n(scheme.reliability.ppaEightFour.dryGwh, 1)}
+                  unit="GWh"
+                  from="Poush through Chaitra"
+                />
+              </div>
+              <Fine>
+                Gross reference energy value = dispatched wet energy × {NEA_ROR_PPA.wetNprPerKwh.toFixed(2)}
+                {' + '}dry energy × {NEA_ROR_PPA.dryNprPerKwh.toFixed(2)} NPR/kWh, with no escalation.
+                It is not a PPA entitlement, contracted revenue, cash flow, NPV or LCOE.
+                {scheme.capacityMW > NEA_ROR_PPA.postedRateCapacityUpToMW && (
+                  <> At {n(scheme.capacityMW, 1)} MW this is above the posted-rate 100 MW boundary;
+                  negotiated/base-rate review is mandatory.</>
+                )}{' '}
+                <a
+                  href={NEA_ROR_PPA.decisionPdf}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                >
+                  NEA Board decision
+                </a>
+              </Fine>
+                </>
+              )}
+              <Fine>
+                Every value above uses the selected turbine&apos;s part-load curve, this scheme&apos;s
+                calculated hydraulic loss, residual flow, and the active measured or modelled
+                record. P90 describes interannual hydrology, not a contractual firm-capacity
+                guarantee.
+                {region === 'nepal' && (
+                  <> NEA&apos;s Bikram Sambat season boundaries are approximated to the nearest
+                  Gregorian day for screening.</>
+                )}
+              </Fine>
+            </>
           )}
         </div>
       )}
@@ -1044,13 +2017,32 @@ export function Reading(props: {
           <Slider
             label="Residual flow"
             value={assume.residualFrac}
-            min={0}
+            min={region === 'nepal' ? NEPAL_EFLOW_POLICY.minimumFractionOfLowestMonthlyMean : 0}
             max={0.5}
             step={0.01}
             display={`${Math.round(assume.residualFrac * 100)}% of min month`}
             onChange={(v) => set('residualFrac', v)}
-            note="Left in the river. Bases vary by jurisdiction — set yours."
+            note={
+              region === 'nepal'
+                ? 'Policy floor: at least 10% of the lowest monthly average, or the higher EIA requirement.'
+                : 'Left in the river. Bases vary by jurisdiction—set the applicable requirement.'
+            }
           />
+          {region === 'nepal' && (
+            <p className="text-[10.5px] leading-relaxed text-faint">
+              This control cannot go below Nepal&apos;s published floor, but 10% is not ecological
+              clearance. Habitat, downstream use, seasonal releases, drought/ramping, fish passage
+              and the approved EIA can require more.{' '}
+              <a
+                href={NEPAL_EFLOW_POLICY.source}
+                target="_blank"
+                rel="noreferrer"
+                className="underline decoration-dotted underline-offset-2 hover:text-ink"
+              >
+                policy §6.1.1
+              </a>
+            </p>
+          )}
           <label className="flex items-center justify-between gap-2 pt-0.5">
             <span className="text-[12px] text-muted">Household use, kWh/yr</span>
             <input
@@ -1070,7 +2062,7 @@ export function Reading(props: {
         <div className="border-b border-line px-4 py-3.5 text-[11px] leading-relaxed text-faint">
           <H>Where this comes from</H>
           <div>
-            <b className="text-muted">Flow</b> — GloFAS v4 reanalysis, {n(years, 0)} years,{' '}
+            <b className="text-muted">Flow</b> — GloFAS v4 consolidated history, {n(modelYears, 0)} complete years,{' '}
             {flow.from === 'network' ? 'fetched now' : flow.from === 'cache' ? 'from cache' : 'stale cache'}
             . Modelled, not gauged. Rescaled along the river by catchment.
           </div>
@@ -1124,7 +2116,7 @@ export function Reading(props: {
       {canExport && (
         <div className="border-b border-line px-4 py-3.5">
           <H>Take it with you</H>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => onExport('csv')}
@@ -1138,6 +2130,13 @@ export function Reading(props: {
               className="flex-1 rounded-lg border border-line bg-panel-2 px-3 py-2 text-[12px] font-medium text-ink hover:border-river/60 hover:bg-[color-mix(in_srgb,var(--color-river)_8%,transparent)] hover:text-river"
             >
               GeoJSON — for QGIS
+            </button>
+            <button
+              type="button"
+              onClick={() => onExport('field-plan')}
+              className="col-span-2 rounded-lg border border-river/30 bg-[color-mix(in_srgb,var(--color-river)_6%,transparent)] px-3 py-2 text-[12px] font-medium text-river hover:border-river/60 hover:text-ink"
+            >
+              Field plan CSV — gates, priorities & deliverables
             </button>
           </div>
           <Fine>

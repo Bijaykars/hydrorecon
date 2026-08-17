@@ -147,7 +147,17 @@ const IMPULSE_MAX_CMS = 150;
  * published source — and pick the machine whose band most tightly brackets the
  * head, on a log scale so a 50–1300 m band does not win by sheer width.
  */
-export function selectTurbine(designFlowCms: number, headM: number): TurbineType | null {
+export type TurbineSelectionEvidence = {
+  type: TurbineType;
+  method: 'HydroGenerate duty-point envelope' | 'ESHA head-range fallback';
+  reason: string;
+};
+
+/** The selected machine plus the exact engineering basis shown in the UI. */
+export function explainTurbineSelection(
+  designFlowCms: number,
+  headM: number
+): TurbineSelectionEvidence | null {
   let best: TurbineType | null = null;
   let bestDist = Infinity;
   for (const { type, poly } of REGIONS) {
@@ -159,7 +169,13 @@ export function selectTurbine(designFlowCms: number, headM: number): TurbineType
       best = type;
     }
   }
-  if (best) return best;
+  if (best) {
+    return {
+      type: best,
+      method: 'HydroGenerate duty-point envelope',
+      reason: `${headM.toFixed(0)} m net head and ${designFlowCms.toFixed(2)} m³/s design flow fall inside the published ${best} operating region.`,
+    };
+  }
   if (!(headM > 0) || !(designFlowCms > 0)) return null;
 
   let fallback: TurbineType | null = null;
@@ -179,7 +195,17 @@ export function selectTurbine(designFlowCms: number, headM: number): TurbineType
       fallback = type;
     }
   }
-  return fallback;
+  return fallback
+    ? {
+        type: fallback,
+        method: 'ESHA head-range fallback',
+        reason: `${headM.toFixed(0)} m net head falls in the ESHA ${fallback} head band; the duty point lies outside the smaller HydroGenerate polygons.`,
+      }
+    : null;
+}
+
+export function selectTurbine(designFlowCms: number, headM: number): TurbineType | null {
+  return explainTurbineSelection(designFlowCms, headM)?.type ?? null;
 }
 
 /** Turbine manufacture / design coefficient. HydroGenerate's default. */

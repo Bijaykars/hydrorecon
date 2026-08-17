@@ -12,17 +12,19 @@ import { haversineKm } from './engine/hydro.ts';
 // ---------------------------------------------------------------------------
 
 /**
- * 20 complete calendar years. Open-Meteo bills long ranges as many
+ * Up to 20 calendar years. Open-Meteo bills long ranges as many
  * request-equivalents, so asking for everything on every click needlessly burns
- * the shared free quota. 20 years still spans several wet/dry cycles, and the
- * period is immutable so it caches perfectly.
+ * the shared free quota. Incomplete local years are removed before use so a
+ * partial season cannot bias the FDC; the remaining period caches perfectly.
  */
 const MODEL = 'consolidated_v4';
 const LAST_COMPLETE_YEAR = new Date().getUTCFullYear() - 1;
 export const GLOFAS_START = `${LAST_COMPLETE_YEAR - 19}-01-01`;
 export const GLOFAS_END = `${LAST_COMPLETE_YEAR}-12-31`;
 
-const CACHE_PREFIX = 'ghatta:glofas:v1:';
+// v2 excludes incomplete calendar years. Keeping v1 responses would silently
+// reintroduce the partial-year bias this version exists to remove.
+const CACHE_PREFIX = 'ghatta:glofas:v2:';
 const CACHE_INDEX = `${CACHE_PREFIX}index`;
 const COOLDOWN_KEY = `${CACHE_PREFIX}cooldown`;
 const CACHE_MAX = 12;
@@ -30,7 +32,7 @@ const CACHE_TTL_MS = 180 * 864e5;
 const inFlight = new Map<string, Promise<DischargeSeries>>();
 
 /** GloFAS is a 0.05° grid; quantizing to it makes the cache actually hit. */
-const CELL_DEG = 0.05;
+export const CELL_DEG = 0.05;
 const quantize = (lat: number, lon: number) => ({
   lat: Math.round(lat / CELL_DEG) * CELL_DEG,
   lon: Math.round(lon / CELL_DEG) * CELL_DEG,
@@ -81,6 +83,42 @@ export type DischargeSeries = {
   elevationM: number;
   from: 'network' | 'cache' | 'stale-cache';
 };
+
+/**
+ * Keep only substantially complete calendar years from a daily record.
+ *
+ * The consolidated endpoint can return the requested date axis with nulls
+ * before local coverage begins and after its latest update. Merely dropping
+ * those nulls leaves seasonal fragments that bias the flow-duration curve.
+ */
+export function completeCalendarYears(
+  dates: readonly string[],
+  values: readonly number[],
+  minCoverage = 0.99
+): { dates: string[]; values: number[]; years: number[] } {
+  const counts = new Map<number, number>();
+  const valid: { date: string; value: number; year: number }[] = [];
+  for (let i = 0; i < Math.min(dates.length, values.length); i++) {
+    const value = values[i];
+    const date = dates[i];
+    const year = Number(date?.slice(0, 4));
+    if (!Number.isInteger(year) || !Number.isFinite(value)) continue;
+    valid.push({ date, value, year });
+    counts.set(year, (counts.get(year) ?? 0) + 1);
+  }
+  const leap = (year: number) => year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const years = [...counts.entries()]
+    .filter(([year, days]) => days >= (leap(year) ? 366 : 365) * minCoverage)
+    .map(([year]) => year)
+    .sort((a, b) => a - b);
+  const keep = new Set(years);
+  const kept = valid.filter((x) => keep.has(x.year));
+  return {
+    dates: kept.map((x) => x.date),
+    values: kept.map((x) => x.value),
+    years,
+  };
+}
 
 export async function fetchDischarge(
   lat: number,
@@ -157,9 +195,13 @@ export async function fetchDischarge(
     if (values.length === 0) {
       throw new Error('The flood model has no river at this point — try a larger channel.');
     }
+    const complete = completeCalendarYears(dates, values);
+    if (complete.values.length === 0) {
+      throw new Error('The flood model returned no complete calendar year at this point.');
+    }
     const data: DischargeSeries = {
-      dates,
-      values,
+      dates: complete.dates,
+      values: complete.values,
       cell: { lat: j.latitude, lon: j.longitude },
       elevationM: j.elevation,
       from: 'network',
@@ -204,6 +246,60 @@ export async function probeNeighbours(
 
 export const meanOf = (v: readonly number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 
+/**
+ * The long record — GloFAS back to 1984 — for one cell, on request only.
+ *
+ * The default up-to-20-year request is a quota courtesy, not a statistics choice. When the
+ * user asks the app to work a site harder, doubling the record is the cheapest
+ * real improvement on the FDC's tails: the up-to-40-year window can hold droughts and
+ * flood years the ordinary request misses. Only complete local years survive.
+ * Not cached in localStorage — at ~15k
+ * daily values it would evict several ordinary studies to store one.
+ */
+export async function fetchDischargeYears(
+  lat: number,
+  lon: number,
+  years = 40,
+  signal?: AbortSignal
+): Promise<DischargeSeries> {
+  const cell = quantize(lat, lon);
+  const start = `${LAST_COMPLETE_YEAR - (years - 1)}-01-01`;
+  const base =
+    `https://flood-api.open-meteo.com/v1/flood?latitude=${cell.lat.toFixed(4)}` +
+    `&longitude=${cell.lon.toFixed(4)}&daily=river_discharge` +
+    `&start_date=${start}&end_date=${GLOFAS_END}`;
+  let res = await fetch(`${base}&models=${MODEL}`, { signal });
+  if (res.status === 400) res = await fetch(base, { signal });
+  if (res.status === 429) throw new Error('Open-Meteo asked us to pause — try the audit again in a few minutes.');
+  if (!res.ok) throw new Error(`Flow history unavailable (HTTP ${res.status}).`);
+  const j = (await res.json()) as {
+    latitude: number;
+    longitude: number;
+    elevation: number;
+    daily: { time: string[]; river_discharge: (number | null)[] };
+  };
+  const dates: string[] = [];
+  const values: number[] = [];
+  for (let i = 0; i < j.daily.time.length; i++) {
+    const v = j.daily.river_discharge[i];
+    if (v === null || v === undefined) continue;
+    dates.push(j.daily.time[i]);
+    values.push(v);
+  }
+  if (values.length === 0) throw new Error('The flood model has no river at this point.');
+  const complete = completeCalendarYears(dates, values);
+  if (complete.values.length === 0) {
+    throw new Error('The flood model returned no complete calendar year at this point.');
+  }
+  return {
+    dates: complete.dates,
+    values: complete.values,
+    cell: { lat: j.latitude, lon: j.longitude },
+    elevationM: j.elevation,
+    from: 'network',
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Terrain — Terrarium DEM tiles decoded in the browser.
 // O(tiles), not O(points): once tiles are cached, sampling more points is free.
@@ -211,8 +307,8 @@ export const meanOf = (v: readonly number[]) => v.reduce((a, b) => a + b, 0) / v
 
 /**
  * Best first. Re:Earth (Mapterhorn) serves 512 px tiles to z17; AWS stops at z15
- * and 404s past it. Gross head is the most error-sensitive input in the whole
- * estimate, so the finer source is worth the bytes.
+ * and 404s past it. Both are 30 m DEMs over Nepal, so profile sampling is capped
+ * at the first zoom that actually resolves that native posting.
  */
 const DEM_SOURCES = [
   {
@@ -238,6 +334,30 @@ const TILE_BUDGET = 12;
 
 const tileCache = new Map<string, Promise<ImageData | null>>();
 
+/** A slow public tile host must never hold the entire study open indefinitely. */
+export const DEM_TILE_TIMEOUT_MS = 6000;
+const DEM_SOURCE_COOLDOWN_MS = 5 * 60_000;
+const demSourceUnavailableUntil = new Map<string, number>();
+
+/** Resolve with a safe fallback when an external operation rejects or exceeds its deadline. */
+export function settleWithin<T>(work: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value: T) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(fallback), timeoutMs);
+    work.then(finish, () => finish(fallback));
+  });
+}
+
+const sourceIsCoolingDown = (id: string) => (demSourceUnavailableUntil.get(id) ?? 0) > Date.now();
+const coolDownSource = (id: string) =>
+  void demSourceUnavailableUntil.set(id, Date.now() + DEM_SOURCE_COOLDOWN_MS);
+
 const lonToTileX = (lon: number, z: number) => ((lon + 180) / 360) * 2 ** z;
 const latToTileY = (lat: number, z: number) => {
   const r = (lat * Math.PI) / 180;
@@ -253,7 +373,7 @@ function loadTile(
   const key = `${src.id}/${z}/${x}/${y}`;
   const hit = tileCache.get(key);
   if (hit) return hit;
-  const p = new Promise<ImageData | null>((resolve) => {
+  const raw = new Promise<ImageData | null>((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous'; // both sources send ACAO:*, so the canvas stays readable
     img.onload = () => {
@@ -271,6 +391,13 @@ function loadTile(
     };
     img.onerror = () => resolve(null);
     img.src = src.url(z, x, y);
+  });
+  let p: Promise<ImageData | null>;
+  p = settleWithin(raw, DEM_TILE_TIMEOUT_MS, null).then((tile) => {
+    // Do not permanently cache a timeout or transient host failure. The source
+    // cooldown prevents an immediate retry storm while preserving later recovery.
+    if (tile === null && tileCache.get(key) === p) tileCache.delete(key);
+    return tile;
   });
   tileCache.set(key, p);
   return p;
@@ -315,6 +442,13 @@ function offset(lat: number, lon: number, bearingRad: number, km: number) {
 }
 
 export type TracedPoint = { lat: number; lon: number; km: number; elevationM: number };
+export type TracedPath = {
+  points: TracedPoint[];
+  source: string;
+  zoom: number;
+  resolutionM: number;
+  tilesFetched: number;
+};
 
 /**
  * Follow the valley downhill from a point, using terrain only.
@@ -325,42 +459,62 @@ export async function traceDownhill(
   lon: number,
   maxKm = 22,
   stepKm = 0.15
-): Promise<TracedPoint[]> {
+): Promise<TracedPath | null> {
   // A generous tile patch around the click, at a zoom that keeps the count sane.
-  const src = DEM_SOURCES[0];
   const spanDeg = maxKm / 111;
   const corners = [
     { lat: lat - spanDeg, lon: lon - spanDeg },
     { lat: lat + spanDeg, lon: lon + spanDeg },
   ];
-  let zoom = 13;
-  for (let z = 13; z >= 9; z--) {
-    const nx =
-      Math.floor(lonToTileX(corners[1].lon, z)) - Math.floor(lonToTileX(corners[0].lon, z)) + 1;
-    const ny =
-      Math.floor(latToTileY(corners[0].lat, z)) - Math.floor(latToTileY(corners[1].lat, z)) + 1;
-    if (nx * ny <= 36) {
-      zoom = z;
-      break;
+  let terrain:
+    | {
+        src: (typeof DEM_SOURCES)[number];
+        zoom: number;
+        tiles: Map<string, ImageData | null>;
+      }
+    | undefined;
+
+  for (const src of DEM_SOURCES) {
+    if (sourceIsCoolingDown(src.id)) continue;
+    const maxUsefulZoom = demAnalysisZoom(src.tilePx, src.maxZoom, src.nativeM, lat);
+    let zoom = maxUsefulZoom;
+    for (let z = maxUsefulZoom; z >= 9; z--) {
+      const nx =
+        Math.floor(lonToTileX(corners[1].lon, z)) - Math.floor(lonToTileX(corners[0].lon, z)) + 1;
+      const ny =
+        Math.floor(latToTileY(corners[0].lat, z)) - Math.floor(latToTileY(corners[1].lat, z)) + 1;
+      if (nx * ny <= 36) {
+        zoom = z;
+        break;
+      }
     }
+
+    const x0 = Math.floor(lonToTileX(corners[0].lon, zoom));
+    const x1 = Math.floor(lonToTileX(corners[1].lon, zoom));
+    const y0 = Math.floor(latToTileY(corners[1].lat, zoom));
+    const y1 = Math.floor(latToTileY(corners[0].lat, zoom));
+    const tiles = new Map<string, ImageData | null>();
+    const jobs: Promise<void>[] = [];
+    for (let x = x0; x <= x1; x++) {
+      for (let y = y0; y <= y1; y++) {
+        jobs.push(loadTile(src, zoom, x, y).then((img) => void tiles.set(`${x}/${y}`, img)));
+      }
+    }
+    await Promise.all(jobs);
+    if ([...tiles.values()].some((tile) => tile === null)) {
+      coolDownSource(src.id);
+      continue;
+    }
+    demSourceUnavailableUntil.delete(src.id);
+    terrain = { src, zoom, tiles };
+    break;
   }
 
-  const x0 = Math.floor(lonToTileX(corners[0].lon, zoom));
-  const x1 = Math.floor(lonToTileX(corners[1].lon, zoom));
-  const y0 = Math.floor(latToTileY(corners[1].lat, zoom));
-  const y1 = Math.floor(latToTileY(corners[0].lat, zoom));
-  const tiles = new Map<string, ImageData | null>();
-  const jobs: Promise<void>[] = [];
-  for (let x = x0; x <= x1; x++) {
-    for (let y = y0; y <= y1; y++) {
-      jobs.push(loadTile(src, zoom, x, y).then((img) => void tiles.set(`${x}/${y}`, img)));
-    }
-  }
-  await Promise.all(jobs);
-  if ([...tiles.values()].every((t) => t === null)) return [];
+  if (!terrain) return null;
+  const { src, zoom, tiles } = terrain;
 
   const z0 = elevationFromTiles(tiles, zoom, lat, lon);
-  if (!Number.isFinite(z0)) return [];
+  if (!Number.isFinite(z0)) return null;
 
   const out: TracedPoint[] = [{ lat, lon, km: 0, elevationM: z0 }];
   let cur = { lat, lon };
@@ -399,7 +553,13 @@ export async function traceDownhill(
     bearing = bestBearing;
     out.push({ lat: cur.lat, lon: cur.lon, km, elevationM: bestZ });
   }
-  return out;
+  return {
+    points: out,
+    source: `${src.id} (valley trace)`,
+    zoom,
+    resolutionM: groundResolution(zoom, src.tilePx, lat, src.nativeM),
+    tilesFetched: tiles.size,
+  };
 }
 
 export type ProfilePoint = { distanceKm: number; elevationM: number; lat: number; lon: number };
@@ -424,7 +584,8 @@ function pickZoom(
   pts: { lat: number; lon: number }[],
   budget: number
 ): number {
-  for (let z = src.maxZoom; z >= 8; z--) {
+  const maxUsefulZoom = demAnalysisZoom(src.tilePx, src.maxZoom, src.nativeM, pts[0]?.lat ?? 0);
+  for (let z = maxUsefulZoom; z >= 8; z--) {
     const need = new Set<string>();
     for (const p of pts) {
       need.add(`${Math.floor(lonToTileX(p.lon, z))}/${Math.floor(latToTileY(p.lat, z))}`);
@@ -438,6 +599,24 @@ function pickZoom(
 /** Ground distance covered by one tile PIXEL. Not the same as knowing that much. */
 const pixelSpacingM = (z: number, tilePx: number, lat: number) =>
   (40075016.686 * Math.cos((lat * Math.PI) / 180)) / (2 ** z * tilePx);
+
+/**
+ * The first zoom whose pixel spacing resolves the DEM's native grid. Going
+ * higher downloads more interpolated pixels without adding terrain evidence.
+ */
+export function demAnalysisZoom(
+  tilePx: number,
+  maxZoom: number,
+  nativeM: number,
+  lat: number
+): number {
+  const cappedMax = Math.max(0, Math.floor(maxZoom));
+  if (!(tilePx > 0) || !(nativeM > 0) || !Number.isFinite(lat)) return cappedMax;
+  for (let z = 0; z <= cappedMax; z++) {
+    if (pixelSpacingM(z, tilePx, lat) <= nativeM) return z;
+  }
+  return cappedMax;
+}
 
 /**
  * How finely the terrain is actually known, metres.
@@ -512,13 +691,20 @@ export async function fetchProfile(
  * Elevation along an arbitrary path — a real river course rather than a straight
  * line. A longer path needs more tiles, so it gets a larger budget and, where
  * that is still not enough, a coarser zoom. The chosen resolution is reported.
+ *
+ * `onlySource` pins the sampling to one named DEM product. The site audit uses
+ * it to measure the same path on the SECOND product and compare: two
+ * independently produced terrains disagreeing by 3 m at this site is worth more
+ * than a global ±15 m assumption, and disagreeing by 30 m is worth even more.
  */
 export function fetchPathProfile(
-  path: { lat: number; lon: number; km: number }[]
+  path: { lat: number; lon: number; km: number }[],
+  onlySource?: string
 ): Promise<ElevationProfile> {
   return sampleAlong(
     path.map((p) => ({ lat: p.lat, lon: p.lon, distanceKm: p.km })),
-    PATH_TILE_BUDGET
+    PATH_TILE_BUDGET,
+    onlySource
   );
 }
 
@@ -527,9 +713,12 @@ const PATH_TILE_BUDGET = 40;
 
 async function sampleAlong(
   pts: { lat: number; lon: number; distanceKm: number }[],
-  budget: number
+  budget: number,
+  onlySource?: string
 ): Promise<ElevationProfile> {
   for (const src of DEM_SOURCES) {
+    if (onlySource && src.id !== onlySource) continue;
+    if (!onlySource && sourceIsCoolingDown(src.id)) continue;
     const zoom = pickZoom(src, pts, budget);
     const needed = new Set<string>();
     for (const p of pts) {
@@ -542,7 +731,13 @@ async function sampleAlong(
         tiles.set(k, await loadTile(src, zoom, x, y));
       })
     );
-    if ([...tiles.values()].every((t) => t === null)) continue; // no coverage — try the next source
+    // One missing tile is enough to create a false head or a broken longitudinal
+    // profile. Retry the complete path on the backup rather than mixing gaps in.
+    if ([...tiles.values()].some((tile) => tile === null)) {
+      coolDownSource(src.id);
+      continue;
+    }
+    demSourceUnavailableUntil.delete(src.id);
 
     const points = pts.map((p) => {
       const fx = lonToTileX(p.lon, zoom);

@@ -14,16 +14,24 @@ import {
   HOURS_PER_YEAR,
   CFS_TO_CMS,
   BENCHMARK,
+  NEA_ROR_PPA,
+  NEPAL_EFLOW_POLICY,
+  POWER_DURATION_GUIDANCE,
   buildFdc,
   flowAtExceedance,
   powerW,
+  powerDurationSummary,
+  ppaReferenceValue,
+  enforceNepalEflowFloor,
   minMonthlyMean,
   netHead,
   netHeadAt,
   residualForBasis,
   turbineFlow,
   annualEnergy,
+  annualEnergyByYear,
   energyFromFdcTrapezoid,
+  valueAtExceedance,
   seasonalRatio,
   wetDryEnergy,
   haversineKm,
@@ -284,6 +292,28 @@ ok('an empty record yields zeros, not NaN (station with no discharge data)', () 
   assert.ok(Number.isFinite(r.ratedPowerW));
 });
 
+ok('daily P90/P95 power dispatches the same residual, Q² loss and efficiency as energy', () => {
+  const duration = powerDurationSummary(new Array(365).fill(10), base)!;
+  const turbineQ = 9; // 10 river - 1 residual
+  const expected = powerW(turbineQ, netHeadAt(base, turbineQ), base.efficiency);
+  near(duration.dailyP90W, expected, 1e-12, 'daily P90 power');
+  near(duration.dailyP95W, expected, 1e-12, 'daily P95 power');
+  assert.equal(duration.zeroOutputFraction, 0);
+  assert.equal(duration.days, 365);
+});
+
+ok('dry shutdown days drive dependable output to zero and the result cannot claim firm capacity', () => {
+  const duration = powerDurationSummary([
+    ...new Array(80).fill(10),
+    ...new Array(20).fill(1),
+  ], base)!;
+  assert.equal(duration.dailyP90W, 0);
+  assert.equal(duration.dailyP95W, 0);
+  assert.equal(duration.zeroOutputFraction, 0.2);
+  assert.match(POWER_DURATION_GUIDANCE.reference, /ESHA 2004.*section 3\.7/i);
+  assert.match(POWER_DURATION_GUIDANCE.interpretation, /not contractual firm capacity.*availability/i);
+});
+
 ok('raising residual flow can only reduce energy', () => {
   const record = Array.from({ length: 1000 }, (_, i) => 1 + 15 * ((i % 97) / 97));
   const low = annualEnergy(record, { ...base, residualFlowCms: 0 }).gwhPerYear;
@@ -339,7 +369,45 @@ ok('manual basis derives nothing', () => {
   assert.ok(Number.isNaN(residualForBasis('manual', ['2020-01-01'], [10])));
 });
 
+ok('Nepal environmental-flow scenarios cannot fall below the policy floor', () => {
+  assert.equal(enforceNepalEflowFloor(0), 0.1);
+  assert.equal(enforceNepalEflowFloor(0.05), 0.1);
+  assert.equal(enforceNepalEflowFloor(0.1), 0.1);
+  assert.equal(enforceNepalEflowFloor(0.25), 0.25);
+  assert.equal(enforceNepalEflowFloor(Number.NaN), 0.1);
+});
+
+ok('the Nepal policy metadata preserves the higher-EIA rule and non-claim', () => {
+  assert.equal(NEPAL_EFLOW_POLICY.minimumFractionOfLowestMonthlyMean, 0.1);
+  assert.match(NEPAL_EFLOW_POLICY.policy, /section 6\.1\.1/i);
+  assert.match(NEPAL_EFLOW_POLICY.interpretation, /higher of at least 10%.*EIA-required minimum/i);
+  assert.match(NEPAL_EFLOW_POLICY.interpretation, /not an approved ecological-flow determination/i);
+  assert.match(NEPAL_EFLOW_POLICY.source, /^https:\/\/doed\.gov\.np\//);
+  assert.match(NEPAL_EFLOW_POLICY.lawCommission, /^https:\/\/repository\.lawcommission\.gov\.np\//);
+});
+
 console.log('\nwet/dry PPA season split');
+
+ok('published NEA base rates convert seasonal GWh to million NPR without a hidden unit factor', () => {
+  const value = ppaReferenceValue(100, 20)!;
+  // 100 GWh × 4.8 NPR/kWh + 20 GWh × 8.4 NPR/kWh = NPR 648 million.
+  near(value.grossMillionNpr, 648, 1e-12);
+  near(value.blendedNprPerKwh, 5.4, 1e-12);
+});
+
+ok('zero generation gives zero gross reference value and invalid energy is refused', () => {
+  assert.deepEqual(ppaReferenceValue(0, 0), { grossMillionNpr: 0, blendedNprPerKwh: 0 });
+  assert.equal(ppaReferenceValue(-1, 2), null);
+  assert.equal(ppaReferenceValue(Number.NaN, 2), null);
+});
+
+ok('the published-rate metadata forbids automatic escalation and flags the 100 MW boundary', () => {
+  assert.equal(NEA_ROR_PPA.wetNprPerKwh, 4.8);
+  assert.equal(NEA_ROR_PPA.dryNprPerKwh, 8.4);
+  assert.equal(NEA_ROR_PPA.postedRateCapacityUpToMW, 100);
+  assert.match(NEA_ROR_PPA.escalation, /not applied/i);
+  assert.match(NEA_ROR_PPA.interpretation, /not a PPA entitlement.*NPV.*LCOE/i);
+});
 
 ok('wet + dry energy sums back to the annual total', () => {
   const dates: string[] = [];
@@ -357,12 +425,35 @@ ok('wet + dry energy sums back to the annual total', () => {
   assert.ok(wetGwh > dryGwh, 'monsoon energy should land in the wet season');
 });
 
-ok('season boundaries fall mid-April and mid-December, not on month ends', () => {
-  const d = ['2022-04-14', '2022-04-15', '2022-12-14', '2022-12-15'];
+ok('the NEA 8+4 boundaries fall in mid-April and mid-December', () => {
+  const d = ['2022-04-13', '2022-04-14', '2022-12-15', '2022-12-16'];
   const v = [10, 10, 10, 10];
   const { wetDays, dryDays } = wetDryEnergy(d, v, base);
-  assert.equal(wetDays, 2, 'Apr 15 and Dec 14 are wet');
-  assert.equal(dryDays, 2, 'Apr 14 and Dec 15 are dry');
+  assert.equal(wetDays, 2, 'Apr 14 and Dec 15 are wet');
+  assert.equal(dryDays, 2, 'Apr 13 and Dec 16 are dry');
+});
+
+ok('the alternative NEA 6+6 boundaries run from late May through November', () => {
+  const d = ['2022-05-29', '2022-05-30', '2022-11-30', '2022-12-01'];
+  const v = [10, 10, 10, 10];
+  const { wetDays, dryDays } = wetDryEnergy(d, v, base, 'nea-6-6');
+  assert.equal(wetDays, 2, 'May 30 and Nov 30 are wet');
+  assert.equal(dryDays, 2, 'May 29 and Dec 1 are dry');
+});
+
+ok('annual reliability excludes incomplete years and orders P90 below P50', () => {
+  const dates: string[] = [];
+  const values: number[] = [];
+  for (const [year, q, days] of [[2019, 6, 365], [2020, 12, 366], [2021, 20, 100]] as const) {
+    const start = Date.UTC(year, 0, 1);
+    for (let k = 0; k < days; k++) {
+      dates.push(new Date(start + k * 864e5).toISOString().slice(0, 10));
+      values.push(q);
+    }
+  }
+  const annual = annualEnergyByYear(dates, values, base);
+  assert.deepEqual(annual.map((x) => x.year), [2019, 2020]);
+  assert.ok(valueAtExceedance(annual.map((x) => x.gwh), 0.9) <= valueAtExceedance(annual.map((x) => x.gwh), 0.5));
 });
 
 console.log('\nseasonality and geometry');
@@ -445,12 +536,54 @@ ok('evaluate reproduces P = rho*g*Q*H*eta by hand', () => {
   near(s.capacityMW, (1000 * 9.81 * 12 * s.netHeadM * c.peak * 0.85) / 1e6, 1e-9);
 });
 
+ok('scheme PPA and P90 figures use the exact same dispatch as headline energy', () => {
+  const dates: string[] = [];
+  const series: number[] = [];
+  for (const [year, q] of [[2019, 9], [2020, 15]] as const) {
+    const days = year === 2020 ? 366 : 365;
+    const start = Date.UTC(year, 0, 1);
+    for (let k = 0; k < days; k++) {
+      dates.push(new Date(start + k * 864e5).toISOString().slice(0, 10));
+      series.push(q);
+    }
+  }
+  const input = {
+    ...steady(ramp()),
+    dates,
+    series,
+    seriesMeanCms: series.reduce((a, b) => a + b, 0) / series.length,
+  };
+  const s = evaluate(input, 0, 50)!;
+  assert.ok(s.reliability, 'dated daily flow must produce reliability diagnostics');
+  near(
+    s.reliability!.ppaEightFour.wetGwh + s.reliability!.ppaEightFour.dryGwh,
+    s.energyGwh,
+    1e-9,
+    'PPA split vs headline dispatch'
+  );
+  assert.ok(s.reliability!.p90Gwh <= s.reliability!.p50Gwh);
+  const ppa = s.reliability!.ppaEightFour;
+  near(
+    ppa.grossReferenceValueMillionNpr,
+    ppa.wetGwh * 4.8 + ppa.dryGwh * 8.4,
+    1e-12,
+    'scheme PPA reference value'
+  );
+  near(
+    ppa.blendedBaseRateNprPerKwh,
+    ppa.grossReferenceValueMillionNpr / (ppa.wetGwh + ppa.dryGwh),
+    1e-12,
+    'scheme blended base rate'
+  );
+});
+
 ok('an intake on a bigger catchment gets proportionally more water', () => {
   const path = ramp();
   for (let k = 60; k < path.length; k++) path[k].meanCms = 24; // a tributary joins
   const upper = evaluate(steady(path), 0, 50)!;
   const lower = evaluate(steady(path), 61, 111)!;
   near(lower.designFlowCms / upper.designFlowCms, 2, 1e-9);
+  near(lower.flowScale / upper.flowScale, 2, 1e-9, 'the displayed intake record uses the same scale');
   // Power tracks flow, but not to the last digit: the runner-size term in the
   // efficiency correlation gives the larger machine a small scale advantage.
   const ratio = lower.capacityMW / upper.capacityMW;

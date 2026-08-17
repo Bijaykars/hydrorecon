@@ -30,7 +30,9 @@ type RawArea = {
   rings: number[][];
 };
 
-const AREAS = (protectedRaw as unknown as { areas: RawArea[] }).areas;
+const PROTECTED_BUNDLE = protectedRaw as unknown as { _retrieved: string; areas: RawArea[] };
+const AREAS = PROTECTED_BUNDLE.areas;
+export const PROTECTED_RETRIEVED = PROTECTED_BUNDLE._retrieved;
 
 export type ProtectedHit = {
   name: string;
@@ -133,3 +135,34 @@ export const isHardStop = (hits: ProtectedHit[]): boolean =>
   hits.some((h) => /prohibited|heavily restricted/i.test(h.regime));
 
 export const PROTECTED_COUNT = AREAS.length;
+
+/** Simplified national protected-area boundaries for visible map context. */
+export function protectedAreasGeoJson(): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: AREAS.map((area) => ({
+      type: 'Feature',
+      geometry: {
+        type: 'Polygon',
+        coordinates: area.rings.map((ring) => {
+          const coordinates = Array.from({ length: Math.floor(ring.length / 2) }, (_, i) => [
+            ring[i * 2 + 1],
+            ring[i * 2],
+          ]);
+          const first = coordinates[0];
+          const last = coordinates.at(-1);
+          if (first && last && (first[0] !== last[0] || first[1] !== last[1])) {
+            coordinates.push([...first]);
+          }
+          return coordinates;
+        }),
+      },
+      properties: {
+        name: area.n,
+        kind: area.k,
+        regime: area.r,
+        areaKm2: area.a,
+      },
+    })),
+  };
+}

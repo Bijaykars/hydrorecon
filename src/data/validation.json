@@ -1,6 +1,6 @@
 {
  "_what": "Ghatta run at ten built Nepali plants with its shipped defaults — same engine and data sources as the app, coordinates from public records, no per-plant tuning.",
- "_generated": "2026-08-13",
+ "_generated": "2026-08-16",
  "_appDefaults": {
   "exceedance": "Q40",
   "efficiency": 0.96,
@@ -37,15 +37,15 @@
     "name": "Upper Tamakoshi",
     "ok": true,
     "predicted": {
-     "capacityMW": 96.82215397189469,
-     "energyGwh": 582.3685475318512,
-     "grossHeadM": 667.9094682738319,
-     "netHeadM": 655.5264397292858,
-     "designFlowCms": 18.46020598200518,
-     "meanFlowCms": 54.463,
+     "capacityMW": 101.87875201668756,
+     "energyGwh": 598.2778409917984,
+     "grossHeadM": 669.1302145282878,
+     "netHeadM": 657.0649513689152,
+     "designFlowCms": 19.39803569757494,
+     "meanFlowCms": 54.46300000000001,
      "waterwayKm": 7.920000000000006,
      "turbine": "Pelton",
-     "plantFactor": 0.686624135832977
+     "plantFactor": 0.6703709639047964
     },
     "snapKm": {
      "intake": 1.102833831293673,
@@ -54,7 +54,7 @@
     "reachKm2": 1754,
     "flow": {
      "authority": "network",
-     "disagreement": 1.545934811744215,
+     "disagreement": 1.5197518817208335,
      "judgeCms": null,
      "judgeKind": null,
      "networkCms": null,
@@ -97,15 +97,15 @@
     "name": "Kali Gandaki A",
     "ok": true,
     "predicted": {
-     "capacityMW": 149.54511194726206,
-     "energyGwh": 630.0114409513836,
-     "grossHeadM": 120.61334732012341,
-     "netHeadM": 111.43926929837508,
-     "designFlowCms": 150.87104782281926,
+     "capacityMW": 162.92711693453853,
+     "energyGwh": 684.8649675914616,
+     "grossHeadM": 125.02614044367232,
+     "netHeadM": 116.0626584267818,
+     "designFlowCms": 157.78933300826958,
      "meanFlowCms": 290.481,
      "waterwayKm": 40.439999999999905,
      "turbine": "Francis",
-     "plantFactor": 0.4809191910546651
+     "plantFactor": 0.47985218080588965
     },
     "snapKm": {
      "intake": 0.24814349562202434,
@@ -114,12 +114,12 @@
     "reachKm2": 7425.4,
     "flow": {
      "authority": "network",
-     "disagreement": 55.882417745197586,
+     "disagreement": 54.79187120253624,
      "judgeCms": 285.09611318932446,
      "judgeKind": "annual",
      "networkCms": 290.481,
-     "modelCms": 5.198075024679176,
-     "note": "Nepal's own regression sides with the mapped network (290.5 vs its 285.1 m³/s annual-mean figure)"
+     "modelCms": 5.301534582132578,
+     "note": "The WECS/DHM regional comparison is closer to the mapped network (290.5 vs its 285.1 m³/s annual-mean figure)"
     },
     "snappedIntake": [
      27.98125,
@@ -157,15 +157,15 @@
     "name": "Middle Marsyangdi",
     "ok": true,
     "predicted": {
-     "capacityMW": 69.86987831345385,
-     "energyGwh": 361.9338066055966,
-     "grossHeadM": 99.9969831125693,
-     "netHeadM": 96.1502171040205,
-     "designFlowCms": 81.9648200833513,
+     "capacityMW": 70.90094891069775,
+     "energyGwh": 362.3145232248542,
+     "grossHeadM": 99.59923974306139,
+     "netHeadM": 95.77990649324394,
+     "designFlowCms": 83.48915801499511,
      "meanFlowCms": 132.569,
      "waterwayKm": 6.960000000000005,
      "turbine": "Francis",
-     "plantFactor": 0.5913370051157542
+     "plantFactor": 0.5833505196532646
     },
     "snapKm": {
      "intake": 0.1136004108703418,
@@ -174,12 +174,12 @@
     "reachKm2": 3027.6,
     "flow": {
      "authority": "network",
-     "disagreement": 39.34015526033304,
+     "disagreement": 38.77325521610349,
      "judgeCms": 97.99483105497586,
      "judgeKind": "annual",
      "networkCms": 132.569,
-     "modelCms": 3.369813848540406,
-     "note": "Nepal's own regression sides with the mapped network (132.6 vs its 98.0 m³/s annual-mean figure)"
+     "modelCms": 3.419083573487036,
+     "note": "The WECS/DHM regional comparison is closer to the mapped network (132.6 vs its 98.0 m³/s annual-mean figure)"
     },
     "snappedIntake": [
      28.189583333333335,
@@ -216,15 +216,15 @@
     "name": "Marsyangdi",
     "ok": true,
     "predicted": {
-     "capacityMW": 46.46003550394194,
-     "energyGwh": 235.63025450017346,
-     "grossHeadM": 52.894196202829846,
-     "netHeadM": 49.05289798962621,
-     "designFlowCms": 108.06803877869518,
+     "capacityMW": 50.464247877257094,
+     "energyGwh": 253.18583360498545,
+     "grossHeadM": 55.310156235880584,
+     "netHeadM": 51.51092471255083,
+     "designFlowCms": 111.80371052648398,
      "meanFlowCms": 204.989,
      "waterwayKm": 9.12,
      "turbine": "Kaplan",
-     "plantFactor": 0.5789584658568119
+     "plantFactor": 0.5727320555922926
     },
     "snapKm": {
      "intake": 0.39515904624472775,
@@ -233,12 +233,12 @@
     "reachKm2": 4130.4,
     "flow": {
      "authority": "network",
-     "disagreement": 5.363344674659793,
+     "disagreement": 5.270128139111863,
      "judgeCms": 157.31502702108017,
      "judgeKind": "annual",
      "networkCms": 204.989,
-     "modelCms": 38.220366661966,
-     "note": "Nepal's own regression sides with the mapped network (205.0 vs its 157.3 m³/s annual-mean figure)"
+     "modelCms": 38.89639769452462,
+     "note": "The WECS/DHM regional comparison is closer to the mapped network (205.0 vs its 157.3 m³/s annual-mean figure)"
     },
     "snappedIntake": [
      27.927083333333332,
@@ -276,15 +276,15 @@
     "name": "Khimti I",
     "ok": true,
     "predicted": {
-     "capacityMW": 33.63652998923104,
-     "energyGwh": 180.52145353233539,
-     "grossHeadM": 496.7533255700657,
-     "netHeadM": 479.6690998800078,
-     "designFlowCms": 8.632152645442575,
+     "capacityMW": 34.9887105204143,
+     "energyGwh": 186.07945929869183,
+     "grossHeadM": 500.0585127571246,
+     "netHeadM": 483.2524274273415,
+     "designFlowCms": 8.918399365365755,
      "meanFlowCms": 15.121,
      "waterwayKm": 8.040000000000006,
      "turbine": "Pelton",
-     "plantFactor": 0.612651538997021
+     "plantFactor": 0.6071086099652849
     },
     "snapKm": {
      "intake": 0.18171920457780366,
@@ -293,7 +293,7 @@
     "reachKm2": 379.4,
     "flow": {
      "authority": "network",
-     "disagreement": 1.7729459210952332,
+     "disagreement": 1.8036516004327754,
      "judgeCms": null,
      "judgeKind": null,
      "networkCms": null,
@@ -336,15 +336,15 @@
     "name": "Upper Marsyangdi A",
     "ok": true,
     "predicted": {
-     "capacityMW": 53.41845877284685,
-     "energyGwh": 278.0635856904029,
-     "grossHeadM": 87.25142739405123,
-     "netHeadM": 83.78314488227977,
-     "designFlowCms": 72.01024650034348,
+     "capacityMW": 53.681706950344804,
+     "energyGwh": 275.9339643519375,
+     "grossHeadM": 86.27762096947833,
+     "netHeadM": 82.83177986877241,
+     "designFlowCms": 73.19549500419599,
      "meanFlowCms": 115.965,
      "waterwayKm": 5.160000000000004,
      "turbine": "Francis",
-     "plantFactor": 0.5942219073146219
+     "plantFactor": 0.5867792361412104
     },
     "snapKm": {
      "intake": 0.29187275229431897,
@@ -353,12 +353,12 @@
     "reachKm2": 2775.4,
     "flow": {
      "authority": "network",
-     "disagreement": 17.34614727441518,
+     "disagreement": 17.09821181973387,
      "judgeCms": 83.70495872566742,
      "judgeKind": "annual",
      "networkCms": 115.965,
-     "modelCms": 6.685346213510096,
-     "note": "Nepal's own regression sides with the mapped network (116.0 vs its 83.7 m³/s annual-mean figure)"
+     "modelCms": 6.782288184438048,
+     "note": "The WECS/DHM regional comparison is closer to the mapped network (116.0 vs its 83.7 m³/s annual-mean figure)"
     },
     "snappedIntake": [
      28.310416666666665,
@@ -397,15 +397,15 @@
     "name": "Upper Bhote Koshi",
     "ok": true,
     "predicted": {
-     "capacityMW": 44.3283101270241,
-     "energyGwh": 208.0066233011651,
-     "grossHeadM": 161.1217277552944,
-     "netHeadM": 156.900250254436,
-     "designFlowCms": 32.04095522317848,
+     "capacityMW": 41.7762087878747,
+     "energyGwh": 191.60633418796974,
+     "grossHeadM": 148.19171656554477,
+     "netHeadM": 144.08044367344047,
+     "designFlowCms": 32.8676041301025,
      "meanFlowCms": 78.86,
      "waterwayKm": 3.360000000000002,
      "turbine": "Francis",
-     "plantFactor": 0.5356632872764303
+     "plantFactor": 0.5235723832816633
     },
     "snapKm": {
      "intake": 0.5397946917804644,
@@ -414,7 +414,7 @@
     "reachKm2": 2132.5,
     "flow": {
      "authority": "network",
-     "disagreement": 1.8185414549573766,
+     "disagreement": 1.7879172260083815,
      "judgeCms": null,
      "judgeKind": null,
      "networkCms": null,
@@ -456,15 +456,15 @@
     "name": "Mistri Khola",
     "ok": true,
     "predicted": {
-     "capacityMW": 5.362773650534292,
-     "energyGwh": 24.683673677987176,
-     "grossHeadM": 796.2523590132002,
-     "netHeadM": 737.0822873587356,
-     "designFlowCms": 0.8551486391193528,
+     "capacityMW": 5.4278732215969825,
+     "energyGwh": 25.058231416362634,
+     "grossHeadM": 795.3778708274865,
+     "netHeadM": 736.5067903249892,
+     "designFlowCms": 0.8664328770409412,
      "meanFlowCms": 1.509,
      "waterwayKm": 6.840000000000005,
      "turbine": "Pelton",
-     "plantFactor": 0.5254316425467671
+     "plantFactor": 0.5270072795945658
     },
     "snapKm": {
      "intake": 0.6493270023286954,
@@ -473,7 +473,7 @@
     "reachKm2": 27.9,
     "flow": {
      "authority": "network",
-     "disagreement": 2.580230552005044,
+     "disagreement": 2.6272308512040228,
      "judgeCms": null,
      "judgeKind": null,
      "networkCms": null,
@@ -515,15 +515,15 @@
     "name": "Chameliya",
     "ok": true,
     "predicted": {
-     "capacityMW": 10.230235870751905,
-     "energyGwh": 67.37791295264712,
-     "grossHeadM": 59.72085496447119,
-     "netHeadM": 54.21805865616806,
-     "designFlowCms": 21.747364931384908,
+     "capacityMW": 10.44299861581626,
+     "energyGwh": 68.11096312973501,
+     "grossHeadM": 59.63743525421171,
+     "netHeadM": 54.18785347847815,
+     "designFlowCms": 22.208522992300978,
      "meanFlowCms": 33.089,
      "waterwayKm": 5.280000000000004,
      "turbine": "Kaplan",
-     "plantFactor": 0.7518441091366334
+     "plantFactor": 0.744539417039862
     },
     "snapKm": {
      "intake": 0.5657922111355809,
@@ -532,7 +532,7 @@
     "reachKm2": 829.6,
     "flow": {
      "authority": "network",
-     "disagreement": 1.4717622908633958,
+     "disagreement": 1.451502820706285,
      "judgeCms": null,
      "judgeKind": null,
      "networkCms": null,
@@ -575,15 +575,15 @@
     "name": "Chilime",
     "ok": true,
     "predicted": {
-     "capacityMW": 19.514278592836394,
-     "energyGwh": 94.91246508790967,
-     "grossHeadM": 443.2994366309558,
-     "netHeadM": 428.4505026744778,
-     "designFlowCms": 5.557464052071904,
-     "meanFlowCms": 9.439999999999998,
+     "capacityMW": 20.0708576101143,
+     "energyGwh": 97.38363415759964,
+     "grossHeadM": 442.855158619697,
+     "netHeadM": 428.2501972957566,
+     "designFlowCms": 5.721983148801903,
+     "meanFlowCms": 9.44,
      "waterwayKm": 4.080000000000003,
      "turbine": "Pelton",
-     "plantFactor": 0.5552219743624832
+     "plantFactor": 0.5538803288971443
     },
     "snapKm": {
      "intake": 0.24335388253149248,
@@ -592,12 +592,12 @@
     "reachKm2": 209,
     "flow": {
      "authority": "network",
-     "disagreement": 7.909568317681239,
+     "disagreement": 8.05164973379569,
      "judgeCms": 7.977895718146055,
      "judgeKind": "annual",
      "networkCms": 9.44,
-     "modelCms": 74.66632491891089,
-     "note": "Nepal's own regression sides with the mapped network (9.4 vs its 8.0 m³/s annual-mean figure)"
+     "modelCms": 76.00757348703131,
+     "note": "The WECS/DHM regional comparison is closer to the mapped network (9.4 vs its 8.0 m³/s annual-mean figure)"
     },
     "snappedIntake": [
      28.21875,

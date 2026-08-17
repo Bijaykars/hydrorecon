@@ -9,7 +9,13 @@
  */
 import assert from 'node:assert/strict';
 import protectedRaw from '../src/data/nepal-protected.json' with { type: 'json' };
-import { PROTECTED_COUNT, isHardStop, protectedAt, protectedNear } from '../src/protected.ts';
+import {
+  PROTECTED_COUNT,
+  isHardStop,
+  protectedAreasGeoJson,
+  protectedAt,
+  protectedNear,
+} from '../src/protected.ts';
 
 let passed = 0;
 const ok = (name: string, fn: () => void) => {
@@ -20,6 +26,7 @@ const ok = (name: string, fn: () => void) => {
 
 const raw = protectedRaw as unknown as {
   _source: string;
+  _retrieved: string;
   areas: { n: string; a: number; rings: number[][] }[];
 };
 
@@ -28,6 +35,7 @@ console.log('\nprotected: the bundled extract');
 ok('the extract carries its licence and covers the real parks', () => {
   assert.match(raw._source, /OpenStreetMap/);
   assert.match(raw._source, /ODbL/);
+  assert.match(raw._retrieved, /^\d{4}-\d{2}-\d{2}$/, 'snapshot needs a retrieval date');
   assert.equal(raw.areas.length, PROTECTED_COUNT);
   // The parks a Nepali engineer would name first must all be present. Their
   // absence is the dangerous failure — silence reads as "not protected".
@@ -75,6 +83,21 @@ ok('foreign parks along the border are excluded', () => {
       !raw.areas.some((a) => a.n.includes(foreign)),
       `${foreign} is in India and must not be in a Nepal layer`
     );
+  }
+});
+
+ok('map boundaries preserve every area and close every polygon ring', () => {
+  const collection = protectedAreasGeoJson();
+  assert.equal(collection.features.length, raw.areas.length);
+  for (const feature of collection.features) {
+    assert.equal(feature.geometry.type, 'Polygon');
+    for (const ring of feature.geometry.coordinates) {
+      assert.ok(ring.length >= 4, 'a mapped protected-area ring needs at least four positions');
+      assert.deepEqual(ring.at(-1), ring[0], 'mapped polygon ring must be closed');
+      for (const [lon, lat] of ring) {
+        assert.ok(lon > 80 && lon < 89 && lat > 26 && lat < 31, `position ${lat},${lon} is outside Nepal`);
+      }
+    }
   }
 });
 

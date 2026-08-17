@@ -1,0 +1,95 @@
+{
+  "_built": "2026-08-13T12:14:53.404Z",
+  "_method": "WECS/DHM 1990 regional hydrology inputs attached to HydroRIVERS reaches",
+  "_primaryCitation": {
+    "title": "Methodologies for estimating hydrologic characteristics of ungauged locations in Nepal",
+    "publisher": "Government of Nepal, Water and Energy Commission Secretariat and Department of Hydrology and Meteorology",
+    "year": 1990,
+    "catalogue": "https://lib.icimod.org/records/ksjap-6sz72"
+  },
+  "_guidance": {
+    "study": "https://doed.gov.np/content/35/guidelines-for-study-of-hydropower-projects--2018/",
+    "headworks": "https://doed.gov.np/content/31/design-guidelines-for-headworks-of-hydropower-projects/",
+    "floodManual": "https://wecs.gov.np/storage/listies/January2021/river-training-manual-final--wecs-2020-06-15-%28f%29-%281%29.pdf"
+  },
+  "_chpclim": {
+    "product": "Climate Hazards Center Precipitation Climatology v2",
+    "productUrl": "https://chc.ucsb.edu/data/chpclim",
+    "resolution": "0.05 degrees",
+    "months": [
+      "06",
+      "07",
+      "08",
+      "09"
+    ],
+    "interpretation": "June-September total averaged over the derived upstream catchment; substitute for the original WECS/DHM monsoon isohyet input",
+    "rights": "Publicly downloadable. No standalone CHPclim reuse licence statement was identified on the product page; attribute the Climate Hazards Center and verify reuse terms. The repository MIT licence does not cover this derivative input.",
+    "files": [
+      {
+        "month": "06",
+        "url": "https://data.chc.ucsb.edu/products/CHPclim/v2/monthly_9090/CHPclim2.90-90.06.tif",
+        "bytes": 31952916,
+        "sha256": "0fd37cdb83dc82996de137b5ff9d77f8c6f5917905d4c5aafa0d26bfa1c43204",
+        "cachedBeforeRun": true,
+        "localFileModified": "2026-08-13T01:26:22.682Z"
+      },
+      {
+        "month": "07",
+        "url": "https://data.chc.ucsb.edu/products/CHPclim/v2/monthly_9090/CHPclim2.90-90.07.tif",
+        "bytes": 31992378,
+        "sha256": "5c8e5f3fddb69e0507f80cc3192dd10171b03832bc0ba0b0140662242bee18ee",
+        "cachedBeforeRun": true,
+        "localFileModified": "2026-08-13T01:26:30.464Z"
+      },
+      {
+        "month": "08",
+        "url": "https://data.chc.ucsb.edu/products/CHPclim/v2/monthly_9090/CHPclim2.90-90.08.tif",
+        "bytes": 32037976,
+        "sha256": "3473fc6133ac69980a22ec53686828b3b18f04f79288384c7d60202514f8e168",
+        "cachedBeforeRun": true,
+        "localFileModified": "2026-08-13T01:26:38.274Z"
+      },
+      {
+        "month": "09",
+        "url": "https://data.chc.ucsb.edu/products/CHPclim/v2/monthly_9090/CHPclim2.90-90.09.tif",
+        "bytes": 31985884,
+        "sha256": "92bd3aec9e945b9dc987975cbdcb4c152223e6a801723e17a437b18dec7d75f8",
+        "cachedBeforeRun": true,
+        "localFileModified": "2026-08-13T01:26:45.563Z"
+      }
+    ]
+  },
+  "_hydrobasins": {
+    "product": "HydroBASINS Asia level 12 v1c",
+    "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_as_lev12_v1c.zip",
+    "bytes": 80155135,
+    "sha256": "05e98a001fc526cd5fcdbbc8144fe0aa3ce6712c35624f72e4728b219193fdb9"
+  },
+  "_hypsometry": {
+    "terrain": "Re:Earth Terrarium elevation tiles",
+    "terrainUrl": "https://terrain.reearth.land/",
+    "terrainZoom": 10,
+    "rasterStepDegrees": 0.004,
+    "thresholdsM": [
+      5000,
+      3000
+    ],
+    "note": "Existing two-byte below-elevation fractions are preserved by this builder; run build:hypso to regenerate them."
+  },
+  "_output": {
+    "file": "public/nepal-hypso.dat",
+    "crs": "EPSG:4326",
+    "reaches": 42197,
+    "bytes": 168788,
+    "strideBytes": 4,
+    "mmpAttached": 34669,
+    "mmpMissing": 7528,
+    "sha256": "9a645edfa82978ab9027daba7dbd714d325d9828c458848ac1dbc357034eaefe"
+  },
+  "_limitations": [
+    "WECS/DHM is a legacy regional regression and not a substitute for site gauging or flood-frequency analysis.",
+    "CHPclim v2 is a gridded climatology rather than the original WECS/DHM isohyet map, and mountain precipitation bias remains possible.",
+    "DoED headworks guidance requires comparison with other applicable flood methods, historical flood investigation, direct measurement where data are absent, and GLOF/CLOF investigation.",
+    "A regional flood estimate is not a selected design flood, diversion flood, spillway check flood or PMF/PMP decision."
+  ]
+}

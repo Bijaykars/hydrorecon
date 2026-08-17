@@ -60,6 +60,80 @@ export const NEPAL = {
   dryEnergyShare: 0.33,
 } as const;
 
+/** Official NEA run-of-river posted-rate decision and its screening boundary. */
+export const NEA_ROR_PPA = {
+  wetNprPerKwh: NEPAL.ppaWetNpr,
+  dryNprPerKwh: NEPAL.ppaDryNpr,
+  effectiveBs: '2074-01-14',
+  effectiveAd: '2017-04-27',
+  reviewed: '2026-08-13',
+  postedRateCapacityUpToMW: 100,
+  escalation: '3% simple escalation for eight years for capacity up to 100 MW; not applied by Ghatta',
+  above100MW:
+    'The NEA decision says the base rate may be lowered above 100 MW where return on equity exceeds 17%; project terms must be confirmed.',
+  sourcePage: 'https://www.nea.org.np/en/pages/ppa-tarrif-rates',
+  decisionPdf: 'https://www.nea.org.np/admin/assets/uploads/PPA_Rates.pdf',
+  corroboration:
+    'https://erc.gov.np/storage/contents/April2025/tme2fFz9L5QMZSqxROI6.pdf',
+  interpretation:
+    'Gross reference energy value at published NEA base rates only—not a PPA entitlement, contracted revenue, cash flow, NPV, LCOE or bankability result.',
+} as const;
+
+/** Nepal hydropower environmental-release policy floor; an approved EIA may be higher. */
+export const NEPAL_EFLOW_POLICY = {
+  minimumFractionOfLowestMonthlyMean: 0.1,
+  policy: 'Hydropower Development Policy 2058 (2001), section 6.1.1',
+  source:
+    'https://doed.gov.np/storage/listies/January2020/hydropower-development-policy-2058-2001.pdf',
+  lawCommission:
+    'https://repository.lawcommission.gov.np/np/documents/prevailing-law/%E0%A4%A8%E0%A5%80%E0%A4%A4%E0%A4%BF/%E0%A4%9C%E0%A4%B2%E0%A4%B5%E0%A4%BF%E0%A4%A6%E0%A5%8D%E0%A4%AF%E0%A5%81%E0%A4%A4-%E0%A4%B5%E0%A4%BF%E0%A4%95%E0%A4%BE%E0%A4%B8-%E0%A4%A8%E0%A5%80%E0%A4%A4%E0%A4%BF-%E0%A5%A8%E0%A5%A6%E0%A5%AB/%E0%A5%AC-%E0%A4%95%E0%A4%BE%E0%A4%B0%E0%A5%8D%E0%A4%AF%E0%A4%A8%E0%A5%80%E0%A4%A4%E0%A4%BF%C3%B7%E0%A4%9C%E0%A4%B2%E0%A4%B5%E0%A4%BF/',
+  reviewed: '2026-08-13',
+  interpretation:
+    'Policy-floor screening release: the higher of at least 10% of minimum monthly average discharge or the EIA-required minimum. Not an approved ecological-flow determination.',
+} as const;
+
+/** Method/source for the empirical daily power-duration screen. */
+export const POWER_DURATION_GUIDANCE = {
+  exceedances: [0.9, 0.95],
+  source:
+    'https://energypedia.info/images/c/ca/Part_1_guide_on_how_to_develop_a_small_hydropower_plant-_final1.pdf',
+  reference: 'ESHA 2004, Guide on How to Develop a Small Hydropower Plant, section 3.7',
+  reviewed: '2026-08-13',
+  interpretation:
+    'Empirical daily hydrological output equalled or exceeded on 90% or 95% of usable record days. Not contractual firm capacity, guaranteed energy or availability.',
+} as const;
+
+/** Enforce the Nepal policy floor without limiting an engineer's higher scenario. */
+export function enforceNepalEflowFloor(requestedFraction: number): number {
+  return Number.isFinite(requestedFraction)
+    ? Math.max(NEPAL_EFLOW_POLICY.minimumFractionOfLowestMonthlyMean, requestedFraction)
+    : NEPAL_EFLOW_POLICY.minimumFractionOfLowestMonthlyMean;
+}
+
+export type PpaReferenceValue = {
+  /** Gross reference value in million Nepalese rupees per year. */
+  grossMillionNpr: number;
+  /** Energy-weighted published base rate, NPR/kWh. */
+  blendedNprPerKwh: number;
+};
+
+/**
+ * Value dispatched wet/dry energy at the published NEA ROR base rates.
+ *
+ * Unit identity: GWh × NPR/kWh = million NPR. No escalation, contracted-energy
+ * cap, losses, curtailment, penalties, tax, royalty, O&M or financing enters.
+ */
+export function ppaReferenceValue(wetGwh: number, dryGwh: number): PpaReferenceValue | null {
+  if (![wetGwh, dryGwh].every((value) => Number.isFinite(value) && value >= 0)) return null;
+  const totalGwh = wetGwh + dryGwh;
+  const grossMillionNpr =
+    wetGwh * NEA_ROR_PPA.wetNprPerKwh + dryGwh * NEA_ROR_PPA.dryNprPerKwh;
+  return {
+    grossMillionNpr,
+    blendedNprPerKwh: totalGwh > 0 ? grossMillionNpr / totalGwh : 0,
+  };
+}
+
 /** Fallback household consumption outside Nepal, kWh/yr. Roughly a European figure. */
 export const DEFAULT_HOUSEHOLD_KWH = 3500;
 
@@ -203,6 +277,17 @@ export type EnergyResult = {
   netHeadM: number;
 };
 
+export type PowerDurationSummary = {
+  /** Power equalled or exceeded on 90% of usable record days. */
+  dailyP90W: number;
+  /** Power equalled or exceeded on 95% of usable record days. */
+  dailyP95W: number;
+  /** Share of usable record days on which the screening unit is off. */
+  zeroOutputFraction: number;
+  /** Finite, non-sentinel daily discharge values evaluated. */
+  days: number;
+};
+
 /**
  * Annual energy by averaging power over every day in the record.
  *
@@ -244,6 +329,36 @@ export function annualEnergy(seriesCms: readonly number[], p: PlantParams): Ener
 }
 
 /**
+ * Convert the daily flow record into a power-duration screen.
+ *
+ * This dispatches exactly the same residual release, turbine cap, minimum-flow
+ * shutdown, Q² hydraulic loss and part-load efficiency as annual energy. P90
+ * here is a percentile across DAYS; it must never be confused with P90 annual
+ * energy, which is a percentile across complete YEARS.
+ */
+export function powerDurationSummary(
+  seriesCms: readonly number[],
+  p: PlantParams
+): PowerDurationSummary | null {
+  const clean = seriesCms.filter((v) => Number.isFinite(v) && v > USGS_NO_DATA + 1);
+  if (clean.length === 0) return null;
+  const power = clean.map((riverQ) => {
+    const turbineQ = turbineFlow(riverQ, p);
+    return powerW(
+      turbineQ,
+      netHeadAt(p, turbineQ),
+      p.efficiencyAt ? p.efficiencyAt(turbineQ) : p.efficiency
+    );
+  });
+  return {
+    dailyP90W: valueAtExceedance(power, 0.9),
+    dailyP95W: valueAtExceedance(power, 0.95),
+    zeroOutputFraction: power.filter((watts) => watts <= 0).length / power.length,
+    days: power.length,
+  };
+}
+
+/**
  * The same annual energy, integrated over the exceedance axis by the trapezoidal
  * rule — the form the hydrology textbooks state. Endpoints are extended flat to
  * p=0 and p=1 because the Weibull positions never reach either bound.
@@ -272,10 +387,29 @@ export function energyFromFdcTrapezoid(fdc: readonly FdcPoint[], p: PlantParams)
  * wording in Nepali run-of-river PPAs. Day-level, not month-level, because the
  * boundaries fall mid-month.
  */
+/** The two published NEA season options for run-of-river PPAs. */
+export type PpaSeasonPlan = 'nea-6-6' | 'nea-8-4';
+
+/**
+ * Gregorian screening approximation to Nepal Electricity Authority's Bikram
+ * Sambat tariff boundaries. The conversion moves by about one day between
+ * years; that precision is below a global daily-flow model.
+ */
+export function isWetPpaDay(month: number, day: number, plan: PpaSeasonPlan): boolean {
+  if (plan === 'nea-6-6') {
+    // Wet Jestha 16-Mangsir 15: approximately 30 May through 30 November.
+    return (month > 5 || (month === 5 && day >= 30)) && month < 12;
+  }
+  // Wet Baisakh-Mangsir: approximately 14 April through 15 December.
+  return (month > 4 || (month === 4 && day >= 14)) &&
+    (month < 12 || (month === 12 && day <= 15));
+}
+
 export function wetDryEnergy(
   dates: readonly string[],
   valuesCms: readonly number[],
-  p: PlantParams
+  p: PlantParams,
+  plan: PpaSeasonPlan = 'nea-8-4'
 ): { wetGwh: number; dryGwh: number; wetDays: number; dryDays: number } {
   let wetW = 0;
   let dryW = 0;
@@ -288,7 +422,7 @@ export function wetDryEnergy(
     const m = Number(d.slice(5, 7));
     const day = Number(d.slice(8, 10));
     if (!m) continue;
-    const isWet = (m > 4 || (m === 4 && day >= 15)) && (m < 12 || (m === 12 && day < 15));
+    const isWet = isWetPpaDay(m, day, plan);
     const qt = turbineFlow(v, p);
     const w = powerW(qt, netHeadAt(p, qt), p.efficiencyAt ? p.efficiencyAt(qt) : p.efficiency);
     if (isWet) {
@@ -305,6 +439,57 @@ export function wetDryEnergy(
   const wetGwh = wetDays > 0 ? ((wetW / wetDays) * HOURS_PER_YEAR * (wetDays / total)) / 1e9 : 0;
   const dryGwh = dryDays > 0 ? ((dryW / dryDays) * HOURS_PER_YEAR * (dryDays / total)) / 1e9 : 0;
   return { wetGwh, dryGwh, wetDays, dryDays };
+}
+
+export type AnnualEnergyYear = {
+  year: number;
+  gwh: number;
+  days: number;
+  coverage: number;
+};
+
+/**
+ * Dispatch every usable day, then form comparable normalised calendar years.
+ * Years below 90% coverage are refused rather than allowing a missing monsoon
+ * or dry-season block to masquerade as hydrologic variability.
+ */
+export function annualEnergyByYear(
+  dates: readonly string[],
+  valuesCms: readonly number[],
+  p: PlantParams,
+  minCoverage = 0.9
+): AnnualEnergyYear[] {
+  const acc = new Map<number, { sumW: number; days: number }>();
+  for (let i = 0; i < Math.min(dates.length, valuesCms.length); i++) {
+    const v = valuesCms[i];
+    const year = Number(dates[i]?.slice(0, 4));
+    if (!Number.isInteger(year) || !Number.isFinite(v) || v <= USGS_NO_DATA + 1) continue;
+    const qt = turbineFlow(v, p);
+    const w = powerW(qt, netHeadAt(p, qt), p.efficiencyAt ? p.efficiencyAt(qt) : p.efficiency);
+    const prior = acc.get(year) ?? { sumW: 0, days: 0 };
+    prior.sumW += w;
+    prior.days++;
+    acc.set(year, prior);
+  }
+  const leap = (year: number) => year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  return [...acc.entries()]
+    .map(([year, x]) => {
+      const expected = leap(year) ? 366 : 365;
+      return {
+        year,
+        days: x.days,
+        coverage: x.days / expected,
+        // Normalise a nearly complete year to 8760 h, as annualEnergy does.
+        gwh: ((x.sumW / x.days) * HOURS_PER_YEAR) / 1e9,
+      };
+    })
+    .filter((x) => x.coverage >= minCoverage)
+    .sort((a, b) => a.year - b.year);
+}
+
+/** Value equalled or exceeded with probability `exceedance` in the sample. */
+export function valueAtExceedance(values: readonly number[], exceedance: number): number {
+  return flowAtExceedance(buildFdc(values), exceedance);
 }
 
 /** Mean of a series, ignoring non-finite values and the USGS sentinel. */

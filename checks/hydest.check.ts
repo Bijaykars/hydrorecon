@@ -1,5 +1,5 @@
 /**
- * HYDEST — Nepal's national ungauged-flow regression.  part of `npm run check`
+ * WECS/DHM — Nepal regional ungauged-flow regression. Part of `npm run check`.
  *
  * The coefficients are transcribed from a published table, so the first job is
  * proving the transcription is faithful and the algebra around it is right. The
@@ -9,17 +9,20 @@
  * hypsometry and the entire reason a total-area shortcut had to be abandoned.
  */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import {
+  HYDEST_PROVENANCE,
   RAINFALL_FREE_MONTHS,
   RETURN_PERIODS,
   allMonthlyFlows,
   annualMeanCms,
-  designFlood,
   driestMonthFlow,
   drySeasonAgreement,
   drySeasonFlows,
   monthlyFlow,
   MONTH_NAMES,
+  regionalFloodEstimate,
 } from '../src/engine/hydest.ts';
 
 let passed = 0;
@@ -108,7 +111,7 @@ ok('the driest month is found, and it is one of the five', () => {
   );
 });
 
-console.log('\nhydest: design floods');
+console.log('\nhydest: regional flood estimates');
 
 ok('the two-point log-normal fit returns its own anchors exactly', () => {
   // sigma is defined as ln(Q100/Q2)/2.326, so evaluating at S=0 and S=2.326
@@ -116,15 +119,15 @@ ok('the two-point log-normal fit returns its own anchors exactly', () => {
   // return-period algebra is wrong, whatever the numbers look like.
   const input = { totalKm2: 900, below5000Km2: 800, below3000Km2: 700 };
   const a = input.below3000Km2;
-  near(designFlood(input, 2)!, 1.8767 * (a + 1) ** 0.8737, 1e-9, 'Q2');
-  near(designFlood(input, 100)!, 14.63 * (a + 1) ** 0.7342, 1e-9, 'Q100');
+  near(regionalFloodEstimate(input, 2)!, 1.8767 * (a + 1) ** 0.8737, 1e-9, 'Q2');
+  near(regionalFloodEstimate(input, 100)!, 14.63 * (a + 1) ** 0.7342, 1e-9, 'Q100');
 });
 
 ok('a rarer flood is always a bigger one', () => {
   const input = { totalKm2: 900, below5000Km2: 800, below3000Km2: 700 };
   let prev = 0;
   for (const t of RETURN_PERIODS) {
-    const q = designFlood(input, t)!;
+    const q = regionalFloodEstimate(input, t)!;
     assert.ok(q > prev, `Q${t} = ${q} is not above Q of the shorter return period`);
     prev = q;
   }
@@ -134,14 +137,14 @@ ok('flood peaks are plausible for a Nepali catchment', () => {
   // Nepali rivers are flashy: a 100-year peak of roughly 1-4 m3/s per km2 on a
   // mid-sized catchment. Well outside that and a coefficient has been mistyped.
   for (const a of [100, 1000, 5000]) {
-    const q100 = designFlood({ totalKm2: a, below5000Km2: a, below3000Km2: a }, 100)!;
+    const q100 = regionalFloodEstimate({ totalKm2: a, below5000Km2: a, below3000Km2: a }, 100)!;
     const perKm2 = q100 / a;
     assert.ok(perKm2 > 0.8 && perKm2 < 8, `${a} km2 gives ${perKm2.toFixed(2)} m3/s/km2 at Q100`);
   }
   // Snow and ice above 3000 m add annual volume but not a rainfall flood peak,
   // so a glaciated catchment must give a smaller peak than a rain-fed one.
-  const rainFed = designFlood({ totalKm2: 800, below5000Km2: 800, below3000Km2: 800 }, 100)!;
-  const glaciated = designFlood({ totalKm2: 800, below5000Km2: 300, below3000Km2: 100 }, 100)!;
+  const rainFed = regionalFloodEstimate({ totalKm2: 800, below5000Km2: 800, below3000Km2: 800 }, 100)!;
+  const glaciated = regionalFloodEstimate({ totalKm2: 800, below5000Km2: 300, below3000Km2: 100 }, 100)!;
   assert.ok(glaciated < rainFed, 'high catchment should not flood harder than a rain-fed one');
 });
 
@@ -195,6 +198,39 @@ ok('more monsoon rain means more monsoon water, gently', () => {
   // The exponent is ~0.25: doubling MMP should raise July by ~19%, not double it.
   const wetter = monthlyFlow({ ...WET, monsoonMm: 3000 }, 6)! / monthlyFlow(WET, 6)!;
   near(wetter, 2 ** 0.2523, 0.01);
+});
+
+console.log('\nhydest: provenance and reproducibility');
+
+ok('the bundled reach input matches its recorded checksum and layout', () => {
+  const binary = readFileSync('public/nepal-hypso.dat');
+  const output = HYDEST_PROVENANCE.bundle.output;
+  assert.equal(binary.length, output.bytes);
+  assert.equal(output.strideBytes, 4);
+  assert.equal(output.reaches * output.strideBytes, output.bytes);
+  assert.equal(createHash('sha256').update(binary).digest('hex'), output.sha256);
+  assert.equal(output.mmpAttached + output.mmpMissing, output.reaches);
+});
+
+ok('method, current guidance and rainfall rights survive into runtime provenance', () => {
+  assert.equal(HYDEST_PROVENANCE.primaryCitation.year, 1990);
+  assert.match(HYDEST_PROVENANCE.primaryCitation.catalogue, /^https:\/\/lib\.icimod\.org\//);
+  assert.match(HYDEST_PROVENANCE.guidance.headworks, /^https:\/\/doed\.gov\.np\//);
+  assert.match(HYDEST_PROVENANCE.guidance.floodManual, /^https:\/\/wecs\.gov\.np\//);
+  assert.match(HYDEST_PROVENANCE.rainfall.rights, /MIT licence does not cover/i);
+  assert.deepEqual(HYDEST_PROVENANCE.rainfall.months, ['06', '07', '08', '09']);
+  assert.equal(HYDEST_PROVENANCE.rainfall.files.length, 4);
+  assert.equal(new Set(HYDEST_PROVENANCE.rainfall.files.map((file) => file.sha256)).size, 4);
+  assert.ok(HYDEST_PROVENANCE.rainfall.files.every((file) => /^[a-f0-9]{64}$/.test(file.sha256)));
+  assert.match(HYDEST_PROVENANCE.hydrobasins.url, /hydrobasins/i);
+  assert.match(HYDEST_PROVENANCE.hydrobasins.sha256, /^[a-f0-9]{64}$/);
+  assert.equal(HYDEST_PROVENANCE.hypsometry.terrainZoom, 10);
+});
+
+ok('the public interpretation cannot masquerade as a design-flood selection', () => {
+  assert.match(HYDEST_PROVENANCE.interpretation, /not selected design floods/i);
+  assert.ok(HYDEST_PROVENANCE.limitations.some((line) => /not a selected design flood/i.test(line)));
+  assert.match(HYDEST_PROVENANCE.equations.q100, /14\.63/);
 });
 
 console.log(`\n${passed} hydest checks passed\n`);

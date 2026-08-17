@@ -11,8 +11,21 @@
  * the objective is annual energy through a real flow-duration curve rather than
  * head × mean flow. See docs/research/2026-08-12-algorithms.md §1.
  */
-import { annualEnergy, buildFdc, flowAtExceedance, type FdcPoint, type PlantParams } from './hydro.ts';
+import {
+  annualEnergy,
+  annualEnergyByYear,
+  buildFdc,
+  flowAtExceedance,
+  ppaReferenceValue,
+  powerDurationSummary,
+  valueAtExceedance,
+  wetDryEnergy,
+  type AnnualEnergyYear,
+  type FdcPoint,
+  type PlantParams,
+} from './hydro.ts';
 import { turbineCurve, type TurbineType } from './turbine.ts';
+import { unitCountSensitivity, type UnitCountScenario } from './units.ts';
 import { sizeWaterway, type Waterway } from './waterway.ts';
 
 export type SchemeInput = {
@@ -24,6 +37,8 @@ export type SchemeInput = {
   path: { km: number; lat: number; lon: number; elevationM: number; meanCms: number }[];
   /** Daily discharge series from the flood model, m³/s. */
   series: number[];
+  /** ISO dates parallel to `series`; enables PPA and interannual dispatch. */
+  dates?: string[];
   /** Mean of `series`. Used to rescale it onto the mapped network's magnitude. */
   seriesMeanCms: number;
   /** Residual flow at the clicked point, m³/s. */
@@ -65,6 +80,8 @@ export type Scheme = {
   netHeadM: number;
   /** Distance along the river between the two — what a canal or tunnel must span. */
   waterwayKm: number;
+  /** Multiplier applied to the source record to obtain flow at this intake. */
+  flowScale: number;
   designFlowCms: number;
   residualCms: number;
   capacityMW: number;
@@ -80,6 +97,41 @@ export type Scheme = {
   turbinePeak: number;
   /** Headrace and penstock sized for this duty point, and what they cost in head. */
   waterway: Waterway | null;
+  /** Exact dispatch diagnostics, using the same loss and turbine model as annual energy. */
+  powerDuration?: {
+    /** Daily hydrological output equalled or exceeded on 90% of record days. */
+    p90MW: number;
+    /** Daily hydrological output equalled or exceeded on 95% of record days. */
+    p95MW: number;
+    zeroOutputFraction: number;
+    days: number;
+  } | null;
+  /** Equal-rated one-to-four-unit sensitivity; not an equipment recommendation. */
+  unitSensitivity?: UnitCountScenario[];
+  /** Exact dispatch diagnostics, using the same loss and turbine model as annual energy. */
+  reliability: {
+    annual: AnnualEnergyYear[];
+    p50Gwh: number;
+    p90Gwh: number;
+    worstGwh: number;
+    bestGwh: number;
+    ppaSixSix: {
+      wetGwh: number;
+      dryGwh: number;
+      dryShare: number;
+      meets: boolean;
+      grossReferenceValueMillionNpr: number;
+      blendedBaseRateNprPerKwh: number;
+    };
+    ppaEightFour: {
+      wetGwh: number;
+      dryGwh: number;
+      dryShare: number;
+      meets: boolean;
+      grossReferenceValueMillionNpr: number;
+      blendedBaseRateNprPerKwh: number;
+    };
+  } | null;
   /** Why this one is on the list at all. */
   reasons: string[];
 };
@@ -135,7 +187,8 @@ export function evaluate(
   input: SchemeInput,
   i: number,
   j: number,
-  qAtClickPre?: number
+  qAtClickPre?: number,
+  includeReliability = true
 ): Scheme | null {
   const { path, series, seriesMeanCms, residualCms, exceedance, efficiency } = input;
   if (i < 0 || j >= path.length || j <= i) return null;
@@ -203,6 +256,51 @@ export function evaluate(
   };
   const scaled = ratio === 1 ? series : series.map((v) => v * ratio);
   const e = annualEnergy(scaled, params);
+  // Like interannual/PPA diagnostics, sorting thousands of daily powers is only
+  // done for the handful of retained alternatives, never for every search pair.
+  const duration = includeReliability ? powerDurationSummary(scaled, params) : null;
+  const unitSensitivity = includeReliability
+    ? unitCountSensitivity({
+        seriesCms: scaled,
+        grossHeadM: Math.max(0, gross),
+        headLossFrac,
+        totalDesignFlowCms: qDesign,
+        residualFlowCms: residualCms * ratio,
+        generatorTransformerEfficiency: efficiency,
+        fallbackMinFlowFrac: input.minFlowFrac,
+      })
+    : [];
+  let reliability: Scheme['reliability'] = null;
+  if (includeReliability && input.dates && input.dates.length === scaled.length) {
+    const annual = annualEnergyByYear(input.dates, scaled, params);
+    const six = wetDryEnergy(input.dates, scaled, params, 'nea-6-6');
+    const eight = wetDryEnergy(input.dates, scaled, params, 'nea-8-4');
+    const ppa = (x: typeof six, threshold: number) => {
+      const total = x.wetGwh + x.dryGwh;
+      const dryShare = total > 0 ? x.dryGwh / total : 0;
+      const reference = ppaReferenceValue(x.wetGwh, x.dryGwh)!;
+      return {
+        wetGwh: x.wetGwh,
+        dryGwh: x.dryGwh,
+        dryShare,
+        meets: dryShare >= threshold,
+        grossReferenceValueMillionNpr: reference.grossMillionNpr,
+        blendedBaseRateNprPerKwh: reference.blendedNprPerKwh,
+      };
+    };
+    if (annual.length > 0) {
+      const values = annual.map((x) => x.gwh);
+      reliability = {
+        annual,
+        p50Gwh: valueAtExceedance(values, 0.5),
+        p90Gwh: valueAtExceedance(values, 0.9),
+        worstGwh: Math.min(...values),
+        bestGwh: Math.max(...values),
+        ppaSixSix: ppa(six, 0.3),
+        ppaEightFour: ppa(eight, 0.15),
+      };
+    }
+  }
 
   return {
     i,
@@ -212,6 +310,7 @@ export function evaluate(
     grossHeadM: gross,
     netHeadM: e.netHeadM,
     waterwayKm,
+    flowScale: ratio,
     designFlowCms: qDesign,
     residualCms: residualCms * ratio,
     capacityMW: e.ratedPowerW / 1e6,
@@ -222,6 +321,16 @@ export function evaluate(
     turbine: curve?.type ?? null,
     turbinePeak: curve?.peak ?? efficiency,
     waterway,
+    powerDuration: duration
+      ? {
+          p90MW: duration.dailyP90W / 1e6,
+          p95MW: duration.dailyP95W / 1e6,
+          zeroOutputFraction: duration.zeroOutputFraction,
+          days: duration.days,
+        }
+      : null,
+    unitSensitivity,
+    reliability,
     reasons: [],
   };
 }
@@ -259,7 +368,9 @@ export function discover(input: SchemeInput): DiscoverResult {
   for (let i = 0; i < lastIntake; i += stride) {
     if (!Number.isFinite(path[i].elevationM)) continue;
     for (let j = i + minSteps; j < Math.min(n, i + maxSteps); j += stride) {
-      const s = evaluate(input, i, j, qAtClick);
+      // Interannual/PPA diagnostics are much more expensive than the scalar
+      // score. Compute them only for the handful of alternatives that survive.
+      const s = evaluate(input, i, j, qAtClick, false);
       if (!s) continue;
       evaluated++;
       if (s.grossHeadM < MIN_HEAD_M || s.capacityMW < MIN_CAPACITY_MW) continue;
@@ -286,7 +397,8 @@ export function discover(input: SchemeInput): DiscoverResult {
     if (kept.length >= 8) break;
   }
 
-  return { schemes: label(kept), evaluated, fdcAtClick };
+  const detailed = kept.map((s) => evaluate(input, s.i, s.j, qAtClick, true) ?? s);
+  return { schemes: label(detailed), evaluated, fdcAtClick };
 }
 
 /** Say what each surviving alternative is actually best at. */

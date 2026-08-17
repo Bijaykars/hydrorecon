@@ -21,6 +21,7 @@ import gridRaw from './data/nepal-grid.json' with { type: 'json' };
 import { haversineKm } from './engine/hydro.ts';
 
 type RawGrid = {
+  _retrieved: string;
   lines: { kv: number; p: number[] }[];
   subs: { n: string | null; kv: number; y: number; x: number }[];
 };
@@ -154,3 +155,36 @@ export function connectionVerdict(link: GridLink): { text: string; hard: boolean
 
 export const GRID_LINE_COUNT = GRID.lines.length;
 export const GRID_SUB_COUNT = GRID.subs.length;
+export const GRID_RETRIEVED = GRID._retrieved;
+
+/** National transmission backbone for the map. Coordinates are stored lat/lon in the bundle. */
+export function gridLinesGeoJson(): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: GRID.lines
+      .filter((line) => line.p.length >= 4)
+      .map((line, index) => ({
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: Array.from({ length: Math.floor(line.p.length / 2) }, (_, i) => [
+            line.p[i * 2 + 1],
+            line.p[i * 2],
+          ]),
+        },
+        properties: { id: index, kv: line.kv },
+      })),
+  };
+}
+
+/** Mapped substations and switchyards for the map. */
+export function gridSubstationsGeoJson(): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: GRID.subs.map((sub, index) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [sub.x, sub.y] },
+      properties: { id: index, name: sub.n ?? 'Mapped substation', kv: sub.kv },
+    })),
+  };
+}

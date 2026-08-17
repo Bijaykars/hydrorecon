@@ -16,7 +16,9 @@
  *
  * SOURCE: CHPclim v2 (Climate Hazards Center, UCSB) — 0.05° monthly
  * precipitation climatology, the station-anchored surface underneath CHIRPS.
- * Public domain. Four months, June through September, ~32 MB each, cached.
+ * Publicly downloadable; the product page does not state a standalone reuse
+ * licence, so the generated sidecar preserves attribution and that rights
+ * caveat. Four months, June through September, ~32 MB each, cached.
  * The TIFFs are LZW-compressed with one row per strip, so only the ~100 rows
  * covering the Nepal window are ever decoded.
  *
@@ -30,14 +32,19 @@
  * existing hypsometry bytes are PRESERVED (no re-sampling of terrain), plus a
  * uint16 of catchment-mean MMP in mm (0xffff = unknown).
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { inflateRawSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
 
 const CACHE = 'pipeline/.cache';
 const RIVERS = 'public/nepal-rivers.dat';
 const HYPSO = 'public/nepal-hypso.dat';
+const PROVENANCE = 'src/data/nepal-hydest-provenance.json';
+const HYPSO_TMP = `${HYPSO}.tmp`;
+const PROVENANCE_TMP = `${PROVENANCE}.tmp`;
 const MONTHS = ['06', '07', '08', '09'];
 const URL = (mm) => `https://data.chc.ucsb.edu/products/CHPclim/v2/monthly_9090/CHPclim2.90-90.${mm}.tif`;
+const sha256 = (buffer) => createHash('sha256').update(buffer).digest('hex');
 
 /** Same window and grid as build-hypsometry.mjs — the basins must line up. */
 const COVER = { west: 79.9, south: 26.2, east: 88.4, north: 30.6 };
@@ -112,7 +119,8 @@ const ROW1 = Math.ceil((90 - (COVER.south - 0.5)) / 0.05);
 
 async function loadMonth(mm) {
   const path = `${CACHE}/chpclim.${mm}.tif`;
-  if (!existsSync(path)) {
+  const cachedBeforeRun = existsSync(path);
+  if (!cachedBeforeRun) {
     console.log(`downloading CHPclim ${mm} (~32 MB)…`);
     const r = await fetch(URL(mm));
     if (!r.ok) throw new Error(`CHPclim ${mm}: HTTP ${r.status}`);
@@ -143,7 +151,18 @@ async function loadMonth(mm) {
     const raw = lzw(buf.subarray(offAt(r), offAt(r) + lenAt(r)), w * 4);
     rows.set(r, new Float32Array(raw.buffer, raw.byteOffset, w));
   }
-  return { rows, w };
+  return {
+    rows,
+    w,
+    source: {
+      month: mm,
+      url: URL(mm),
+      bytes: buf.length,
+      sha256: sha256(buf),
+      cachedBeforeRun,
+      localFileModified: statSync(path).mtime.toISOString(),
+    },
+  };
 }
 
 console.log(`decoding CHPclim rows ${ROW0}–${ROW1} for ${MONTHS.length} months…`);
@@ -436,6 +455,75 @@ for (let i = 0; i < count; i++) {
   if (enc !== 0xffff) attached++;
 }
 
-writeFileSync(HYPSO, out);
+const built = new Date().toISOString();
+const hydroBasinsArchive = readFileSync(ZIP);
+const provenance = {
+  _built: built,
+  _method: 'WECS/DHM 1990 regional hydrology inputs attached to HydroRIVERS reaches',
+  _primaryCitation: {
+    title: 'Methodologies for estimating hydrologic characteristics of ungauged locations in Nepal',
+    publisher: 'Government of Nepal, Water and Energy Commission Secretariat and Department of Hydrology and Meteorology',
+    year: 1990,
+    catalogue: 'https://lib.icimod.org/records/ksjap-6sz72',
+  },
+  _guidance: {
+    study: 'https://doed.gov.np/content/35/guidelines-for-study-of-hydropower-projects--2018/',
+    headworks: 'https://doed.gov.np/content/31/design-guidelines-for-headworks-of-hydropower-projects/',
+    floodManual: 'https://wecs.gov.np/storage/listies/January2021/river-training-manual-final--wecs-2020-06-15-%28f%29-%281%29.pdf',
+  },
+  _chpclim: {
+    product: 'Climate Hazards Center Precipitation Climatology v2',
+    productUrl: 'https://chc.ucsb.edu/data/chpclim',
+    resolution: '0.05 degrees',
+    months: MONTHS,
+    interpretation: 'June-September total averaged over the derived upstream catchment; substitute for the original WECS/DHM monsoon isohyet input',
+    rights: 'Publicly downloadable. No standalone CHPclim reuse licence statement was identified on the product page; attribute the Climate Hazards Center and verify reuse terms. The repository MIT licence does not cover this derivative input.',
+    files: monthGrids.map((grid) => grid.source),
+  },
+  _hydrobasins: {
+    product: 'HydroBASINS Asia level 12 v1c',
+    url: 'https://data.hydrosheds.org/file/hydrobasins/standard/hybas_as_lev12_v1c.zip',
+    bytes: hydroBasinsArchive.length,
+    sha256: sha256(hydroBasinsArchive),
+  },
+  _hypsometry: {
+    terrain: 'Re:Earth Terrarium elevation tiles',
+    terrainUrl: 'https://terrain.reearth.land/',
+    terrainZoom: 10,
+    rasterStepDegrees: STEP,
+    thresholdsM: [5000, 3000],
+    note: 'Existing two-byte below-elevation fractions are preserved by this builder; run build:hypso to regenerate them.',
+  },
+  _output: {
+    file: HYPSO,
+    crs: 'EPSG:4326',
+    reaches: count,
+    bytes: out.length,
+    strideBytes: 4,
+    mmpAttached: attached,
+    mmpMissing: count - attached,
+    sha256: sha256(out),
+  },
+  _limitations: [
+    'WECS/DHM is a legacy regional regression and not a substitute for site gauging or flood-frequency analysis.',
+    'CHPclim v2 is a gridded climatology rather than the original WECS/DHM isohyet map, and mountain precipitation bias remains possible.',
+    'DoED headworks guidance requires comparison with other applicable flood methods, historical flood investigation, direct measurement where data are absent, and GLOF/CLOF investigation.',
+    'A regional flood estimate is not a selected design flood, diversion flood, spillway check flood or PMF/PMP decision.',
+  ],
+};
+
+// Build both outputs completely before replacement. A fetch, decode or
+// validation failure before this point therefore leaves the previous outputs
+// untouched; the sidecar checksum lets a later check detect any partial pair.
+try {
+  writeFileSync(HYPSO_TMP, out);
+  writeFileSync(PROVENANCE_TMP, `${JSON.stringify(provenance, null, 2)}\n`);
+  renameSync(HYPSO_TMP, HYPSO);
+  renameSync(PROVENANCE_TMP, PROVENANCE);
+} finally {
+  rmSync(HYPSO_TMP, { force: true });
+  rmSync(PROVENANCE_TMP, { force: true });
+}
 console.log(`wrote ${HYPSO}: ${count} reaches × 4 bytes, ${(out.length / 1024).toFixed(1)} KB`);
 console.log(`  with MMP: ${attached} (${((attached / count) * 100).toFixed(1)}%)`);
+console.log(`  provenance: ${PROVENANCE} (${provenance._output.sha256.slice(0, 12)}…)`);

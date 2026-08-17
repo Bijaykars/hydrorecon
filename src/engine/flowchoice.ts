@@ -16,9 +16,10 @@
  * two-hundred-fold. So neither source is always right, and the choice has to
  * be made per reach, not by policy.
  *
- * The judge is HYDEST — Nepal's own regional regression, fitted to Nepali
- * gauge records, computed from the catchment's area and hypsometry, and
- * entirely independent of both global models. Where the two candidates
+ * The comparison is the legacy WECS/DHM regional regression, fitted to Nepali
+ * gauge records and computed from catchment area, hypsometry and rainfall. Its
+ * discharge relation is independent of both global discharge models, although
+ * the screening inputs share mapped catchment geography. Where the candidates
  * disagree beyond what rescaling is meant to correct, each one's dry-season
  * flow is compared against HYDEST's, and the closer wins. Outside Nepal (no
  * hypsometry, no HYDEST) the network keeps winning, which is the long-standing
@@ -40,7 +41,7 @@ export const DISAGREE_RATIO = 3;
 export type FlowChoice = {
   /**
    * Which source supplies the magnitude. 'hydest' means both global sources
-   * failed the judge and Nepal's own regression carries the figure itself.
+   * sit far from the regional comparison and it carries the screening figure.
    */
   authority: 'network' | 'model' | 'hydest';
   /** How far apart the two candidates were, as a ratio ≥ 1. */
@@ -59,9 +60,8 @@ export type FlowChoice = {
 /**
  * A winner still this far off the judge has not won, it has merely lost less.
  * Log-space factor: e^1 ≈ 2.7×. Beyond it, if HYDEST can state an annual mean
- * of its own, the regression fitted to Nepali rivers beats two broken global
- * models — the Chilime read 1.6 m³/s in one and 44 in the other around a river
- * carrying about ten, and the less-wrong of those is still wrong.
+ * of its own, the regression becomes a provisional screening fallback. It does
+ * not become an observation or a project flow record.
  */
 const BOTH_LOST = 1;
 
@@ -164,9 +164,9 @@ export function chooseFlowMagnitude(opts: {
       modelCms,
       targetMeanCms: annual,
       note:
-        `both global sources fail Nepal's own regression here (network ${networkCms.toFixed(1)}, ` +
+        `both global sources sit far from the WECS/DHM regional estimate here (network ${networkCms.toFixed(1)}, ` +
         `flood model ${modelCms.toFixed(1)}, against its ${judge.toFixed(1)} m³/s annual mean) — ` +
-        'the record keeps its day-to-day shape, rescaled onto the regression, and only a gauge record does better',
+        'the record keeps its day-to-day shape, provisionally rescaled onto the regression; this remains screening and needs a gauge record',
     };
   }
 
@@ -180,8 +180,8 @@ export function chooseFlowMagnitude(opts: {
     modelCms,
     note:
       authority === 'network'
-        ? `Nepal's own regression sides with the mapped network (${networkCms.toFixed(1)} vs its ${judge.toFixed(1)} m³/s ${kindWord} figure)`
-        : `Nepal's own regression sides with the flood model (${modelCms.toFixed(1)} vs its ${judge.toFixed(1)} m³/s ${kindWord} figure) — ` +
+        ? `The WECS/DHM regional comparison is closer to the mapped network (${networkCms.toFixed(1)} vs its ${judge.toFixed(1)} m³/s ${kindWord} figure)`
+        : `The WECS/DHM regional comparison is closer to the flood model (${modelCms.toFixed(1)} vs its ${judge.toFixed(1)} m³/s ${kindWord} figure) — ` +
           'the network\'s discharge is broken on this reach, a known failure of its global water model in high Himalayan valleys',
   };
 }
