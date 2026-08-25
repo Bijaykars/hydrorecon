@@ -197,7 +197,9 @@ function table(caption: string, head: Row, rows: Row[]): string {
  * something the reader must not skim past.
  */
 const finding = (tone: 'clear' | 'watch' | 'note', html: string) =>
-  `<p class="find ${tone}">${html}</p>`;
+  `<aside class="finding ${tone}"><div class="finding-label">${
+    tone === 'clear' ? 'Key finding' : tone === 'watch' ? 'Required field verification' : 'Limitation'
+  }</div><div class="finding-body">${html}</div></aside>`;
 
 /** Key-value facts as a definition list. Not a grid; a grid is a cage. */
 function facts(rows: [string, string][]): string {
@@ -975,7 +977,7 @@ export function deskStudyHtml(
     const amb = c.ambiguity;
     const ratio = amb.nearestKm2 > 0 ? amb.mainKm2 / amb.nearestKm2 : null;
     sec.push(
-      H('IS THIS THE RIGHT RIVER?') +
+      H('RIVER AND CATCHMENT IDENTITY CHECK') +
         finding(
           'watch',
           `<b>A larger river runs ${n(amb.mainKm, 1)} km from the point studied.</b> This study is of a ` +
@@ -994,7 +996,7 @@ export function deskStudyHtml(
   // ---- 02 location ---------------------------------------------------------
   const muni = c.localGis?.municipality ?? null;
   sec.push(
-    H('LOCATION AND SITE LAYOUT') +
+    H('SITE SETTING AND PRELIMINARY LAYOUT') +
       (s
         ? `<p>The ${esc(meta.projectName)} is a proposed ${cap} run-of-river scheme. The intake lies at
         ${dms(s.intake.lat, 'N', 'S')}, ${dms(s.intake.lon, 'E', 'W')}${muni ? `, within ${esc(muni)}` : ''},
@@ -1009,7 +1011,7 @@ export function deskStudyHtml(
   // ---- 03 topography -------------------------------------------------------
   const prof = profileSvg(c);
   sec.push(
-    H('TOPOGRAPHY AND TERRAIN') +
+    H('TERRAIN AND LONGITUDINAL PROFILE') +
       `<p>The diverted reach falls ${s ? n(s.grossHeadM, 1) : '–'} m over ${s ? n(s.waterwayKm, 2) : '–'} km,
       an average gradient of ${s ? n(s.slopeMPerKm, 1) : '–'} m/km. Terrain is resolved at
       ${n(c.demResolutionM, 0)} m.</p>` +
@@ -1677,7 +1679,7 @@ export function deskStudyHtml(
       | unknown as { name?: string; routeKm?: number }
       | undefined;
     sec.push(
-      H('NEIGHBOURING PROJECTS ON THIS RIVER') +
+      H('LICENCE AND CASCADE SCREEN') +
         `<p>${c.cascade.upstream.length} licensed projects lie upstream of the intake and
         ${c.cascade.downstream.length} downstream of the powerhouse. ${c.cascade.directReachRecords} licence
         records fall on the diverted reach itself, of which ${c.cascade.directAdvancedRecords} hold a
@@ -1716,7 +1718,7 @@ export function deskStudyHtml(
       access = finding('watch', 'No motorable road was found within the searched radius of either structure. Access must be treated as an open question.');
     }
     sec.push(
-      H('ACCESS AND GRID CONNECTION') +
+      H('ACCESS AND POWER EVACUATION') +
         access +
         (c.grid
           ? facts([
@@ -1765,6 +1767,8 @@ export function deskStudyHtml(
 
   // ---- 10 hazards ----------------------------------------------------------
   let hazardAppendix = '';
+  let hazardSection = '';
+  const hazardHeading = () => (hazardSection ? '' : H('NATURAL HAZARD SCREENING'));
   if (c.hazards) {
     const cats = (c.hazards.categories ?? []).filter((k) => k.count > 0);
     const slides = cats.find((k) => /landslide/i.test(k.title));
@@ -1811,12 +1815,13 @@ export function deskStudyHtml(
       c.hazards.total === 0
         ? finding('clear', `<b>No hazard has been recorded within ${n(c.hazards.radiusKm, 1)} km of this corridor</b> over the period searched. That is an absence of records, not proof of a stable slope.`)
         : nearSlides >= 10
-          ? finding('watch', `<b>This is an actively failing corridor.</b> ${nearSlides} landslides have been recorded within ${NEAR_CORRIDOR_KM} km of the works — ${slideRecords.length} within the full ${n(c.hazards.radiusKm, 1)} km screen — the nearest ${n(slides?.nearestKm, 1)} km from the alignment. Slope stability along the headrace is a primary design risk here, not a checklist item, and the alignment should be walked by an engineering geologist before it is fixed.${clusterNote}`)
+          ? finding('watch', `<b>The incident register contains ${nearSlides} landslide records within ${NEAR_CORRIDOR_KM} km of the corridor</b> — ${slideRecords.length} within the full ${n(c.hazards.radiusKm, 1)} km screen — the nearest ${n(slides?.nearestKm, 1)} km from the alignment. These are historical incident locations, not slope-failure probabilities; an engineering-geology traverse is required before routing.${clusterNote}`)
           : nearSlides > 0
-            ? finding('note', `<b>${nearSlides} landslide${nearSlides === 1 ? ' has' : 's have'} been recorded within ${NEAR_CORRIDOR_KM} km of the works,</b> the nearest ${n(slides?.nearestKm, 1)} km from the alignment, out of ${slideRecords.length} across the full ${n(c.hazards.radiusKm, 1)} km screen. The corridor sits in failing country without the works themselves being ringed by it, so slope stability is a design item to walk rather than a reason to move the layout.${clusterNote}`)
+            ? finding('note', `<b>${nearSlides} landslide${nearSlides === 1 ? ' has' : 's have'} been recorded within ${NEAR_CORRIDOR_KM} km of the corridor,</b> the nearest ${n(slides?.nearestKm, 1)} km from the alignment, out of ${slideRecords.length} across the full ${n(c.hazards.radiusKm, 1)} km screen. The incident data indicate slope instability in the surrounding terrain but do not establish conditions on the route; verify the alignment by ground traverse.${clusterNote}`)
             : finding('note', `${c.hazards.total} records fall within the ${n(c.hazards.radiusKm, 1)} km screen, the nearest ${n(nearest, 1)} km from the alignment, and none within ${NEAR_CORRIDOR_KM} km of the works. The alignment should still be walked: absence of a filed record is not evidence of a stable slope.${clusterNote}`);
-    sec.push(
-      H('RECORDED NATURAL HAZARDS') +
+    hazardSection +=
+      hazardHeading() +
+        '<h2>Recorded incident data</h2>' +
         `<p>${c.hazards.total} hazard records fall within ${n(c.hazards.radiusKm, 1)} km of the scheme corridor
         between ${esc(c.hazards.period.from)} and ${esc(c.hazards.period.to)}.${
           c.hazards.records?.length
@@ -1830,7 +1835,7 @@ export function deskStudyHtml(
           }`,
           figures.hazards
         )
-    );
+    ;
     if (c.hazards.records?.length) {
       hazardAppendix = table(
         'Hazard records, nearest first',
@@ -1855,10 +1860,11 @@ export function deskStudyHtml(
       const ha = ll.areaHa ?? (ll.areaKm2 != null ? ll.areaKm2 * 100 : 0);
       return ha >= 10 && (ll.routeKm ?? 1e9) <= 60;
     });
-    sec.push(
-      H('GLACIAL LAKE OUTBURST FLOOD SCREEN') +
+    hazardSection +=
+      hazardHeading() +
+        '<h2>Glacial-lake outburst flood screen</h2>' +
         (u.lakes.length === 0
-          ? finding('clear', `<b>No glacial lake drains through this site.</b> All ${u.lakeInventory.total.toLocaleString()} lakes in the inventory were tested against the flow path above the intake and none reaches it, so a glacial lake outburst flood is <b>not a design case</b> for this scheme.`)
+          ? finding('note', `<b>No mapped glacial-lake source in the screened inventory intersects the upstream flow path.</b> The connectivity test covered ${u.lakeInventory.total.toLocaleString()} mapped lakes. Verify inventory completeness and upstream routing during detailed hazard assessment; this screen does not eliminate GLOF risk.`)
           : risky.length
             ? finding('watch', `<b>${risky.length} of the ${u.lakes.length} upstream lakes are large and close enough to matter</b> — at least 10 ha within 60 km of flow path. A GLOF study and an outburst design flood are required, and the intake and powerhouse levels should be set against it rather than against the flood frequency curve alone.`)
             : finding('note', `${u.lakes.length} upstream lakes drain through the site, but none is both large (≥10 ha) and close (≤60 km of flow path). GLOF is a residual risk to note rather than a governing design case.`)) +
@@ -1871,7 +1877,7 @@ export function deskStudyHtml(
           }`,
           figures.lakes
         )
-    );
+    ;
     if (u.lakes.length) {
       lakeAppendix = table(
         'Upstream glacial lakes draining through the site',
@@ -1890,7 +1896,7 @@ export function deskStudyHtml(
   if (c.seismic?.quakeCount != null) seis.push(['Recorded earthquakes nearby', String(c.seismic.quakeCount)]);
   if (c.seismic?.largest) seis.push(['Largest recorded earthquake', c.seismic.largest]);
   if (c.faults?.nearest) seis.push(['Nearest mapped fault', `${c.faults.nearest.name ?? c.faults.nearest.type} · ${n(c.faults.nearest.distanceKm, 1)} km`]);
-  if (c.faults?.crossings != null) seis.push(['Faults crossing the alignment', String(c.faults.crossings)]);
+  if (c.faults?.crossings != null) seis.push(['Mapped fault intersections at dataset resolution', String(c.faults.crossings)]);
   if (seis.length) {
     const pga = c.seismic?.pga475g ?? null;
     const faultKm = c.faults?.nearest?.distanceKm ?? null;
@@ -1898,18 +1904,16 @@ export function deskStudyHtml(
       pga == null
         ? ''
         : pga >= 0.4
-          ? finding('watch', `<b>A peak ground acceleration of ${n(pga, 2)} g is severe.</b> Every retaining structure, the powerhouse and the penstock anchors must be designed for it explicitly, and the surge and intake structures checked for displacement rather than shaking alone.`)
+          ? finding('watch', `<b>The regional 475-year PGA screen is ${n(pga, 2)} g.</b> Confirm the governing code parameters and site class before structural or transient design.`)
           : pga >= 0.25
-            ? finding('note', `A peak ground acceleration of ${n(pga, 2)} g is high but ordinary for Nepal. Standard seismic detailing to the national code is expected to be sufficient.`)
-            : finding('clear', `A peak ground acceleration of ${n(pga, 2)} g is moderate for this region.`);
+            ? finding('note', `The regional 475-year PGA screen is ${n(pga, 2)} g. Site class and code parameters are not established at desktop stage.`)
+            : finding('note', `The regional 475-year PGA screen is ${n(pga, 2)} g. This is regional context, not a site response assessment.`);
     const fv =
       faultKm == null
         ? ''
         : (c.faults?.crossings ?? 0) > 0
           ? finding('watch', `<b>A mapped fault crosses the alignment.</b> A tunnel or buried penstock across an active trace needs a fault-crossing detail, not a standard section.`)
-          : faultKm < 10
-            ? finding('note', `The nearest mapped fault is ${n(faultKm, 1)} km away and does not cross the alignment.`)
-            : '';
+          : finding('note', `<b>No mapped active fault intersects the corridor at the resolution of the screened dataset.</b> The nearest mapped trace is ${n(faultKm, 1)} km away. Field mapping and the detailed seismic assessment remain required.`);
     /**
      * A DISTANCE TO A FAULT IS NOT A PICTURE OF ONE.
      *
@@ -1946,8 +1950,15 @@ export function deskStudyHtml(
           figures.seismic
         )
       : '';
-    sec.push(H('SEISMICITY AND ACTIVE FAULTS') + facts(seis) + seisFig + sv + fv);
+    hazardSection +=
+      hazardHeading() +
+      '<h2>Seismicity and mapped active faults</h2>' +
+      facts(seis) +
+      seisFig +
+      sv +
+      fv;
   }
+  if (hazardSection) sec.push(hazardSection);
 
   /**
    * GEOLOGY IS A GAP, AND THE REPORT HAS TO SAY SO.
@@ -1970,7 +1981,7 @@ export function deskStudyHtml(
     const covering = dmg?.maps ?? [];
     const samples = c.geology?.regional?.samples ?? [];
     const distinct = new Set(samples.flatMap((smp) => smp.units.map((u) => u.name)));
-    let geo = H('ENGINEERING GEOLOGY');
+    let geo = H('PRELIMINARY ENGINEERING GEOLOGY');
 
     /**
      * THE PROVINCIAL SHEET LEADS THE SECTION.
@@ -2185,7 +2196,7 @@ export function deskStudyHtml(
         ? finding('note', `The scheme lies outside all protected areas; the nearest is ${esc(near[0].name)}, ${n(near[0].distanceKm, 1)} km away. Downstream and buffer-zone effects should still be addressed in the environmental assessment.`)
         : finding('clear', '<b>The scheme lies outside every protected area screened,</b> and none falls near enough to be flagged.');
     sec.push(
-      H('PROTECTED AREAS') +
+      H('PROTECTED-AREA SCREENING') +
         pv +
         table(
           'Protected areas',
@@ -2220,7 +2231,7 @@ export function deskStudyHtml(
     const built = kmOf(50);
 
     let land =
-      H('LAND THE WATERWAY CROSSES') +
+      H('LAND-COVER AND TENURE SCREENING') +
       facts([
         ['Alignment screened', dist(lc.waterwayKm)],
         ['Ground at the intake', lc.intake ?? 'unclassified'],
@@ -2277,7 +2288,7 @@ export function deskStudyHtml(
     const basin = desander({ designFlowCms: s.designFlowCms, netHeadM: s.netHeadM });
     const bench = c.sediment.bench;
     let sed =
-      H('SEDIMENT AND DESANDING') +
+      H('SEDIMENT AND HEADWORKS SCREENING') +
       `<p><b>${esc(src.label.charAt(0).toUpperCase() + src.label.slice(1))}</b> — ${n(src.highFrac * 100, 0)}% of
       the catchment lies above 3 000 m. ${esc(src.note)}</p>`;
     if (basin) {
@@ -2340,32 +2351,33 @@ export function deskStudyHtml(
   // ---- how much to trust the numbers ---------------------------------------
   const unc = c.uncertainty;
   if (unc) {
-    const capPct = s && s.capacityMW > 0 ? ((unc.capacityMW.high - unc.capacityMW.low) / 2 / s.capacityMW) * 100 : null;
     let uc =
-      H('HOW MUCH TO TRUST THESE NUMBERS') +
-      `<p>Every figure in this report is a screening estimate carried from global and national datasets
-      without a site measurement. The capacity above is plausibly between
-      ${n(unc.capacityMW.low, 3)} and ${n(unc.capacityMW.high, 3)} MW${capPct ? `, about ±${n(capPct, 0)}% of the
-      figure quoted` : ''}, and the annual energy between ${n(unc.energyGwh.low, 2)} and
-      ${n(unc.energyGwh.high, 2)} GWh.</p>` +
+      H('UNCERTAINTY AND CONFIDENCE ASSESSMENT') +
+      `<p>All results remain screening estimates because no site measurement has been used. The
+      ranges below communicate the evidence quality; they are not statistical design bounds.</p>` +
       facts([
-        ['Capacity range', `${n(unc.capacityMW.low, 3)} – ${n(unc.capacityMW.high, 3)} MW`],
-        ['Annual energy range', `${n(unc.energyGwh.low, 2)} – ${n(unc.energyGwh.high, 2)} GWh`],
-        ['Spread carried on the flow', `± ${n(unc.flowSpreadPct, 0)} %`],
-        ['Spread carried on the head', `± ${n(unc.headSpreadM, 1)} m`],
+        ['Indicative capacity range', `${n(unc.capacityMW.low, 1)}–${n(unc.capacityMW.high, 1)} MW`],
+        ['Indicative annual-energy range', `${n(unc.energyGwh.low, 0)}–${n(unc.energyGwh.high, 0)} GWh`],
+        ['Hydrology confidence', 'Low — dominant uncertainty and no site discharge measurement'],
+        ['Head confidence', `Moderate — DEM-derived, with a screening spread of approximately ±${n(unc.headSpreadM, 0)} m`],
+        ['Layout confidence', 'Low — waterway and structures are not surveyed or field-routed'],
       ]);
     if (unc.drivers.length) {
       uc += table(
-        'What drives the spread, largest first',
-        ['Source of uncertainty', 'Swing in capacity', 'Why'],
-        unc.drivers.map((d) => [d.name, `± ${n(d.swingPct, 0)} %`, d.note])
+        'Principal uncertainty drivers',
+        ['Evidence area', 'Relative influence', 'Basis'],
+        unc.drivers.map((driver, index) => [
+          driver.name,
+          index === 0 ? 'Dominant' : 'Secondary',
+          index === 0
+            ? 'No calibrated site record; flow-model uncertainty transfers directly to capacity and energy.'
+            : driver.note,
+        ])
       );
       const top = unc.drivers[0];
       uc += finding(
-        'note',
-        `<b>${esc(top.name)} dominates</b>, worth ±${n(top.swingPct, 0)}% of the capacity on its own. ` +
-          'Resolving it is worth more than refining anything else in this report, and it is what the ' +
-          'fieldwork below is aimed at.'
+        'watch',
+        `<b>${esc(top.name)} is the dominant uncertainty.</b> Resolve it before refining equipment, energy, pondage or financial cases.`
       );
     }
     sec.push(uc);
@@ -2373,15 +2385,15 @@ export function deskStudyHtml(
 
   // ---- what to do next, from the readiness screen ---------------------------
   const decisionText: Record<string, string> = {
-    hold: 'A constraint found in this screening should be resolved before further spend.',
-    fieldwork: 'The site is worth a field campaign; the tasks below are what it should cover.',
-    screening: 'The site remains at screening stage; the gaps below are what stands between it and a field campaign.',
+    hold: 'Hold further design expenditure until the stop-level constraints are closed.',
+    fieldwork: 'Proceed to the targeted field programme below.',
+    screening: 'Retain at desktop-screening stage pending the evidence listed below.',
   };
   sec.push(
-    H('CONCLUSION AND NEXT STEPS') +
-      `<p>The screening indicates a ${s ? n(s.capacityMW, 3) : '–'} MW run-of-river scheme generating
-      approximately ${s ? n(s.energyGwh, 2) : '–'} GWh a year, at a gross head of
-      ${s ? n(s.grossHeadM, 1) : '–'} m over a ${s ? n(s.waterwayKm, 2) : '–'} km waterway.
+    H('SCREENING CONCLUSION AND FIELD PROGRAMME') +
+      `<p>The central desktop case is an indicative ${s ? approx(s.capacityMW, 1) : '–'} MW run-of-river
+      scheme with ${s ? approx(s.energyGwh, 0) : '–'} GWh/year, approximately ${s ? n(s.grossHeadM, 0) : '–'} m
+      gross head and an unsurveyed ${s ? approx(s.waterwayKm, 1) : '–'} km waterway.
       ${rd ? esc(decisionText[rd.decision] ?? '') : ''}</p>` +
       (rd?.stopReasons?.length
         ? finding(
@@ -2389,6 +2401,9 @@ export function deskStudyHtml(
             `<b>Held for: </b>${rd.stopReasons.map((r) => esc(r.replace(/\.\s*$/, ''))).join('; ')}.`
           )
         : '') +
+      '<p>Subject to favourable closure of the tasks below, the next project stage is a field-informed ' +
+      'pre-feasibility or feasibility study. Detailed deliverables and gate-closure criteria are provided ' +
+      'in the field-plan CSV export.</p>' +
       /**
        * TRIMMED, AND WHAT WAS CUT IS NOT LOST.
        *
@@ -2419,10 +2434,7 @@ export function deskStudyHtml(
             ['Priority', 'Discipline', 'Task', 'Why it is needed'],
             rd.tasks.map((t) => [t.priority, t.discipline, t.title, t.reason])
           )
-        : '') +
-      '<p>Subject to a favourable outcome from the tasks above, a full feasibility study should follow. ' +
-      'The deliverable expected from each task, and what closes each gate, are carried in full in the ' +
-      'field-plan CSV export rather than reproduced here.</p>'
+        : '')
   );
 
   // ---- appendices ----------------------------------------------------------
@@ -2472,10 +2484,9 @@ export function deskStudyHtml(
 
     app.push(
       A('SOURCES, METHOD AND MEASURED ACCURACY') +
-        `<p>Nothing in the body of this report was asserted. Every layer below is a published
-        dataset, and every accuracy figure was measured against something independent — Nepal's own
-        gauge records, its own built plants, or a second terrain product — rather than quoted from a
-        specification.</p>` +
+        `<p>The report uses the published datasets listed below. Validation figures describe the
+        screening system against independent Nepali evidence or a second terrain product; they do
+        not establish accuracy at this site.</p>` +
         table('What this study is built on', ['Layer', 'Source', 'Licence, resolution, vintage'], src) +
         `<p>The accuracy below is the app's own, measured on Nepali evidence. It is not a claim
         about this site: it is the spread you should expect a screening result to carry before any
@@ -2483,10 +2494,10 @@ export function deskStudyHtml(
         table('Measured accuracy', ['Quantity', 'Result', 'Measured against'], acc) +
         finding(
           'watch',
-          '<b>Flow is the binding constraint, not terrain.</b> Flow carries roughly a factor of 1.6 ' +
-            'on an ungauged Nepali catchment while head carries 3.4%, so a 1.6× flow error is a 1.6× ' +
-            'energy error. That is why the gauging-station section earlier is the most valuable page ' +
-            'in this document: a measured record replaces the largest uncertainty in it.'
+          '<b>Hydrology is the dominant validation priority.</b> The measured system-wide flow error ' +
+            'is materially larger than the terrain error, and flow uncertainty transfers directly into ' +
+            'capacity and energy. A quality-controlled measured record should therefore be established ' +
+            'before refining the energy case.'
         ) +
         `<p class="eqnote">MERIT Hydro is CC-BY-NC, so derived per-vertex values are used and the
         original raster is not redistributed. The DMG sheet is reproduced as published, watermark
@@ -2658,16 +2669,20 @@ export function deskStudyHtml(
   th:last-child, td:last-child { padding-right: 0; }
   .num { text-align: right; }
 
-  /* ---- findings: the sentence that answers the section's question ---- */
-  .find {
-    border-left: 3px solid var(--rule); padding: 2.2mm 0 2.2mm 4mm;
-    margin: 0 0 4mm; text-align: left; page-break-inside: avoid;
-    font-size: 10.5pt; line-height: 1.55;
+  /* ---- findings: three repeatable engineering record types ---- */
+  .finding {
+    display: grid; grid-template-columns: 37mm 1fr; gap: 5mm;
+    border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+    padding: 2.6mm 0; margin: 0 0 4mm; text-align: left; page-break-inside: avoid;
   }
-  .find.clear { border-left-color: #2f7d5b; background: #2f7d5b0a; }
-  .find.watch { border-left-color: var(--warm); background: #b3541e0d; }
-  .find.note  { border-left-color: var(--soft); background: #8b949c0a; }
-  .find b { font-weight: 700; }
+  .finding-label {
+    font: 600 7.4pt/1.35 Inter, Helvetica, Arial, sans-serif; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--mid);
+  }
+  .finding.watch .finding-label { color: var(--warm); }
+  .finding.clear .finding-label { color: #2f6f56; }
+  .finding-body { font-size: 10pt; line-height: 1.5; }
+  .finding-body b { font-weight: 700; }
 
   /* ---- the working ---- */
   .eq {
