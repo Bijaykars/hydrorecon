@@ -46,8 +46,11 @@ export type ReportMeta = {
   projectName: string;
   developer: string;
   consultant: string;
-  /** Defaults to the standard DoED addressee block. */
+  /** Optional client/addressee. An official authority is never assumed. */
   submittedTo?: string[];
+  reportId?: string;
+  revision?: string;
+  status?: string;
 };
 
 /** Map captures, as data URLs. Any may be absent; the section adapts. */
@@ -87,12 +90,6 @@ export type ReportFigures = {
   geologySheet?: { province: string; placementKm: number | null; scale: string } | null;
 };
 
-const DEFAULT_ADDRESSEE = [
-  'Department of Electricity Development (DoED)',
-  'Ministry of Energy, Water Resources and Irrigation (MoEWRI)',
-  'Government of Nepal',
-];
-
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const esc = (v: unknown) =>
@@ -106,6 +103,10 @@ const n = (v: number | null | undefined, dp = 2): string =>
   typeof v === 'number' && Number.isFinite(v)
     ? v.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp })
     : '–';
+
+/** Client-facing screening values are approximate; raw model output remains in appendices/exports. */
+const approx = (v: number | null | undefined, dp = 1): string =>
+  typeof v === 'number' && Number.isFinite(v) ? `~${n(v, dp)}` : '–';
 
 const dms = (v: number, pos: string, neg: string): string => {
   if (!Number.isFinite(v)) return '–';
@@ -799,11 +800,25 @@ export function deskStudyHtml(
   tableNo = 0;
   figureNo = 0;
   const s = c.selected;
-  const addressee = (meta.submittedTo ?? DEFAULT_ADDRESSEE).map((l) => `<div>${esc(l)}</div>`).join('');
+  const preparedFor = (
+    meta.submittedTo?.length
+      ? meta.submittedTo
+      : [meta.developer && meta.developer !== '—' ? meta.developer : 'Preliminary project screening']
+  )
+    .map((l) => `<div>${esc(l)}</div>`)
+    .join('');
   const today = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-  const cap = s ? `${n(s.capacityMW, 3)} MW` : '';
+  const cap = s ? `${approx(s.capacityMW, 1)} MW indicative` : '';
   const exc = c.assumptions?.exceedance ?? 0.4;
   const scale = s?.flowScale ?? 1;
+  const rd = c.readiness;
+  const reportId =
+    meta.reportId ??
+    (s
+      ? `HR-DS-${Math.abs(Math.round(s.intake.lat * 1000))}-${Math.abs(Math.round(s.intake.lon * 1000))}`
+      : 'HR-DS-SITE');
+  const revision = meta.revision ?? '01';
+  const reportStatus = meta.status ?? 'Preliminary desktop screening';
 
   const sec: string[] = [];
   const app: string[] = [];
@@ -813,61 +828,84 @@ export function deskStudyHtml(
   const A = (t: string) =>
     `<h1 class="appx"><span class="hn">${String.fromCharCode(65 + ++appNo)}</span>${esc(t)}</h1>`;
 
-  // ---- key figures, the page a reader actually reads -----------------------
-  const kf = (v: string, u: string, l: string) =>
-    `<div class="kf"><b>${esc(v)}</b><i>${esc(u)}</i><span>${esc(l)}</span></div>`;
+  // ---- key figures, presented at the precision the evidence can support ----
+  const kf = (v: string, u: string, l: string, detail: string) =>
+    `<div class="kf"><b>${esc(v)}</b><i>${esc(u)}</i><span>${esc(l)}</span><small>${esc(detail)}</small></div>`;
   const keyFigures = s
     ? `<section class="keys">
-        ${kf(n(s.capacityMW, 3), 'MW', 'Installed capacity')}
-        ${kf(n(s.energyGwh, 2), 'GWh/yr', 'Average annual energy')}
-        ${kf(n(s.netHeadM, 1), 'm', 'Net head')}
-        ${kf(n(s.designFlowCms, 2), 'm³/s', 'Design flow')}
-        ${kf(n(s.waterwayKm, 2), 'km', 'Waterway length')}
-        ${kf(n(catchmentKm2(c), 1), 'km²', 'Catchment at intake')}
+        ${kf(approx(s.capacityMW, 1), 'MW', 'Indicative capacity', c.band ? `Range ${n(c.band.capLow, 1)}–${n(c.band.capHigh, 1)} MW · low confidence` : 'Low confidence')}
+        ${kf(approx(s.energyGwh, 0), 'GWh/yr', 'Indicative annual energy', c.band ? `Range ${n(c.band.energyLow, 0)}–${n(c.band.energyHigh, 0)} GWh · low confidence` : 'Low confidence')}
+        ${kf(approx(s.netHeadM, 0), 'm', 'Net head', `${n(c.demResolutionM, 0)} m DEM · moderate confidence`)}
+        ${kf(approx(s.designFlowCms, 2), 'm³/s', `Reference flow · Q${Math.round(exc * 100)}`, 'Modelled · low confidence')}
+        ${kf(approx(s.waterwayKm, 1), 'km', 'Indicative waterway', 'Unsurveyed route · low confidence')}
+        ${kf(approx(catchmentKm2(c), 1), 'km²', 'Catchment at intake', 'Mapped · moderate confidence')}
       </section>`
     : '';
 
-  // ---- 01 salient features -------------------------------------------------
-  const g = c.grid;
-  const ra = c.roadAccess;
+  // ---- 01 executive screening summary --------------------------------------
+  const decisionLabel: Record<string, string> = {
+    hold: 'Hold further design spend until the identified constraints are resolved.',
+    fieldwork: 'Proceed to a targeted field reconnaissance and measurement programme.',
+    screening: 'Retain at desktop-screening stage pending the evidence listed below.',
+  };
+  const stopSummary = rd?.stopReasons?.length
+    ? rd.stopReasons.map((reason) => reason.replace(/\.\s*$/, '')).join('; ')
+    : 'No desktop fatal flaw identified; field verification remains required.';
   sec.push(
-    H('SALIENT FEATURES') +
+    H('EXECUTIVE DESKTOP-SCREENING SUMMARY') +
+      `<p class="lede">This report screens whether the site warrants field investigation. It does not
+      establish a design, surveyed quantity, cost, consent position or construction basis.</p>` +
       keyFigures +
-      '<h2>General</h2>' +
       facts([
-        ['Project name', meta.projectName],
-        ['Project type', 'Run-of-river'],
-        ['Developer', meta.developer || '–'],
-        ['Intake', s ? `${dms(s.intake.lat, 'N', 'S')}, ${dms(s.intake.lon, 'E', 'W')} · ${n(c.path[s.i]?.elevationM, 0)} m` : '–'],
-        ['Powerhouse', s ? `${dms(s.power.lat, 'N', 'S')}, ${dms(s.power.lon, 'E', 'W')} · ${n(c.path[s.j]?.elevationM, 0)} m` : '–'],
+        ['Screening recommendation', rd ? decisionLabel[rd.decision] ?? decisionLabel.screening : decisionLabel.screening],
+        ['Dominant uncertainty', 'River flow; no site discharge measurement is available.'],
+        ['Principal hold points', stopSummary],
+        ['Appropriate next decision', 'Whether to fund reconnaissance, gauging, survey and constraint verification.'],
       ]) +
-      '<h2>Hydrology</h2>' +
+      finding(
+        rd?.decision === 'hold' ? 'watch' : 'note',
+        `<b>Screening recommendation:</b> ${esc(rd ? decisionLabel[rd.decision] ?? decisionLabel.screening : decisionLabel.screening)}`
+      )
+  );
+
+  // ---- 02 basis, scope and limitations -------------------------------------
+  sec.push(
+    H('BASIS, SCOPE AND LIMITATIONS') +
+      `<p>The assessment uses global and national datasets only. Results are suitable for comparing
+      options and planning fieldwork; they are not suitable for fixing structure locations, dimensions,
+      quantities, tender requirements or investment returns.</p>` +
+      '<h2>Evidence not obtained at desktop stage</h2>' +
       facts([
-        ['Catchment area at intake', `${n(catchmentKm2(c), 1)} km²`],
-        ['Long-term mean flow', `${n(meanAtIntake(c), 2)} m³/s`],
-        ['Design flow', s ? `${n(s.designFlowCms, 2)} m³/s at Q${Math.round(exc * 100)}` : '–'],
-        ['Environmental release', s ? `${n(s.residualCms, 2)} m³/s` : '–'],
-        ['Record length', `${c.flowYears} years`],
+        ['Site reconnaissance', 'Not undertaken'],
+        ['River-flow gauging', 'No site measurement'],
+        ['Topographic survey', `Not undertaken; terrain model cell ${n(c.demResolutionM, 0)} m`],
+        ['Engineering-geology mapping', 'No mapped ground traverse, drilling or geotechnical testing'],
+        ['Sediment investigation', 'No suspended-load or bed-load samples'],
+        ['Grid connection', 'Mapped proximity only; capacity and connection point unconfirmed'],
+        ['Environmental and social baseline', 'Desktop register and land-cover screen only'],
+        ['Cost, schedule and bankability', 'Not assessed'],
       ]) +
-      '<h2>Head, waterway and plant</h2>' +
+      '<h2>Screening assumptions</h2>' +
       facts([
-        ['Gross head', s ? `${n(s.grossHeadM, 1)} m` : '–'],
-        ['Net head', s ? `${n(s.netHeadM, 1)} m` : '–'],
-        ['Head lost in the waterway', s ? `${n(s.grossHeadM - s.netHeadM, 1)} m` : '–'],
-        ['Waterway length', s ? `${n(s.waterwayKm, 2)} km` : '–'],
-        ['Average gradient of diverted reach', s ? `${n(s.slopeMPerKm, 1)} m/km` : '–'],
-        ['Turbine', s?.turbine ? String(s.turbine) : '–'],
-        ['Units', s ? `2 × ${n((s.capacityMW * 1000) / 2, 0)} kW` : '–'],
-        ['Plant factor', s ? `${n(s.plantFactor * 100, 1)} %` : '–'],
+        ['Reference design-flow exceedance', `Q${Math.round(exc * 100)}`],
+        ['Overall plant efficiency', `${n((c.assumptions?.efficiency ?? 0) * 100, 1)} %`],
+        ['Head-loss allowance', `${n((c.assumptions?.headLossFrac ?? 0) * 100, 1)} %`],
+        ['Environmental release', `${n((c.assumptions?.residualFrac ?? 0) * 100, 0)} % of the lowest monthly mean`],
+        ['Hydrological record used', `${c.flowYears} model years`],
+        ['Automated layouts evaluated', String(c.evaluated)],
       ]) +
-      '<h2>Evacuation and access</h2>' +
-      facts([
-        ['Connection voltage', g ? `${n(g.requiredKv, 0)} kV` : '–'],
-        ['Interconnection point', g?.nearestSub ? `${g.nearestSub.name ?? 'Nearest mapped substation'} · ${n(g.nearestSub.kv, 0)} kV` : '–'],
-        ['Transmission line length', g?.nearestSub ? `~${dist(g.nearestSub.km)}` : '–'],
-        ['Motorable road to intake', ra?.intake ? `~${dist(kmOf(ra.intake.distanceM))}` : '–'],
-        ['Motorable road to powerhouse', ra?.powerhouse ? `~${dist(kmOf(ra.powerhouse.distanceM))}` : '–'],
-      ])
+      (c.localGis && (c.localGis.municipality || c.localGis.sheet || c.localGis.isohyetMm != null)
+        ? '<h2>Administrative and survey context</h2>' +
+          facts([
+            ['Local body', c.localGis.municipality ?? '–'],
+            ['Survey sheet', c.localGis.sheet ?? '–'],
+            ['Mean annual rainfall', c.localGis.isohyetMm == null ? '–' : `${n(c.localGis.isohyetMm, 0)} mm`],
+          ])
+        : '') +
+      finding(
+        'note',
+        '<b>Display precision follows evidence quality.</b> Rounded values in the main report are decision-level estimates; raw model values remain available in the technical appendices and machine-readable exports.'
+      )
   );
 
   /**
@@ -2208,29 +2246,6 @@ export function deskStudyHtml(
     sec.push(sed);
   }
 
-  if (c.localGis && (c.localGis.municipality || c.localGis.sheet || c.localGis.isohyetMm != null)) {
-    sec.push(
-      H('SURVEY AND ADMINISTRATIVE CONTEXT') +
-        facts([
-          ['Local body', c.localGis.municipality ?? '–'],
-          ['Survey sheet', c.localGis.sheet ?? '–'],
-          ['Mean annual rainfall', c.localGis.isohyetMm == null ? '–' : `${n(c.localGis.isohyetMm, 0)} mm`],
-        ])
-    );
-  }
-
-  sec.push(
-    H('DESIGN ASSUMPTIONS') +
-      facts([
-        ['Design flow exceedance', `Q${Math.round(exc * 100)}`],
-        ['Overall plant efficiency', `${n((c.assumptions?.efficiency ?? 0) * 100, 1)} %`],
-        ['Head loss allowance', `${n((c.assumptions?.headLossFrac ?? 0) * 100, 1)} %`],
-        ['Environmental release', `${n((c.assumptions?.residualFrac ?? 0) * 100, 0)} % of the lowest monthly mean`],
-        ['Terrain model resolution', `${n(c.demResolutionM, 0)} m`],
-        ['Layouts evaluated', String(c.evaluated)],
-      ])
-  );
-
   // ---- how much to trust the numbers ---------------------------------------
   const unc = c.uncertainty;
   if (unc) {
@@ -2266,7 +2281,6 @@ export function deskStudyHtml(
   }
 
   // ---- what to do next, from the readiness screen ---------------------------
-  const rd = c.readiness;
   const decisionText: Record<string, string> = {
     hold: 'A constraint found in this screening should be resolved before further spend.',
     fieldwork: 'The site is worth a field campaign; the tasks below are what it should cover.',
@@ -2394,7 +2408,7 @@ export function deskStudyHtml(
   if (lakeAppendix) app.push(A('UPSTREAM GLACIAL LAKE INVENTORY') + lakeAppendix);
 
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
-<title>${esc(meta.projectName)} — Desk Study Report</title>
+<title>${esc(meta.projectName)} — Desktop Screening Report</title>
 <style>
   @page {
     size: A4;
@@ -2405,7 +2419,7 @@ export function deskStudyHtml(
       font: 8pt/1 Inter, Helvetica, Arial, sans-serif; letter-spacing: .1em; color: #8b949c;
     }
     @top-left {
-      content: "DESK STUDY REPORT";
+      content: "DESKTOP SCREENING REPORT";
       vertical-align: bottom; padding-bottom: 5mm;
       font: 8pt/1 Inter, Helvetica, Arial, sans-serif; letter-spacing: .1em; color: #8b949c;
     }
@@ -2435,6 +2449,7 @@ export function deskStudyHtml(
     color: var(--ink); margin: 0; -webkit-font-smoothing: antialiased;
   }
   p { margin: 0 0 3.5mm; text-align: justify; hyphens: auto; }
+  .lede { font-size: 12pt; line-height: 1.5; text-align: left; max-width: 155mm; }
   .flag { color: var(--warm); font-weight: 600; }
 
   /* ---- cover ---- */
@@ -2458,7 +2473,24 @@ export function deskStudyHtml(
   .cover hr { border: 0; border-top: 2px solid var(--ink); margin: 0 0 9mm; width: 34mm; }
   .cover .kind {
     font: 8.5pt/1 Inter, Helvetica, Arial, sans-serif; letter-spacing: .28em; text-transform: uppercase;
-    color: var(--mid); margin-bottom: auto;
+    color: var(--mid); margin-bottom: 7mm;
+  }
+  .cover .status {
+    width: fit-content; border-top: 1.5px solid var(--warm); border-bottom: 1px solid var(--rule);
+    padding: 3mm 0; margin-bottom: auto;
+    font: 600 8pt/1.35 Inter, Helvetica, Arial, sans-serif; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--warm);
+  }
+  .cover .docmeta {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 7mm;
+    border-top: 1px solid var(--rule); padding-top: 4mm; margin-bottom: 8mm;
+  }
+  .cover .docmeta b {
+    display: block; margin-bottom: 1.5mm;
+    font: 500 7.5pt/1 Inter, Helvetica, Arial, sans-serif; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--soft);
+  }
+  .cover .docmeta span { font: 9.5pt/1.35 Inter, Helvetica, Arial, sans-serif; color: var(--ink); }
   }
   .cover .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 9mm; margin-bottom: 10mm; }
   .cover .parties h3 {
@@ -2499,6 +2531,10 @@ export function deskStudyHtml(
     display: block; margin-top: 1.5mm;
     font: 7.5pt/1.3 Inter, Helvetica, Arial, sans-serif; letter-spacing: .1em;
     text-transform: uppercase; color: var(--soft);
+  }
+  .kf small {
+    display: block; margin-top: 1.2mm;
+    font: 7.5pt/1.35 Inter, Helvetica, Arial, sans-serif; color: var(--mid);
   }
 
   /* ---- facts: a definition list, never a grid of boxes ---- */
@@ -2610,16 +2646,21 @@ export function deskStudyHtml(
 </style></head><body>
 
 <section class="cover">
-  <div class="eyebrow">Run-of-river hydropower</div>
+  <div class="eyebrow">Preliminary project screening</div>
   <h1>${esc(meta.projectName)}</h1>
   ${cap ? `<div class="cap">${cap}</div>` : ''}
   <hr>
-  <div class="kind">Desk Study Report</div>
+  <div class="kind">Desktop Screening Report</div>
+  <div class="status">Screening only · not for design, consent or construction</div>
+  <div class="docmeta">
+    <div><b>Report</b><span>${esc(reportId)}</span></div>
+    <div><b>Revision</b><span>${esc(revision)}</span></div>
+    <div><b>Status</b><span>${esc(reportStatus)}</span></div>
+  </div>
   <div class="parties">
-    <div><h3>Submitted to</h3>${addressee}</div>
+    <div><h3>Prepared for</h3>${preparedFor}</div>
     <div>
-      <h3>Submitted by</h3><div>${esc(meta.developer)}</div>
-      <h3 style="margin-top:6mm">Prepared by</h3><div>${esc(meta.consultant)}</div>
+      <h3>Prepared by</h3><div>${esc(meta.consultant)}</div>
     </div>
   </div>
   <div class="date">${esc(today)}</div>
