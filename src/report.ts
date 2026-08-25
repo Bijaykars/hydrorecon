@@ -33,7 +33,7 @@
 import type { ExportContext } from './export.ts';
 import { geologySpans, type GeologyUnitHit } from './geology-units.ts';
 import { stationDisplayName } from './gauges.ts';
-import { buildFdc, minMonthlyMean, NEA_ROR_PPA, seasonalRatio } from './engine/hydro.ts';
+import { buildFdc, minMonthlyMean, seasonalRatio } from './engine/hydro.ts';
 import {
   pondageDemand,
   PONDAGE_REFERENCE_HOURS,
@@ -426,7 +426,7 @@ function designFlowSvg(sweep: DesignFlowSweep): string {
  * 128, and the sentence was simply untrue. Named here so the prose can quote
  * the same number the table obeys.
  */
-const HAZARD_APPENDIX_ROWS = 40;
+const HAZARD_APPENDIX_ROWS = 15;
 
 /** The band, in km either side of the river, that counts as "at the works". */
 const NEAR_CORRIDOR_KM = 2;
@@ -712,6 +712,60 @@ function monthlyEnvelopeSvg(
   <rect x="${L}" y="6" width="18" height="8" fill="#0f4c5c" opacity=".12"/><text x="${L + 24}" y="14" style="${AX}">P10–P90 monthly range</text>
   <line x1="${L + 156}" y1="10" x2="${L + 176}" y2="10" stroke="#0f4c5c" stroke-width="2"/><text x="${L + 182}" y="14" style="${AX}">median</text>
   <text x="13" y="${(Hh / 2).toFixed(0)}" style="${LB}" text-anchor="middle" transform="rotate(-90 13 ${(Hh / 2).toFixed(0)})">MONTHLY MEAN FLOW  m³/s</text>
+</svg>`;
+}
+
+/** Composition strip for land-cover exposure; proportions, not a chainage map. */
+function landcoverCompositionSvg(
+  spans: readonly { code: number; label: string; km: number; share: number }[]
+): string {
+  const valid = spans.filter((span) => span.share > 0 && Number.isFinite(span.share));
+  if (!valid.length) return '';
+  const W = 540;
+  const L = 18;
+  const R = 18;
+  const barY = 24;
+  const barH = 24;
+  const palette: Record<number, string> = {
+    10: '#547a58',
+    20: '#9db36a',
+    30: '#b8a36b',
+    40: '#c4a252',
+    50: '#8c6b63',
+    60: '#a89e8a',
+    70: '#d8d6cf',
+    80: '#5d8ea6',
+    90: '#7aa7a0',
+    95: '#8fa3b3',
+    100: '#c1b8a0',
+  };
+  let cursor = L;
+  const segments = valid
+    .map((span) => {
+      const width = span.share * (W - L - R);
+      const colour = palette[span.code] ?? '#8b949c';
+      const label = span.share >= 0.1
+        ? `<text x="${(cursor + width / 2).toFixed(1)}" y="${barY + 16}" style="font:8px Inter,Helvetica,Arial,sans-serif;fill:#fff;font-weight:600" text-anchor="middle">${n(span.share * 100, 0)}%</text>`
+        : '';
+      const shape = `<rect x="${cursor.toFixed(1)}" y="${barY}" width="${width.toFixed(1)}" height="${barH}" fill="${colour}"/>${label}`;
+      cursor += width;
+      return shape;
+    })
+    .join('');
+  const legend = valid
+    .map((span, index) => {
+      const col = index % 2;
+      const row = Math.floor(index / 2);
+      const x = L + col * 252;
+      const y = 68 + row * 20;
+      const colour = palette[span.code] ?? '#8b949c';
+      return `<rect x="${x}" y="${y - 8}" width="9" height="9" fill="${colour}"/><text x="${x + 15}" y="${y}" style="${AXD}">${esc(span.label)} · ${n(span.km, 1)} km · ${n(span.share * 100, 0)}%</text>`;
+    })
+    .join('');
+  const Hh = 84 + Math.ceil(valid.length / 2) * 20;
+  return `<svg viewBox="0 0 ${W} ${Hh}" class="chart" xmlns="http://www.w3.org/2000/svg">
+  <text x="${L}" y="13" style="${LB}">ALIGNMENT COMPOSITION</text>
+  ${segments}${legend}
 </svg>`;
 }
 
@@ -1004,8 +1058,7 @@ export function deskStudyHtml(
         downstream along the river at ${n(c.path[s.j]?.elevationM, 0)} m, giving a gross head of
         ${n(s.grossHeadM, 1)} m. The catchment at the intake is ${n(catchmentKm2(c), 1)} km².</p>`
         : '<p>No scheme has been selected.</p>') +
-      figure('Project layout — intake, waterway, powerhouse and neighbouring licence areas', figures.site) +
-      figure('The site on satellite imagery', figures.satellite)
+      figure('Project screening map — intake, waterway, powerhouse and neighbouring licence areas', figures.site)
   );
 
   // ---- 03 topography -------------------------------------------------------
@@ -1015,8 +1068,7 @@ export function deskStudyHtml(
       `<p>The diverted reach falls ${s ? n(s.grossHeadM, 1) : '–'} m over ${s ? n(s.waterwayKm, 2) : '–'} km,
       an average gradient of ${s ? n(s.slopeMPerKm, 1) : '–'} m/km. Terrain is resolved at
       ${n(c.demResolutionM, 0)} m.</p>` +
-      chartBlock(prof, 'Long profile of the diverted reach') +
-      figure('Topographic setting', figures.topo)
+      chartBlock(prof, 'Long profile of the diverted reach')
   );
 
   // ---- 04 hydrology --------------------------------------------------------
@@ -1169,7 +1221,7 @@ export function deskStudyHtml(
       downstream: 'downstream, scale down',
       'nearby catchment': 'different branch',
     };
-    const near = c.gauges.slice(0, 8);
+    const near = c.gauges.slice(0, 5);
     const usable = c.gauges.filter((gg) => gg.measuresDischarge && gg.trustworthy);
     const best = usable[0] ?? null;
 
@@ -1225,13 +1277,10 @@ export function deskStudyHtml(
       '<h2>Gauge transfer screen</h2>' +
       `<figure class="cw appendix-figure">${gaugeTransferSvg(c.gauges)}<figcaption>Appendix figure · Catchment ratio at nearby gauges; the shaded band indicates the area-ratio transfer screen.</figcaption></figure>` +
       table(
-        'Gauging stations near the site',
+        'Five closest gauging stations near the site',
         ['Station', 'Distance', 'Relation', 'Record', 'Catchment', 'Transfer'],
         gaugeRows
-      ) +
-      `<p class="eqnote">Area-ratio transfer assumes comparable runoff response and is retained only
-      for similar catchments on a relevant river reach. Distances are straight-line to the studied
-      corridor. Water-level records require a separate rating curve before they can be used as flow.</p>`;
+      );
   }
 
   if (hydrologyAppendix) {
@@ -1323,28 +1372,8 @@ export function deskStudyHtml(
         ['Daily output exceeded 95% of days', 'MW', s?.powerDuration ? n(s.powerDuration.p95MW, 2) : '–'],
       ]
     ) +
-    basisOfCalculation(c) +
-    '<h2>Published tariff reference inputs</h2>' +
-    facts([
-      ['Wet-season base rate', `${n(NEA_ROR_PPA.wetNprPerKwh, 2)} NPR/kWh`],
-      ['Dry-season base rate', `${n(NEA_ROR_PPA.dryNprPerKwh, 2)} NPR/kWh`],
-      ['Use in this report', 'Criterion screen only; no revenue, PPA entitlement or financial result'],
-    ]);
+    basisOfCalculation(c);
 
-  if (s?.unitSensitivity?.length) {
-    powerAppendix += table(
-      'Equal-rated unit-count sensitivity',
-      ['Units', 'Runner', 'Capacity MW', 'Energy GWh', 'Daily P90 MW', 'Daily P95 MW'],
-      s.unitSensitivity.map((unit) => [
-        String(unit.units),
-        unit.turbine ? String(unit.turbine) : '–',
-        n(unit.capacityMW, 3),
-        n(unit.energyGwh, 2),
-        n(unit.dailyP90MW, 2),
-        n(unit.dailyP95MW, 2),
-      ])
-    );
-  }
   app.push(A('POWER AND ENERGY CALCULATION BASIS') + powerAppendix);
 
   /**
@@ -1685,17 +1714,18 @@ export function deskStudyHtml(
         records fall on the diverted reach itself, of which ${c.cascade.directAdvancedRecords} hold a
         construction licence or are already operating.${
           nearest?.name ? ` The closest is ${esc(nearest.name)}, ${n(nearest.routeKm ?? null, 1)} km away along the river.` : ''
-        } The full register, with each licence's published coordinate range, is in
-        Appendix ${String.fromCharCode(65 + appNo + 1)}.</p>`
+        }${rows.length ? ` The routed register is provided in Appendix ${String.fromCharCode(65 + appNo + 1)}.` : ''}</p>`
     );
-    app.push(
-      A('REGISTER OF NEIGHBOURING LICENSED PROJECTS') +
-        table(
-          'Licensed projects upstream and downstream',
-          ['Project', 'Direction', 'Capacity MW', 'Stage', 'Route km', 'Published range km'],
-          rows
-        )
-    );
+    if (rows.length) {
+      app.push(
+        A('REGISTER OF NEIGHBOURING LICENSED PROJECTS') +
+          table(
+            'Licensed projects upstream and downstream',
+            ['Project', 'Direction', 'Capacity MW', 'Stage', 'Route km', 'Published range km'],
+            rows
+          )
+      );
+    }
   }
 
   // ---- 09 access and grid --------------------------------------------------
@@ -1936,25 +1966,10 @@ export function deskStudyHtml(
      * caption. So it describes what is actually there, and where a fault is
      * known but out of frame it says so with the distance.
      */
-    const drawnFaults = c.faults?.nearby?.length ?? 0;
-    const nearestFaultKm = c.faults?.nearest?.distanceKm ?? null;
-    const seisFig = figures.seismic
-      ? figure(
-          `Recorded epicentres around the scheme — hillshaded relief, the alignment in colour, ` +
-            `instrumented earthquakes as orange circles sized by magnitude` +
-            (drawnFaults ? `, and ${drawnFaults} mapped active fault trace${drawnFaults === 1 ? '' : 's'} in dark red` : '') +
-            (figures.seismicFrameKm ? `. Frame about ${n(figures.seismicFrameKm, 0)} km across` : '') +
-            (!drawnFaults && nearestFaultKm != null
-              ? `; no mapped fault falls inside it — the nearest is ${n(nearestFaultKm, 1)} km away`
-              : ''),
-          figures.seismic
-        )
-      : '';
     hazardSection +=
       hazardHeading() +
       '<h2>Seismicity and mapped active faults</h2>' +
       facts(seis) +
-      seisFig +
       sv +
       fv;
   }
@@ -1976,6 +1991,7 @@ export function deskStudyHtml(
    * known — which published DMG sheets cover the alignment, if any — and states
    * the gap plainly instead of dressing it up.
    */
+  let geologyAppendix = '';
   {
     const dmg = c.geology?.dmg ?? null;
     const covering = dmg?.maps ?? [];
@@ -1998,34 +2014,19 @@ export function deskStudyHtml(
      */
     const sheet = figures.geologySheet ?? null;
     if (figures.geology && sheet) {
-      // 0.5 mm is about the finest line a printed map holds, so the scale
-      // denominator over 2000 is that line's width on the ground: 175 m at
-      // 1:350,000. Nothing scaled off the sheet can beat it.
-      const denom = Number((sheet.scale.match(/1:\s*([\d,]+)/)?.[1] ?? '').replace(/,/g, ''));
-      const lineM = Number.isFinite(denom) && denom > 0 ? Math.round(denom / 2000) : null;
       const km = sheet.placementKm;
       // The index keys sheets by file stem, so the province arrives lowercase.
       const prov = sheet.province.replace(/\b[a-z]/g, (ch) => ch.toUpperCase());
       geo +=
-        `<p>The Department of Mines and Geology publishes a geological map of each province at
-        ${esc(sheet.scale)}. The <b>${esc(prov)} Province</b> sheet covers this alignment and is
-        reproduced below beneath the layout, so the mapped units, thrusts and fold axes can be read
-        against the waterway directly.</p>` +
+        `<p>The Department of Mines and Geology ${esc(prov)} Province sheet provides regional
+        geological context at ${esc(sheet.scale)}. It is shown beneath the indicative alignment.</p>` +
         figure(
-          `Published geological map of ${prov} Province at ${sheet.scale}, beneath the scheme alignment${
-            figures.geologyFrameKm
-              ? `. Framed ${n(figures.geologyFrameKm, 0)} km wide: at the scheme's own scale a sheet of this kind resolves nothing`
-              : ''
-          }`,
+          `Published ${prov} Province geological map at ${sheet.scale} beneath the indicative alignment`,
           figures.geology
         ) +
         finding(
-          km !== null && km <= 0.5 ? 'note' : 'watch',
-          km === null
-            ? `<b>The placement of this sheet has not been measured.</b> Read it as regional context and do not scale a position off it.`
-            : km <= 0.5
-              ? `<b>The sheet is registered to within ${n(km, 2)} km</b> — measured, not asserted. The surveyed spot heights printed on it were compared against a 30 m elevation model, and the shift that would make them agree any better is at or below ${n(km, 2)} km.${lineM ? ` At ${esc(sheet.scale)} a printed line is about ${lineM} m wide on the ground, so the sheet is hung about as precisely as it can be read.` : ''} Read units and structures from it; do not scale a contact to better than a few hundred metres.`
-              : `<b>This sheet is registered to about ${n(km, 2)} km, looser than the others.</b> The same spot-height test puts its best fit that far from where it is drawn. Use it for regional context only — a contact read off it could be a kilometre from the ground.`
+          'note',
+          `<b>The provincial sheet is regional context, not route-level engineering mapping.</b> ${km === null ? 'Its placement has not been independently measured.' : `Its measured placement tolerance is approximately ${n(km, 2)} km.`} Do not use it to fix a portal, foundation, support change or contact chainage.`
         );
     }
 
@@ -2064,11 +2065,14 @@ export function deskStudyHtml(
             ? u.name
             : `unit ${u.code} (the sheet labels it "${u.name}" and publishes no legend expanding it)`;
 
-      geo +=
-        `<p>Nepal's own geological map, published by the Department of Mines and Geology at
-        ${esc(gu.scale)}, has been read along the waterway itself rather than at a point. The
-        <b>intake stands on ${esc(unitWord(gu.intake))}</b> and the <b>powerhouse on
-        ${esc(unitWord(gu.powerhouse))}</b>.</p>`;
+      geo += facts([
+        ['National mapping scale', gu.scale],
+        ['Mapped unit at intake', unitWord(gu.intake)],
+        ['Mapped unit at powerhouse', unitWord(gu.powerhouse)],
+        ['Mapped formation contacts', `${gu.formationContacts}`],
+        ['Mapped alignment coverage', `${n(gu.mappedKm, 1)} of ${n(gu.lengthKm, 1)} km`],
+        ['Indicative contact tolerance', `approximately ±${n(gu.contactErrorKm, 1)} km`],
+      ]);
 
       /**
        * A NAME HERE IS A CORRELATION, NOT NECESSARILY LOCAL MAPPING.
@@ -2081,9 +2085,9 @@ export function deskStudyHtml(
        * its job as a national compilation, but Lesser Himalayan stratigraphy in
        * Nepal is genuinely not agreed between regions, and a Nepali geologist
        * reading this report will notice immediately. Better to say it.
-       */
+      */
       if (spans.some((sp) => sp.unit.named)) {
-        geo += finding(
+        geologyAppendix += '<h2>Regional nomenclature limitation</h2>' + finding(
           'note',
           `<b>Treat the unit name as a regional correlation rather than local mapping.</b> The 1994 ` +
             `compilation applies one national nomenclature: 17 of its 44 named units are drawn across ` +
@@ -2097,13 +2101,7 @@ export function deskStudyHtml(
       if (blankShare > 0.02) {
         geo += finding(
           'watch',
-          `<b>${n(blankKm, 1)} km of this ${n(gu.lengthKm, 1)} km alignment — ${n(blankShare * 100, 0)}% — ` +
-            `is not carried by the national digital dataset.</b> That is a gap in the data, not in Nepal's ` +
-            `geology: the published 1994 map covers the whole country, and the Department's own ` +
-            `1:350,000 province sheets map this ground. About 30% of the digitised extent is missing this ` +
-            `way and it is concentrated in the high north, so a scheme with real head falls in it more ` +
-            `often than a low one. <b>Nothing below describes those kilometres — obtain the published ` +
-            `sheet for them rather than reading them as unremarkable.</b>`
+          `<b>${n(blankKm, 1)} km (${n(blankShare * 100, 0)}%) of the alignment is absent from the national digital unit dataset.</b> Treat this as missing evidence and verify the published mapping directly.`
         );
       }
 
@@ -2115,7 +2113,12 @@ export function deskStudyHtml(
         const rows = gu.contacts
           .filter((ct) => !ct.withinFormation)
           .map((ct) => [`${n(ct.atKm, 1)} km`, cell(ct.from), cell(ct.to)]);
-        geo +=
+        geo += finding(
+          'watch',
+          `<b>The regional mapping indicates ${gu.formationContacts} formation contact${gu.formationContacts === 1 ? '' : 's'} along the corridor.</b> Indicative chainages carry approximately ±${n(gu.contactErrorKm, 1)} km tolerance and require route-level mapping.`
+        );
+        geologyAppendix +=
+          '<h2>Mapped contacts and unit lengths</h2>' +
           `<p>The waterway crosses <b>${gu.formationContacts} mapped formation contact${gu.formationContacts === 1 ? '' : 's'}</b>` +
           `${gu.contacts.length > gu.formationContacts ? `, plus ${gu.contacts.length - gu.formationContacts} boundary between members of one formation, which is not counted here` : ''}` +
           `${gu.coverageEdges ? `. It also runs across the edge of the mapping ${gu.coverageEdges === 1 ? 'once' : `${gu.coverageEdges} times`}, which is not a contact` : ''}.
@@ -2139,7 +2142,7 @@ export function deskStudyHtml(
       }
 
       if (spans.length > 1) {
-        geo += table(
+        geologyAppendix += table(
           'Ground the waterway crosses, national geological map',
           ['Unit', 'Code', 'Length', 'Share'],
           spans.map((sp) => [
@@ -2153,15 +2156,14 @@ export function deskStudyHtml(
     }
 
     if (covering.length) {
-      geo +=
-        `<p>${covering.length} published geological map${covering.length === 1 ? '' : 's'} at
-        ${esc(dmg?.scale ?? '1:50,000')} cover${covering.length === 1 ? 's' : ''} this alignment.</p>` +
+      geo += finding('clear', `${covering.length} published ${esc(dmg?.scale ?? '1:50,000')} geological map${covering.length === 1 ? '' : 's'} cover${covering.length === 1 ? 's' : ''} the alignment. Obtain and review the sheets before fixing underground or foundation works.`);
+      geologyAppendix +=
+        '<h2>Published detailed sheets</h2>' +
         table(
           'Published geological maps covering the alignment',
           ['Map', 'Published', 'Sheets touched'],
           covering.map((m) => [m.title, m.published, m.sheets.map((sh) => sh.code).join(', ')])
-        ) +
-        finding('note', 'These sheets are the correct basis for the engineering geology; obtain them before fixing any underground or foundation layout.');
+        );
     } else {
       geo += finding(
         'watch',
@@ -2174,16 +2176,15 @@ export function deskStudyHtml(
 
     if (distinct.size) {
       const only = [...distinct];
-      geo +=
-        `<p>${sheet ? 'The open global coverage' : 'The only regional coverage available at this location'} resolves the intake, mid-reach and
-        powerhouse to ${only.length === 1 ? 'a single unit' : `${only.length} units`}:
-        ${only.map((u) => esc(u)).join('; ')}.</p>` +
-        (only.length === 1
-          ? finding('watch', `<b>That is one polygon spanning the entire alignment, and it is not an engineering input.</b> It cannot distinguish phyllite from quartzite from gneiss, place a contact, or say anything about rock mass, weathering, discontinuities, permeability or tunnelling behaviour — all of which govern the headrace.${sheet ? ' The provincial sheet above is the better regional basis and should be read in preference to it.' : ''} <b>Engineering geology for this scheme is unresolved and a mapped ground traverse is required.</b>`)
-          : finding('note', 'Regional coverage only. It cannot place a contact or establish rock mass, weathering, discontinuities or tunnelling behaviour.'));
+      geo += finding(
+        'watch',
+        `<b>Engineering geology remains unresolved.</b> The open global layer resolves the corridor to ${only.length === 1 ? 'one regional polygon' : `${only.length} regional polygons`} and cannot establish rock mass, weathering, discontinuities, permeability or excavation behaviour. A mapped ground traverse is required.`
+      );
     }
     sec.push(geo);
   }
+
+  if (geologyAppendix) app.push(A('GEOLOGICAL MAP INTERPRETATION') + geologyAppendix);
 
   if (c.conservation) {
     const inside = c.conservation.inside;
@@ -2238,10 +2239,9 @@ export function deskStudyHtml(
         ['Ground at the powerhouse', lc.powerhouse ?? 'unclassified'],
         ['Cover cell', `${lc.cellM} m`],
       ]) +
-      table(
-        'Land cover along the alignment',
-        ['Cover', 'Length', 'Share of alignment'],
-        lc.along.map((a) => [a.label, dist(a.km), `${n(a.share * 100, 0)} %`])
+      chartBlock(
+        landcoverCompositionSvg(lc.along),
+        'Mapped land-cover composition along the alignment — aggregate proportions, not spatial order or land tenure'
       );
 
     land += tree > 0
@@ -2283,6 +2283,7 @@ export function deskStudyHtml(
   }
 
   // ===================================================== SEDIMENT ===========
+  let sedimentAppendix = '';
   if (c.sediment?.source && s) {
     const src = c.sediment.source;
     const basin = desander({ designFlowCms: s.designFlowCms, netHeadM: s.netHeadM });
@@ -2290,9 +2291,16 @@ export function deskStudyHtml(
     let sed =
       H('SEDIMENT AND HEADWORKS SCREENING') +
       `<p><b>${esc(src.label.charAt(0).toUpperCase() + src.label.slice(1))}</b> — ${n(src.highFrac * 100, 0)}% of
-      the catchment lies above 3 000 m. ${esc(src.note)}</p>`;
+      the catchment lies above 3 000 m. ${esc(src.note)} This is a catchment proxy; no sediment
+      samples or grain-size distribution are available.</p>` +
+      facts([
+        ['Sediment evidence', 'No site sampling or sediment rating curve'],
+        ['Screening interpretation', 'Intake sediment exclusion and desanding provision likely required'],
+        ['Headworks confidence', 'Low; layout and footprint not established'],
+      ]);
     if (basin) {
-      sed +=
+      sedimentAppendix +=
+        '<h2>Preliminary desander calculation</h2>' +
         facts([
           ['Smallest grain the basin must catch', `${n(basin.particleMm, 2)} mm`],
           ['Settling velocity of that grain', `${n(basin.settlingMmS, 1)} mm/s`],
@@ -2339,14 +2347,20 @@ export function deskStudyHtml(
       if (bench) {
         sed +=
           bench.verdict === 'fits'
-            ? finding('clear', `The valley offers ${n(bench.widestM, 0)} m of flat ground on the ${bench.side ?? 'near'} bank, ${n(bench.liftM, 0)} m above the river — <b>enough for the ${n(basin.benchNeededM, 0)} m the basin needs</b>.`)
+            ? finding('note', '<b>The terrain screen identifies a possible headworks bench.</b> Confirm its width, level, bank condition, flood exposure and constructability by survey and field reconnaissance.')
             : bench.verdict === 'marginal'
-              ? finding('note', `The widest bench found is ${n(bench.widestM, 0)} m against the ${n(basin.benchNeededM, 0)} m required. That difference is inside the terrain model's own error, so it is unresolved rather than tight — a cross-section survey settles it.`)
-              : finding('watch', `<b>No bench wide enough for the desanding basin was found.</b> The widest flat ground is ${n(bench.widestM, 0)} m against ${n(basin.benchNeededM, 0)} m required, so the basin implies either significant cut into the valley side, an underground chamber, or an intake moved to a wider reach.`);
+              ? finding('watch', '<b>Headworks bench suitability is unresolved at terrain-model resolution.</b> Survey cross-sections and inspect both banks before retaining the intake position.')
+              : finding('watch', '<b>No DEM-visible bench suitable for the screening desander footprint was identified.</b> Reconsider the intake reach or headworks arrangement during field reconnaissance.');
+        sedimentAppendix += facts([
+          ['Widest terrain-screen bench', `${n(bench.widestM, 0)} m`],
+          ['Screening footprint width', `${n(basin.benchNeededM, 0)} m`],
+          ['Terrain-screen verdict', bench.verdict],
+        ]);
       }
     }
     sec.push(sed);
   }
+  if (sedimentAppendix) app.push(A('PRELIMINARY DESANDER CALCULATION') + sedimentAppendix);
 
   // ---- how much to trust the numbers ---------------------------------------
   const unc = c.uncertainty;
@@ -2373,11 +2387,6 @@ export function deskStudyHtml(
             ? 'No calibrated site record; flow-model uncertainty transfers directly to capacity and energy.'
             : driver.note,
         ])
-      );
-      const top = unc.drivers[0];
-      uc += finding(
-        'watch',
-        `<b>${esc(top.name)} is the dominant uncertainty.</b> Resolve it before refining equipment, energy, pondage or financial cases.`
       );
     }
     sec.push(uc);
@@ -2429,13 +2438,20 @@ export function deskStudyHtml(
           )
         : '') +
       (rd?.tasks?.length
-        ? table(
-            'Recommended field programme',
-            ['Priority', 'Discipline', 'Task', 'Why it is needed'],
-            rd.tasks.map((t) => [t.priority, t.discipline, t.title, t.reason])
-          )
+        ? '<p class="small">The complete prioritised field investigation programme is retained in the technical appendices.</p>'
         : '')
   );
+
+  if (rd?.tasks?.length) {
+    app.push(
+      A('FIELD INVESTIGATION PROGRAMME') +
+        table(
+          'Recommended field programme',
+          ['Priority', 'Discipline', 'Task', 'Why it is needed'],
+          rd.tasks.map((task) => [task.priority, task.discipline, task.title, task.reason])
+        )
+    );
+  }
 
   // ---- appendices ----------------------------------------------------------
 
