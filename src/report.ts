@@ -392,7 +392,7 @@ function designFlowSvg(sweep: DesignFlowSweep): string {
   const barFlip = barLeft > W * 0.62;
   const barMark = bar
     ? `<line x1="${barLeft.toFixed(1)}" y1="20" x2="${barLeft.toFixed(1)}" y2="${Hh - B}" stroke="#a8562f" stroke-width="1" stroke-dasharray="4 3"/>` +
-      `<text x="${(barLeft + (barFlip ? -6 : 6)).toFixed(1)}" y="30" style="font:9.5px Inter,Helvetica,Arial,sans-serif;fill:#a8562f;font-weight:600" text-anchor="${barFlip ? 'end' : 'start'}">largest clearing 30% dry</text>`
+      `<text x="${(barLeft + (barFlip ? -6 : 6)).toFixed(1)}" y="30" style="font:9.5px Inter,Helvetica,Arial,sans-serif;fill:#a8562f;font-weight:600" text-anchor="${barFlip ? 'end' : 'start'}">30% dry-season screen</text>`
     : '';
 
   const c = sweep.chosen;
@@ -400,7 +400,7 @@ function designFlowSvg(sweep: DesignFlowSweep): string {
   const cFlip = cx < W * 0.42;
   const chosen = c
     ? `<circle cx="${cx.toFixed(1)}" cy="${y(c.energyGwh).toFixed(1)}" r="4.5" fill="#0f4c5c"/>` +
-      `<text x="${(cx + (cFlip ? 9 : -9)).toFixed(1)}" y="${(y(c.energyGwh) + 14).toFixed(1)}" style="font:10px Inter,Helvetica,Arial,sans-serif;fill:#0f4c5c;font-weight:600" text-anchor="${cFlip ? 'start' : 'end'}">as designed · Q${Math.round(c.exceedance * 100)}</text>`
+      `<text x="${(cx + (cFlip ? 9 : -9)).toFixed(1)}" y="${(y(c.energyGwh) + 14).toFixed(1)}" style="font:10px Inter,Helvetica,Arial,sans-serif;fill:#0f4c5c;font-weight:600" text-anchor="${cFlip ? 'start' : 'end'}">screening reference · Q${Math.round(c.exceedance * 100)}</text>`
     : '';
 
   return `<svg viewBox="0 0 ${W} ${Hh}" class="chart" xmlns="http://www.w3.org/2000/svg">
@@ -627,39 +627,89 @@ function gaugeTransferSvg(gauges: readonly ExportContext['gauges'][number][]): s
 </svg>`;
 }
 
-/** Monthly means as a hydrograph. Twelve bars beat twelve rows. */
-function monthlySvg(means: readonly number[], scale: number): string {
-  const v = means.map((m) => m * scale).filter((m) => Number.isFinite(m));
-  if (v.length !== 12) return '';
+/** Interannual monthly envelope: seasonality and uncertainty belong on the same chart. */
+function monthlyEnvelopeSvg(
+  dates: readonly string[],
+  values: readonly number[],
+  scale: number,
+  designQ: number | null,
+  residualQ: number | null
+): string {
+  if (dates.length !== values.length || dates.length < 365) return '';
+  const byYear = new Map<number, { sum: number[]; count: number[] }>();
+  for (let i = 0; i < dates.length; i++) {
+    const q = values[i] * scale;
+    const match = String(dates[i]).match(/^(\d{4})-(\d{2})/);
+    if (!match || !Number.isFinite(q)) continue;
+    const year = Number(match[1]);
+    const month = Number(match[2]) - 1;
+    if (!Number.isInteger(month) || month < 0 || month > 11) continue;
+    const bucket = byYear.get(year) ?? { sum: Array(12).fill(0), count: Array(12).fill(0) };
+    bucket.sum[month] += q;
+    bucket.count[month] += 1;
+    byYear.set(year, bucket);
+  }
+  const monthYears = Array.from({ length: 12 }, () => [] as number[]);
+  for (const bucket of byYear.values()) {
+    for (let month = 0; month < 12; month++) {
+      if (bucket.count[month]) monthYears[month].push(bucket.sum[month] / bucket.count[month]);
+    }
+  }
+  if (monthYears.some((month) => month.length < 3)) return '';
+  const quantile = (input: readonly number[], p: number) => {
+    const sorted = input.slice().sort((a, b) => a - b);
+    const at = (sorted.length - 1) * p;
+    const lo = Math.floor(at);
+    const hi = Math.ceil(at);
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (at - lo);
+  };
+  const p10 = monthYears.map((month) => quantile(month, 0.1));
+  const p50 = monthYears.map((month) => quantile(month, 0.5));
+  const p90 = monthYears.map((month) => quantile(month, 0.9));
   const W = 540;
-  const Hh = 210;
+  const Hh = 228;
   const L = 56;
-  const B = 34;
-  const max = Math.max(...v) || 1;
+  const B = 36;
+  const max = Math.max(...p90, designQ ?? 0) * 1.08 || 1;
   const bw = (W - L - 16) / 12;
-  const y = (q: number) => Hh - B - (q / max) * (Hh - B - 20);
-  const bars = v
-    .map((q, i) => {
-      const bx = L + i * bw + bw * 0.16;
-      const bwid = bw * 0.68;
-      const isDry = q === Math.min(...v);
-      return (
-        `<rect x="${bx.toFixed(1)}" y="${y(q).toFixed(1)}" width="${bwid.toFixed(1)}" height="${(Hh - B - y(q)).toFixed(1)}" fill="${isDry ? '#b3541e' : '#0f4c5c'}" opacity="${isDry ? 0.95 : 0.82}"/>` +
-        `<text x="${(bx + bwid / 2).toFixed(1)}" y="${Hh - B + 15}" style="${AX}" text-anchor="middle">${MONTHS[i]}</text>` +
-        `<text x="${(bx + bwid / 2).toFixed(1)}" y="${(y(q) - 5).toFixed(1)}" style="font:8.5px Inter,Helvetica,Arial,sans-serif;fill:#5c6670" text-anchor="middle">${q < 10 ? q.toFixed(2) : q.toFixed(0)}</text>`
-      );
-    })
-    .join('');
+  const x = (month: number) => L + bw * (month + 0.5);
+  const y = (q: number) => Hh - B - (q / max) * (Hh - B - 30);
   const grid = [0.25, 0.5, 0.75, 1]
     .map((f) => {
       const yy = y(max * f);
       return `<line x1="${L}" y1="${yy.toFixed(1)}" x2="${W - 16}" y2="${yy.toFixed(1)}" stroke="#e6e9ec"/><text x="${L - 8}" y="${(yy + 3).toFixed(1)}" style="${AX}" text-anchor="end">${max * f < 10 ? (max * f).toFixed(1) : (max * f).toFixed(0)}</text>`;
     })
     .join('');
+  const drySeason = [0, 1, 2, 3, 10, 11]
+    .map((month) => `<rect x="${(L + month * bw).toFixed(1)}" y="20" width="${bw.toFixed(1)}" height="${(Hh - B - 20).toFixed(1)}" fill="#b3541e" opacity=".035"/>`)
+    .join('');
+  const band =
+    p90.map((q, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(q).toFixed(1)}`).join('') +
+    p10
+      .slice()
+      .reverse()
+      .map((q, reverseIndex) => `L${x(11 - reverseIndex).toFixed(1)},${y(q).toFixed(1)}`)
+      .join('') +
+    'Z';
+  const median = p50.map((q, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(q).toFixed(1)}`).join('');
+  const ticks = MONTHS.map((month, i) => `<text x="${x(i).toFixed(1)}" y="${Hh - B + 16}" style="${AX}" text-anchor="middle">${month}</text>`).join('');
+  const markers = p50.map((q, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(q).toFixed(1)}" r="2.2" fill="#0f4c5c"/>`).join('');
+  const reference = (q: number | null, label: string, colour: string, dash: string) => {
+    if (q === null || !Number.isFinite(q) || q < 0 || q > max) return '';
+    const yy = y(q);
+    return `<line x1="${L}" y1="${yy.toFixed(1)}" x2="${W - 16}" y2="${yy.toFixed(1)}" stroke="${colour}" stroke-width="1" stroke-dasharray="${dash}"/><text x="${W - 16}" y="${(yy - 4).toFixed(1)}" style="font:8.5px Inter,Helvetica,Arial,sans-serif;fill:${colour};font-weight:600" text-anchor="end">${label}</text>`;
+  };
   return `<svg viewBox="0 0 ${W} ${Hh}" class="chart" xmlns="http://www.w3.org/2000/svg">
-  ${grid}${bars}
+  ${drySeason}${grid}
+  <path d="${band}" fill="#0f4c5c" opacity=".12"/>
+  <path d="${median}" fill="none" stroke="#0f4c5c" stroke-width="2"/>
+  ${markers}${ticks}
+  ${reference(designQ, 'Q reference', '#0f4c5c', '5 3')}
+  ${reference(residualQ, 'environmental release', '#b3541e', '2 3')}
   <line x1="${L}" y1="${Hh - B}" x2="${W - 16}" y2="${Hh - B}" stroke="#9aa2aa"/>
-  <text x="13" y="${(Hh / 2).toFixed(0)}" style="${LB}" text-anchor="middle" transform="rotate(-90 13 ${(Hh / 2).toFixed(0)})">MEAN FLOW  m³/s</text>
+  <rect x="${L}" y="6" width="18" height="8" fill="#0f4c5c" opacity=".12"/><text x="${L + 24}" y="14" style="${AX}">P10–P90 monthly range</text>
+  <line x1="${L + 156}" y1="10" x2="${L + 176}" y2="10" stroke="#0f4c5c" stroke-width="2"/><text x="${L + 182}" y="14" style="${AX}">median</text>
+  <text x="13" y="${(Hh / 2).toFixed(0)}" style="${LB}" text-anchor="middle" transform="rotate(-90 13 ${(Hh / 2).toFixed(0)})">MONTHLY MEAN FLOW  m³/s</text>
 </svg>`;
 }
 
@@ -978,22 +1028,48 @@ export function deskStudyHtml(
   };
   const driest = monthly.driestMonth >= 0 ? MONTHS[monthly.driestMonth] : null;
 
+  const transferableGauge = c.gauges?.find((gauge) => gauge.measuresDischarge && gauge.trustworthy) ?? null;
   let hyd =
-    H('HYDROLOGY') +
-    `<p>The long-term mean flow at the intake is ${n(meanAtIntake(c), 2)} m³/s over ${c.flowYears} years of
-    daily record.${driest ? ` The driest month is ${driest}.` : ''} The scheme is sized on
-    ${s ? n(s.designFlowCms, 2) : '–'} m³/s at Q${Math.round(exc * 100)}, after an environmental release of
-    ${s ? n(s.residualCms, 2) : '–'} m³/s held continuously in the diverted reach.${
-      c.gauges?.length ? ' Gauging stations near the site are listed in the appendices.' : ''
-    }</p>`;
+    H('HYDROLOGY AND FLOW EVIDENCE') +
+    `<p>The modelled long-term mean flow at the intake is ${approx(meanAtIntake(c), 2)} m³/s over
+    ${c.flowYears} years.${driest ? ` The lowest long-term monthly mean occurs in ${driest}.` : ''}
+    Q${Math.round(exc * 100)} is used as a <b>reference case</b>, not a selected design flow.</p>` +
+    facts([
+      ['Primary flow basis', 'GloFAS v4 daily model, approximately 5 km grid'],
+      ['Catchment at intake', `${approx(catchmentKm2(c), 1)} km²`],
+      ['Modelled mean flow', `${approx(meanAtIntake(c), 2)} m³/s`],
+      ['Reference flow after release', s ? `${approx(s.designFlowCms, 2)} m³/s at Q${Math.round(exc * 100)}` : '–'],
+      ['Hydrological confidence', transferableGauge ? 'Low to moderate; a transferable record may be obtainable' : 'Low; no transferable measured record identified'],
+    ]);
 
   const chart = fdcSvg(c.flow.values.map((v) => v * scale), s?.designFlowCms ?? null, exc);
-  hyd += chartBlock(chart, 'Flow-duration curve at the intake');
+  hyd += chartBlock(chart, 'Modelled flow-duration curve at the intake — reference flow marked');
 
-  const mchart = monthlySvg(monthly.monthlyMeans, scale);
-  hyd += chartBlock(mchart, 'Mean monthly flow at the intake — driest month highlighted');
+  const mchart = monthlyEnvelopeSvg(
+    c.flow.dates,
+    c.flow.values,
+    scale,
+    s?.designFlowCms ?? null,
+    s?.residualCms ?? null
+  );
+  hyd += chartBlock(
+    mchart,
+    'Monthly flow envelope — median and P10–P90 of annual monthly means; dry-season months lightly shaded'
+  );
 
-  hyd += table(
+  hyd += transferableGauge
+    ? finding(
+        'note',
+        `<b>A potentially transferable discharge record was identified at ${esc(stationDisplayName(transferableGauge.name).name)}.</b> Obtain and quality-check that series before fixing design flow.`
+      )
+    : finding(
+        'watch',
+        '<b>No nearby station combines a discharge record with a transferable catchment.</b> Flow, capacity and energy therefore remain low-confidence model results until site gauging or a defensible measured comparator is established.'
+      );
+
+  sec.push(hyd);
+
+  let hydrologyAppendix = table(
     'Flow duration at the intake',
     ['Exceedance', 'Discharge m³/s'],
     [5, 20, 40, 50, 60, 80, 95].map((p) => [`Q${p}`, n(atP(p / 100), 3)])
@@ -1011,16 +1087,15 @@ export function deskStudyHtml(
       m.driest ? `${n(m.driest.cms, 3)} · ${MONTHS[m.driest.month] ?? '–'}` : '–',
     ]);
   }
-  if (reg.length) hyd += table('Regional method comparison', ['Method', 'Mean flow m³/s', 'Lowest monthly mean'], reg);
+  if (reg.length) hydrologyAppendix += table('Regional method comparison', ['Method', 'Mean flow m³/s', 'Lowest monthly mean'], reg);
 
   if (c.hydest?.floods?.length) {
-    hyd += table(
+    hydrologyAppendix += table(
       'Regional flood estimates',
       ['Return period', 'Peak discharge m³/s'],
       c.hydest.floods.map((f) => [`${f.t}-year`, n(f.cms, 1)])
     );
   }
-  sec.push(hyd);
 
   /**
    * THE GAUGES DESERVED BETTER THAN AN APPENDIX.
@@ -1053,8 +1128,8 @@ export function deskStudyHtml(
   if (c.flowShape) {
     const fs = c.flowShape;
     const q = Math.round(fs.exceedance * 100);
-    sec.push(
-      H('FLOW-DURATION SHAPE CHECK') +
+    hydrologyAppendix +=
+      '<h2>Flow-duration shape check</h2>' +
         `<p>Flood models are built to get floods right, and their low-flow tail is the part least
         constrained by what they were calibrated against. A design flow is a point on the
         flow-duration curve, so a wrong tail moves the machine size directly. The modelled curve is
@@ -1083,8 +1158,7 @@ export function deskStudyHtml(
               'clear',
               `<b>The modelled curve sits inside the range Nepali gauges show</b>, so no shape correction ` +
                 `was applied and the flow figures are the model's own.`
-            ))
-    );
+            ));
   }
 
   if (c.gauges?.length) {
@@ -1097,47 +1171,35 @@ export function deskStudyHtml(
     const usable = c.gauges.filter((gg) => gg.measuresDischarge && gg.trustworthy);
     const best = usable[0] ?? null;
 
+    const gaugeRows = near.map((gg) => [
+      (() => {
+        const dn = stationDisplayName(gg.name);
+        return dn.note ? `${dn.name} — register note: "${dn.note}"` : dn.name;
+      })(),
+      dist(gg.distanceKm),
+      RELATION[gg.relation] ?? gg.relation,
+      gg.measuresDischarge ? `discharge${gg.seriesId ? ` · series ${gg.seriesId}` : ''}` : 'water level only',
+      gg.uplandKm2 == null ? '–' : `${n(gg.uplandKm2, 0)} km²`,
+      !gg.measuresDischarge
+        ? 'needs a rating curve'
+        : gg.areaRatio == null
+          ? 'catchment unknown'
+          : gg.trustworthy
+            ? `×${n(gg.areaRatio, 2)}, defensible`
+            : `×${n(gg.areaRatio, 2)}, too different`,
+    ]);
+
     let gs =
-      H('GAUGING STATIONS NEAR THE SITE') +
+      H('HYDROLOGICAL DATA AVAILABILITY') +
       `<p>${c.gauges.length} Department of Hydrology and Meteorology station${c.gauges.length === 1 ? '' : 's'}
-      lie${c.gauges.length === 1 ? 's' : ''} near this reach. What matters is not how close they are but whether
-      their record can be carried to this intake: a station gauging discharge on a catchment of a
-      similar size can be transferred by area ratio, and one gauging only water level cannot be used
-      at all until its rating curve is obtained separately.</p>` +
+      lie${c.gauges.length === 1 ? 's' : ''} near the reach. Proximity alone does not make a record
+      transferable: it must measure discharge, represent a comparable catchment and share a relevant
+      hydrological regime.</p>` +
       figure(
-        `The stations on the ground — hillshaded relief, the alignment in colour, stations in blue where the record is a usable flow series and slate where it gauges water level only${
+        `Nearby DHM stations — discharge records in blue and water-level-only stations in slate${
           figures.gaugeFrameKm ? `. Frame about ${n(figures.gaugeFrameKm, 0)} km across${figures.gaugesShown && figures.gaugesTotal && figures.gaugesShown < figures.gaugesTotal ? `, holding ${figures.gaugesShown} of the ${figures.gaugesTotal} stations tabulated below` : ''}` : ''
         }`,
         figures.gauges
-      ) +
-      chartBlock(
-        gaugeTransferSvg(c.gauges),
-        `Each station's catchment against the intake's, on a log scale. Inside the shaded band the record can be carried across by area ratio; markers pinned at an axis end are far outside it${
-          c.gauges.filter((gg) => gg.areaRatio == null).length
-            ? `. ${c.gauges.filter((gg) => gg.areaRatio == null).length} station${c.gauges.filter((gg) => gg.areaRatio == null).length === 1 ? ' is' : 's are'} off the plot because the mapped network carries no catchment there`
-            : ''
-        }`
-      ) +
-      table(
-        'Gauging stations near the site',
-        ['Station', 'Distance', 'Relation', 'Record', 'Catchment', 'Transfer'],
-        near.map((gg) => [
-          (() => {
-            const dn = stationDisplayName(gg.name);
-            return dn.note ? `${dn.name} — register note: "${dn.note}"` : dn.name;
-          })(),
-          dist(gg.distanceKm),
-          RELATION[gg.relation] ?? gg.relation,
-          gg.measuresDischarge ? `discharge${gg.seriesId ? ` · series ${gg.seriesId}` : ''}` : 'water level only',
-          gg.uplandKm2 == null ? '–' : `${n(gg.uplandKm2, 0)} km²`,
-          !gg.measuresDischarge
-            ? 'needs a rating curve'
-            : gg.areaRatio == null
-              ? 'catchment unknown'
-              : gg.trustworthy
-                ? `×${n(gg.areaRatio, 2)}, defensible`
-                : `×${n(gg.areaRatio, 2)}, too different`,
-        ])
       );
 
     gs += best
@@ -1146,153 +1208,142 @@ export function deskStudyHtml(
           `<b>${esc(stationDisplayName(best.name).name)} is the record to obtain</b> — ${dist(best.distanceKm)} away, gauging discharge, ` +
             `on a catchment ${best.areaRatio == null ? 'of comparable size' : `whose flow scales to this intake by ×${n(best.areaRatio, 2)}`}. ` +
             `${best.seriesId ? `Quote series ${best.seriesId} when requesting it. ` : ''}` +
-            'A measured record here would replace the modelled flow that every number in this study rests on, and it is the single most valuable thing that can be bought for this site.'
+            'Quality-checking this record is the first hydrological verification task.'
         )
       : finding(
           'watch',
           '<b>No nearby station combines a discharge record with a transferable catchment.</b> ' +
             `${c.gauges.some((gg) => gg.measuresDischarge) ? 'The stations that gauge discharge sit on catchments too different in size for area-ratio transfer to hold' : 'The nearby stations record water level only, which is not a flow series until its rating curve is obtained'}, ` +
-            'so the flow in this study stays modelled. That is the largest single uncertainty in it.'
+            'so the flow in this study remains modelled and low confidence.'
         );
 
-    gs += `<p class="eqnote">Area-ratio transfer, Q here = Q gauge × (A here / A gauge), is the standard
-    method for an ungauged site and what a feasibility study would do with these records. It assumes
-    the two catchments generate runoff at a similar rate per km², which holds while they share a
-    climate and a terrain — so it is marked defensible only inside roughly 0.5–2× and on the same
-    river. Distances are straight-line to the nearest point on the studied reach, not along it.</p>`;
-
     sec.push(gs);
+
+    hydrologyAppendix +=
+      '<h2>Gauge transfer screen</h2>' +
+      `<figure class="cw appendix-figure">${gaugeTransferSvg(c.gauges)}<figcaption>Appendix figure · Catchment ratio at nearby gauges; the shaded band indicates the area-ratio transfer screen.</figcaption></figure>` +
+      table(
+        'Gauging stations near the site',
+        ['Station', 'Distance', 'Relation', 'Record', 'Catchment', 'Transfer'],
+        gaugeRows
+      ) +
+      `<p class="eqnote">Area-ratio transfer assumes comparable runoff response and is retained only
+      for similar catchments on a relevant river reach. Distances are straight-line to the studied
+      corridor. Water-level records require a separate rating curve before they can be used as flow.</p>`;
+  }
+
+  if (hydrologyAppendix) {
+    app.push(A('HYDROLOGY METHOD AND DATA AVAILABILITY') + hydrologyAppendix);
   }
 
   // ---- 05 power and energy -------------------------------------------------
+  const rel = s?.reliability ?? null;
   let pe =
-    H('POWER AND ENERGY') +
-    `<p>The installed capacity is ${s ? n(s.capacityMW, 3) : '–'} MW, generating ${s ? n(s.energyGwh, 2) : '–'} GWh
-    a year at a plant factor of ${s ? n(s.plantFactor * 100, 1) : '–'}%, on ${s?.turbine ? esc(String(s.turbine)) : '–'}
-    turbines.${c.band ? ` Capacity is indicatively ${n(c.band.capLow, 2)}–${n(c.band.capHigh, 2)} MW and energy ${n(c.band.energyLow, 1)}–${n(c.band.energyHigh, 1)} GWh.` : ''}</p>` +
+    H('POWER AND ENERGY SCREENING') +
+    `<p>The Q${Math.round(exc * 100)} reference case indicates ${s ? approx(s.capacityMW, 1) : '–'} MW
+    and ${s ? approx(s.energyGwh, 0) : '–'} GWh/year. These are energy-screening outputs, not an
+    equipment selection or an economic optimum.</p>` +
+    facts([
+      ['Indicative installed capacity', s ? `${approx(s.capacityMW, 1)} MW${c.band ? ` (range ${n(c.band.capLow, 1)}–${n(c.band.capHigh, 1)} MW)` : ''}` : '–'],
+      ['Indicative average annual energy', s ? `${approx(s.energyGwh, 0)} GWh${c.band ? ` (range ${n(c.band.energyLow, 0)}–${n(c.band.energyHigh, 0)} GWh)` : ''}` : '–'],
+      ['Modelled plant factor', s ? `${n(s.plantFactor * 100, 0)} %` : '–'],
+      ['Indicative turbine family', s?.turbine ? `${String(s.turbine)} — screening only` : '–'],
+      ['Unit number and rating', 'Not selected at desktop stage'],
+      ['Energy confidence', 'Low; inherited from the modelled flow record'],
+    ]);
+
+  if (rel) {
+    pe +=
+      chartBlock(
+        yearsSvg(rel.annual, rel.p50Gwh, rel.p90Gwh),
+        'Modelled annual energy by year — P50 and P90 reference levels marked'
+      ) +
+      facts([
+        ['P50 annual energy', `${approx(rel.p50Gwh, 0)} GWh`],
+        ['P90 annual energy', `${approx(rel.p90Gwh, 0)} GWh`],
+        ['Modelled annual range', `${approx(rel.worstGwh, 0)}–${approx(rel.bestGwh, 0).replace(/^~/, '')} GWh`],
+      ]);
+
+    const tests: [string, typeof rel.ppaEightFour, number][] = [
+      ['NEA 8 + 4 months', rel.ppaEightFour, 0.15],
+      ['NEA 6 + 6 months', rel.ppaSixSix, 0.3],
+    ];
+    pe +=
+      '<h2>Dry-season energy criterion screen</h2>' +
+      table(
+        'Dry-season energy share against published run-of-river criteria',
+        ['Season split', 'Dry energy', 'Dry share', 'Criterion', 'Screening result'],
+        tests.map(([label, test, threshold]) => [
+          label,
+          `${n(test.dryGwh, 1)} GWh`,
+          `${n(test.dryShare * 100, 1)} %`,
+          `${n(threshold * 100, 0)} %`,
+          test.meets ? 'above criterion' : 'below criterion',
+        ])
+      );
+    const closest = tests
+      .map(([, test, threshold]) => (test.dryShare - threshold) * 100)
+      .reduce((a, b) => (Math.abs(a) < Math.abs(b) ? a : b));
+    pe += Math.abs(closest) <= 5
+      ? finding(
+          'watch',
+          `<b>The closest dry-season result is ${n(Math.abs(closest), 1)} percentage points from its criterion, within the measured model error.</b> This screen is not sufficient to determine tariff eligibility; dry-season gauging is required.`
+        )
+      : finding(
+          'note',
+          `<b>The nearest dry-season criterion is ${n(Math.abs(closest), 1)} percentage points ${closest >= 0 ? 'below the modelled share' : 'above the modelled share'}.</b> Treat this as a screening indication only; PPA eligibility, tariff and revenue are not assessed.`
+        );
+  }
+
+  pe += finding(
+    'note',
+    '<b>Equipment remains open.</b> Turbine family, unit arrangement, efficiencies and part-load behaviour are calculation assumptions until hydraulic transients, maintainability and supplier options are studied.'
+  );
+  sec.push(pe);
+
+  let powerAppendix =
+    '<h2>Model output and calculation basis</h2>' +
     table(
-      'Power and energy',
-      ['Parameter', 'Unit', 'Value'],
+      'Power and energy model output',
+      ['Parameter', 'Unit', 'Raw model value'],
       [
         ['Design discharge', 'm³/s', s ? n(s.designFlowCms, 3) : '–'],
         ['Environmental release', 'm³/s', s ? n(s.residualCms, 3) : '–'],
         ['Gross head', 'm', s ? n(s.grossHeadM, 1) : '–'],
         ['Head loss in the waterway', 'm', s ? n(s.grossHeadM - s.netHeadM, 1) : '–'],
         ['Net head at the turbine inlet', 'm', s ? n(s.netHeadM, 1) : '–'],
-        ['Plant efficiency', '–', n(c.assumptions?.efficiency ?? null, 3)],
-        ['Turbine efficiency at design flow', '–', s ? n(s.turbinePeak, 3) : '–'],
-        ['Turbine type', '–', s?.turbine ? String(s.turbine) : '–'],
-        ['Number of units', '–', '2'],
-        ['Rated capacity per unit', 'kW', s ? n((s.capacityMW * 1000) / 2, 0) : '–'],
+        ['Plant efficiency assumption', '–', n(c.assumptions?.efficiency ?? null, 3)],
+        ['Turbine efficiency at reference flow', '–', s ? n(s.turbinePeak, 3) : '–'],
         ['Installed capacity', 'MW', s ? n(s.capacityMW, 3) : '–'],
         ['Average annual energy', 'GWh', s ? n(s.energyGwh, 2) : '–'],
         ['Plant factor', '%', s ? n(s.plantFactor * 100, 1) : '–'],
         ['Daily output exceeded 90% of days', 'MW', s?.powerDuration ? n(s.powerDuration.p90MW, 2) : '–'],
         ['Daily output exceeded 95% of days', 'MW', s?.powerDuration ? n(s.powerDuration.p95MW, 2) : '–'],
-        ['Days with no output', '%', s?.powerDuration ? n(s.powerDuration.zeroOutputFraction * 100, 1) : '–'],
-        ['Indicative capacity range', 'MW', c.band ? `${n(c.band.capLow, 2)} – ${n(c.band.capHigh, 2)}` : '–'],
-        ['Indicative energy range', 'GWh', c.band ? `${n(c.band.energyLow, 1)} – ${n(c.band.energyHigh, 1)}` : '–'],
       ]
     ) +
-    basisOfCalculation(c);
+    basisOfCalculation(c) +
+    '<h2>Published tariff reference inputs</h2>' +
+    facts([
+      ['Wet-season base rate', `${n(NEA_ROR_PPA.wetNprPerKwh, 2)} NPR/kWh`],
+      ['Dry-season base rate', `${n(NEA_ROR_PPA.dryNprPerKwh, 2)} NPR/kWh`],
+      ['Use in this report', 'Criterion screen only; no revenue, PPA entitlement or financial result'],
+    ]);
 
   if (s?.unitSensitivity?.length) {
-    pe += table(
+    powerAppendix += table(
       'Equal-rated unit-count sensitivity',
       ['Units', 'Runner', 'Capacity MW', 'Energy GWh', 'Daily P90 MW', 'Daily P95 MW'],
-      s.unitSensitivity.map((u) => [
-        String(u.units),
-        u.turbine ? String(u.turbine) : '–',
-        n(u.capacityMW, 3),
-        n(u.energyGwh, 2),
-        n(u.dailyP90MW, 2),
-        n(u.dailyP95MW, 2),
+      s.unitSensitivity.map((unit) => [
+        String(unit.units),
+        unit.turbine ? String(unit.turbine) : '–',
+        n(unit.capacityMW, 3),
+        n(unit.energyGwh, 2),
+        n(unit.dailyP90MW, 2),
+        n(unit.dailyP95MW, 2),
       ])
     );
   }
-  sec.push(pe);
-
-  // ---- energy reliability and PPA value ------------------------------------
-  const rel = s?.reliability ?? null;
-  if (rel) {
-    const spread = rel.bestGwh > 0 ? rel.worstGwh / rel.bestGwh : 0;
-    let en =
-      H('ENERGY RELIABILITY AND PPA VALUE') +
-      `<p>Across ${rel.annual.length} complete years of record the scheme generates a median of
-      ${n(rel.p50Gwh, 2)} GWh. Nine years in ten it exceeds ${n(rel.p90Gwh, 2)} GWh; the weakest year in the
-      record delivers ${n(rel.worstGwh, 2)} GWh and the strongest ${n(rel.bestGwh, 2)} GWh.</p>` +
-      chartBlock(
-        yearsSvg(rel.annual, rel.p50Gwh, rel.p90Gwh),
-        'Annual energy year by year — years below P90 in orange'
-      ) +
-      facts([
-        ['P50 annual energy — median year', `${n(rel.p50Gwh, 2)} GWh`],
-        ['P90 annual energy — exceeded in 9 years of 10', `${n(rel.p90Gwh, 2)} GWh`],
-        ['Weakest year in the record', `${n(rel.worstGwh, 2)} GWh`],
-        ['Strongest year in the record', `${n(rel.bestGwh, 2)} GWh`],
-      ]);
-    en +=
-      spread > 0 && spread < 0.6
-        ? finding('watch', `The weakest year delivers only <b>${n(spread * 100, 0)}% of the strongest</b>. Debt sizing should be set against the P90 figure, not the average.`)
-        : finding('clear', `Year-to-year variation is contained — the weakest year still delivers <b>${n(spread * 100, 0)}% of the strongest</b>.`);
-
-    // ---- the PPA tests ----------------------------------------------------
-    const tests: [string, typeof rel.ppaEightFour, number][] = [
-      ['NEA 8 + 4 months', rel.ppaEightFour, 0.15],
-      ['NEA 6 + 6 months', rel.ppaSixSix, 0.3],
-    ];
-    en +=
-      '<h2>Dry-energy tests and indicative tariff value</h2>' +
-      table(
-        'NEA run-of-river PPA dry-energy tests',
-        ['Season split', 'Wet GWh', 'Dry GWh', 'Dry share', 'Threshold', 'Result', 'Gross value NPR m/yr'],
-        tests.map(([label, t, thr]) => [
-          label,
-          n(t.wetGwh, 2),
-          n(t.dryGwh, 2),
-          `${n(t.dryShare * 100, 1)} %`,
-          `${n(thr * 100, 0)} %`,
-          t.meets ? 'meets' : 'below',
-          n(t.grossReferenceValueMillionNpr, 1),
-        ])
-      );
-    const best = rel.ppaEightFour.meets || rel.ppaSixSix.meets;
-    en += best
-      ? finding('clear', `The scheme <b>meets the dry-energy threshold</b> on ${rel.ppaEightFour.meets ? 'the 8 + 4 split' : ''}${rel.ppaEightFour.meets && rel.ppaSixSix.meets ? ' and ' : ''}${rel.ppaSixSix.meets ? 'the 6 + 6 split' : ''}, so the published base rates apply as tabulated.`)
-      : finding('watch', `The scheme <b>falls below the dry-energy threshold on both splits</b> — dry-season output is only ${n(rel.ppaEightFour.dryShare * 100, 1)}% of the annual total. The tariff mix, and therefore the revenue above, would be weaker than the posted rates suggest. Pondage or a lower design flow are the two levers.`);
-    /**
-     * THE DRY-SHARE VERDICT NOW CARRIES ITS MEASURED ERROR.
-     *
-     * checks/dryshare-vs-gauges.mjs scored this table for the first time: at 74
-     * DHM gauges, dispatching the app's own flow series and the gauge's measured
-     * record through one identical plant on the days both cover. The app
-     * under-reads the dry share by a median 3.7 percentage points on a
-     * Pelton-like machine and 5.6 on a Francis-like one, with a typical error of
-     * 5 to 9 points. The direction is one-signed and physical: the flood model's
-     * low-flow tail runs below what Nepali rivers hold, which is the same defect
-     * engine/fdcshape.ts exists to guard.
-     *
-     * So a "below" verdict is the one more likely to be wrong, and a scheme
-     * sitting within the measurement error of its threshold has not been
-     * decided by this table. Saying that is not hedging — it is the difference
-     * between a screening result and a claim the reader cannot audit.
-     */
-    const MEASURED_DRYSHARE_ERROR_PT = 5;
-    const margins = tests.map(([, t, thr]) => (t.dryShare - thr) * 100);
-    const closest = margins.reduce((a, b) => (Math.abs(a) < Math.abs(b) ? a : b));
-    en += finding(
-      'note',
-      Math.abs(closest) <= MEASURED_DRYSHARE_ERROR_PT
-        ? `<b>This scheme sits ${n(Math.abs(closest), 1)} points from its threshold, inside the measurement error, so the test above does not settle it.</b> Scored against 74 DHM gauges, the dry share this app computes runs a median 4 to 6 percentage points BELOW what the gauge measured, with a typical error of 5 to 9 points depending on the machine. The bias is one-signed — the flood model's low-flow tail sits under what Nepali rivers actually hold — so a marginal scheme is more likely to clear the threshold than to miss it. A year of dry-season gauging, or a neighbouring record, decides this; a desk study cannot.`
-        : `Scored against 74 DHM gauges, the dry share this app computes runs a median 4 to 6 percentage points <b>below</b> what the gauge measured, with a typical error of 5 to 9 points. The bias is one-signed — the flood model's low-flow tail sits under what Nepali rivers hold — so a "below" verdict is the one more likely to be wrong. This scheme ${closest >= 0 ? 'clears' : 'misses'} its nearest threshold by ${n(Math.abs(closest), 1)} points, outside that error.`
-    );
-    en += `<p class="eqnote">Gross value at the published NEA base rates for run-of-river schemes,
-    ${n(NEA_ROR_PPA.wetNprPerKwh, 2)} NPR/kWh wet and ${n(NEA_ROR_PPA.dryNprPerKwh, 2)} NPR/kWh dry, blended at
-    ${n(rel.ppaEightFour.blendedBaseRateNprPerKwh, 2)} NPR/kWh on the 8 + 4 split. This is a reference energy
-    value only — not a PPA entitlement, contracted revenue, cash flow, NPV or bankability result. The
-    escalation available for schemes up to 100 MW is not applied.</p>`;
-    sec.push(en);
-  }
+  app.push(A('POWER AND ENERGY CALCULATION BASIS') + powerAppendix);
 
   /**
    * THE ONE PARAMETER THE DEVELOPER ACTUALLY CONTROLS.
@@ -1313,75 +1364,89 @@ export function deskStudyHtml(
     const chosen = sw.chosen;
     const bar = sw.dryLimitSixSix;
     const eight = sw.dryLimitEightFour;
+    const decisionExceedances = new Set(
+      [0.3, 0.4, 0.45, 0.5, chosen?.exceedance, bar?.exceedance, eight?.exceedance]
+        .filter((value): value is number => typeof value === 'number')
+        .map((value) => value.toFixed(3))
+    );
+    let decisionPoints = sw.points
+      .filter((point) => decisionExceedances.has(point.exceedance.toFixed(3)))
+      .sort((a, b) => a.exceedance - b.exceedance);
+    if (decisionPoints.length < 3) {
+      decisionPoints = [sw.points[0], sw.points[Math.floor(sw.points.length / 2)], sw.points[sw.points.length - 1]]
+        .filter((point, index, all) => all.findIndex((other) => other.exceedance === point.exceedance) === index)
+        .sort((a, b) => a.exceedance - b.exceedance);
+    }
     let df =
-      H('DESIGN FLOW — HOW BIG SHOULD THE MACHINE BE') +
-      `<p>Design flow is not a property of the river; it is the decision this study
-      makes on the developer's behalf, and every figure above follows from it. The layout is
-      fixed — same intake, same powerhouse, same waterway — and only the size of the machine
-      is varied.</p>` +
+      H('DESIGN-FLOW SENSITIVITY') +
+      `<p>The same indicative layout is tested across several reference flows. This is a physical
+      sensitivity, not an optimisation: without capital cost, operating cost, outage assumptions
+      and financing, it cannot identify a preferred machine size.</p>` +
       chartBlock(
         designFlowSvg(sw),
-        'Annual energy against installed capacity, at one fixed layout. The curve flattening is the diminishing return.'
+        'Annual energy against installed capacity for one fixed indicative layout'
       ) +
       table(
-        'The trade-off, size by size',
-        ['Sized at', 'Design flow', 'Capacity', 'Energy', 'Last MW earns', 'Dry share 6+6'],
-        sw.points
-          .slice()
-          .reverse()
-          .map((p) => [
-            `Q${Math.round(p.exceedance * 100)}${chosen && p.exceedance === chosen.exceedance ? '  (as designed)' : ''}`,
-            `${n(p.designFlowCms, 2)} m³/s`,
-            `${n(p.capacityMW, 3)} MW`,
-            `${n(p.energyGwh, 1)} GWh`,
-            p.marginalHours === null ? '–' : `${n(p.marginalHours, 0)} h/yr`,
-            p.dryShareSixSix === null ? '–' : `${n(p.dryShareSixSix * 100, 1)} %`,
-          ])
+        'Decision-relevant reference cases',
+        ['Reference', 'Design flow', 'Indicative capacity', 'Annual energy', 'Dry share 6+6'],
+        decisionPoints.map((point) => [
+          `Q${Math.round(point.exceedance * 100)}${chosen && point.exceedance === chosen.exceedance ? '  (screening reference)' : ''}`,
+          `${n(point.designFlowCms, 2)} m³/s`,
+          `${n(point.capacityMW, 1)} MW`,
+          `${n(point.energyGwh, 1)} GWh`,
+          point.dryShareSixSix === null ? '–' : `${n(point.dryShareSixSix * 100, 1)} %`,
+        ])
       );
-
-    const big = sw.points[sw.points.length - 1];
-    const small = sw.points[0];
-    df += finding(
-      'note',
-      `<b>Between the smallest and largest machine screened, capacity moves ${n(small.capacityMW, 2)} to ${n(big.capacityMW, 2)} MW — a factor of ${n(big.capacityMW / small.capacityMW, 1)} — while energy moves only a factor of ${n(big.energyGwh / small.energyGwh, 1)}.</b> ` +
-        `That gap is the whole argument. The last megawatt at the largest size earns ${big.marginalHours === null ? 'no measurable increment' : `${n(big.marginalHours, 0)} full-load hours a year`}, against ${n(small.fullLoadHours, 0)} for the smallest plant overall. Multiply those hours by a tariff and divide by an installed cost and the choice closes; this study supplies the hours and deliberately not the cost.`
-    );
 
     if (bar && chosen && bar.designFlowCms < chosen.designFlowCms) {
       df += finding(
-        'watch',
-        `<b>The scheme as designed misses NEA's 30% dry-season bar, and sizing at Q${Math.round(bar.exceedance * 100)} would clear it</b> — ${n(bar.capacityMW, 3)} MW against ${n(chosen.capacityMW, 3)} MW, giving up ${n(chosen.energyGwh - bar.energyGwh, 1)} GWh a year to move ${n((chosen.dryShareSixSix ?? 0) * 100, 1)}% dry energy to ${n((bar.dryShareSixSix ?? 0) * 100, 1)}%. ` +
-          'That is the 6 + 6 tariff option bought with capacity, and it is the trade the report could previously only gesture at.'
+        'note',
+        `<b>The Q${Math.round(exc * 100)} reference case is below the 30% dry-season criterion.</b> The model indicates Q${Math.round(bar.exceedance * 100)} as a smaller comparison case above the criterion (${n(bar.capacityMW, 1)} MW and ${n(bar.energyGwh, 1)} GWh/year). Hydrological verification and economics are required before selecting between them.`
       );
     } else if (bar && chosen && bar.designFlowCms >= chosen.designFlowCms) {
       df += finding(
         'clear',
-        `<b>The scheme clears the 30% dry-season bar as designed,</b> and would still clear it up to Q${Math.round(bar.exceedance * 100)} — ${n(bar.capacityMW, 3)} MW, ${n(bar.energyGwh, 1)} GWh. There is headroom to size up without losing the 6 + 6 option.`
+        `<b>The Q${Math.round(exc * 100)} reference case is above the 30% dry-season criterion.</b> The model indicates that comparison cases up to Q${Math.round(bar.exceedance * 100)} remain above it. This does not establish PPA eligibility.`
       );
     } else if (!bar) {
       df += finding(
         'watch',
-        `<b>No machine screened clears the 30% dry-season bar on this river</b>${eight ? `, though the 15% bar on the 8 + 4 split holds up to Q${Math.round(eight.exceedance * 100)} at ${n(eight.capacityMW, 3)} MW` : ' and none clears the 15% bar either'}. Design flow is not the lever here; pondage is.`
+        `<b>No reference case screened is above the 30% dry-season criterion.</b>${eight ? ` The 15% criterion is met up to Q${Math.round(eight.exceedance * 100)} in the model.` : ' The 15% criterion is also not met.'} Verify the seasonal flow regime before drawing a tariff conclusion.`
       );
     }
 
     if (sw.maxEnergy.designFlowCms < sw.points[sw.points.length - 1].designFlowCms) {
       df += finding(
         'watch',
-        `<b>Energy peaks at Q${Math.round(sw.maxEnergy.exceedance * 100)} and falls beyond it.</b> A larger machine spends more days below its own minimum gate and shuts down, so past this size a more expensive plant generates less. Sizing above ${n(sw.maxEnergy.capacityMW, 3)} MW is losing on both counts.`
+        `<b>Modelled energy peaks near Q${Math.round(sw.maxEnergy.exceedance * 100)} and declines for larger reference flows</b> because the assumed turbine minimum-flow constraint increases shutdown time. Equipment selection must verify this behaviour.`
       );
     }
 
-    df += `<p class="eqnote">Each size re-sizes its own headrace and penstock, re-selects its own
-    turbine and runs the full daily record through that machine's part-load curve — the same
-    arithmetic as the headline figures, so the row marked "as designed" reproduces them exactly.
-    "Last MW earns" is the extra energy divided by the extra capacity over the size below, in
-    equivalent full-load hours per year for that increment alone. <b>No capital cost, discount rate
-    or NPV is applied</b>, so this is the physical trade-off and not an economic optimum. The
-    dry-share column carries a measured bias: scored against 74 DHM gauges it reads 4 to 6
-    percentage points low, so the qualifying sizes above are conservative.</p>`;
+    df += `<p class="eqnote">Each case re-sizes the screening waterway, applies an indicative turbine
+    curve and dispatches the same daily model record. No capital cost, operating cost, discount rate
+    or NPV is applied. Dry-season share has a measured model bias of approximately 4–6 percentage
+    points and should not be used as a contractual determination.</p>`;
 
     sec.push(df);
+
+    app.push(
+      A('DESIGN-FLOW SENSITIVITY DATA') +
+        table(
+          'Full reference-flow sweep',
+          ['Reference', 'Design flow', 'Capacity', 'Energy', 'Incremental full-load hours', 'Dry share 6+6'],
+          sw.points
+            .slice()
+            .sort((a, b) => a.exceedance - b.exceedance)
+            .map((point) => [
+              `Q${Math.round(point.exceedance * 100)}`,
+              `${n(point.designFlowCms, 2)} m³/s`,
+              `${n(point.capacityMW, 3)} MW`,
+              `${n(point.energyGwh, 1)} GWh`,
+              point.marginalHours === null ? '–' : `${n(point.marginalHours, 0)} h/yr`,
+              point.dryShareSixSix === null ? '–' : `${n(point.dryShareSixSix * 100, 1)} %`,
+            ])
+        )
+    );
   }
 
   // ---- 06 pondage ----------------------------------------------------------
@@ -1397,11 +1462,46 @@ export function deskStudyHtml(
         : null;
 
     let pd =
-      H('PONDAGE') +
-      `<p>A level-pool screen at the intake, for ${n(pond.damHeightM, 1)} m of retained water above the
-      detected bed at ${n(pond.bedElevationM, 1)} m, gives ${n(pond.areaM2 / 10000, 2)} ha of water surface
-      and ${n(pond.volumeM3 / 1e6, 3)} million m³ of storage, with backwater reaching
-      ${n(pond.upstreamLengthM / 1000, 2)} km upstream.</p>` +
+      H('PRELIMINARY PONDAGE POTENTIAL') +
+      `<p>A connected level-pool test on the ${n(cellM, 0)} m terrain model indicates that pondage may
+      be topographically possible near the intake. It is a site-screening result only; the terrain
+      model cannot establish storage volume, dam height, inundation, freeboard or hydraulic operation.</p>` +
+      facts([
+        ['Terrain-screen level', `+${n(pond.damHeightM, 0)} m above detected channel bed`],
+        ['Indicative water surface', `${approx(pond.areaM2 / 10000, 1)} ha`],
+        ['Indicative storage', `${approx(pond.volumeM3 / 1e6, 1)} million m³`],
+        ['Indicative upstream extent', `${approx(pond.upstreamLengthM / 1000, 1)} km`],
+        ['Evidence level', `${n(cellM, 0)} m DEM; no topographic or bathymetric survey`],
+      ]) +
+      chartBlock(sc, 'Preliminary stage–area–storage sensitivity from the terrain screen') +
+      finding(
+        'watch',
+        '<b>Do not use the reported area or volume for design.</b> A surveyed surface, verified dam axis, hydraulic boundary conditions and inundation assessment are required before storage or operating pondage can be stated.'
+      );
+
+    if (pond.edgeLimited) {
+      pd += finding('note', 'The modelled water surface reaches the terrain-window edge, so even the desktop footprint is a lower bound.');
+    }
+
+    if (demand) {
+      const hours = demand.hoursSupported === null ? null : Math.min(demand.hoursSupported, demand.inflowCeilingHours);
+      if (demand.deficitCms <= 0) {
+        pd += finding('clear', '<b>The modelled dry-month inflow is at or above the reference flow.</b> Pondage would affect dispatch timing rather than increase the modelled daily energy supply.');
+      } else if (demand.inflowLimited) {
+        pd += finding(
+          'note',
+          `<b>Dry-season operation is inflow-limited in the model.</b> The daily inflow supports approximately ${n(demand.inflowCeilingHours, 1)} hours at the reference flow, irrespective of a larger storage volume. Pondage may shift generation timing but does not resolve the seasonal water deficit.`
+        );
+      } else if (hours !== null && hours >= PONDAGE_REFERENCE_HOURS) {
+        pd += finding('note', `<b>The terrain-screen volume exceeds the ${PONDAGE_REFERENCE_HOURS}-hour peaking reference.</b> This is a potential worth surveying, not confirmation of an operating pond.`);
+      } else {
+        pd += finding('note', `<b>The terrain-screen volume supports approximately ${n(hours ?? 0, 1)} hours at the reference flow.</b> Survey and hydraulic modelling are required before using this result.`);
+      }
+    }
+    sec.push(pd);
+
+    stageAppendix =
+      '<h2>Connected level-pool calculation</h2>' +
       `<div class="eq">
         <div class="eqhead">How the pond was measured</div>
         <div class="eqrow"><span>Water level  = bed + retained height</span><b>${n(pond.bedElevationM, 1)} + ${n(pond.damHeightM, 1)} = <u>${n(pond.waterLevelM, 1)} m</u></b></div>
@@ -1414,36 +1514,28 @@ export function deskStudyHtml(
       cells that lie below the level, and the natural outlet is closed by the inferred dam axis, so a
       pool that would drain downstream is not counted. Maximum depth is ${n(pond.maxDepthM, 1)} m and the
       inferred dam-axis span is ${pond.damLengthM == null ? 'not closed within the window' : `${n(pond.damLengthM, 0)} m`}.
-      Terrain is read at ${n(cellM, 0)} m, so the shoreline is resolved to about one cell.</p>` +
-      chartBlock(sc, 'Stage against water area and storage');
+      Terrain is read at ${n(cellM, 0)} m, so the shoreline is resolved to about one cell.</p>`;
 
-    if (pond.edgeLimited) {
-      pd += finding('watch', 'The retained water reaches the edge of the modelled window, so the area and storage above are <b>lower bounds</b>, not estimates.');
-    }
     if (pond.levelSensitivity) {
       const ls = pond.levelSensitivity;
-      pd +=
+      stageAppendix +=
         `<p>Because the shoreline is resolved to a cell, the answer moves with the assumed water level.
         Perturbing it by ±${n(ls.errorM, 0)} m moves the area by ${n(ls.areaSpreadPct, 0)}% and the storage by
         ${n(ls.volumeSpreadPct, 0)}%.</p>`;
-      if (ls.areaSpreadPct > 50 || ls.volumeSpreadPct > 50) {
-        pd += finding('watch', 'That is a wide swing for a plausible level error: treat this pondage as <b>order-of-magnitude only</b> until a survey fixes the shoreline.');
-      }
     }
     if (pond.terrainComparison) {
       const tc = pond.terrainComparison;
-      pd += `<p>Screened again on a second, independently produced elevation surface at the same dam axis,
+      stageAppendix += `<p>Screened again on a second, independently produced elevation surface at the same dam axis,
       the same pool measures ${n(tc.areaM2 / 10000, 2)} ha and ${n(tc.volumeM3 / 1e6, 3)} million m³ — a spread of
       ${n(tc.areaSpreadPct, 0)}% on area and ${n(tc.volumeSpreadPct, 0)}% on storage.</p>`;
     } else {
-      pd += finding('note', 'Only one elevation surface was available, so this footprint carries no second-source check.');
+      stageAppendix += finding('note', 'Only one elevation surface was available, so this footprint carries no second-source check.');
     }
 
-    // ---- is it enough -----------------------------------------------------
     if (demand) {
       const hrs = demand.hoursSupported === null ? null : Math.min(demand.hoursSupported, demand.inflowCeilingHours);
-      pd +=
-        '<h2>Is it enough for peaking?</h2>' +
+      stageAppendix +=
+        '<h2>Reference peaking balance</h2>' +
         `<div class="eq">
           <div class="eqhead">Daily peaking balance, driest month</div>
           <div class="eqrow"><span>Usable inflow  Qa = dry-month mean − residual release</span><b>${n(demand.dryInflowCms, 3)} − ${n(s?.residualCms ?? 0, 3)} = <u>${n(demand.usableInflowCms, 3)} m³/s</u></b></div>
@@ -1451,21 +1543,11 @@ export function deskStudyHtml(
           <div class="eqrow"><span>Storage for ${demand.referenceHours} h at design flow  = (Qd − Qa) × h × 3600</span><b><u>${n(demand.requiredM3 / 1e6, 3)} million m³</u></b></div>
           <div class="eqrow"><span>Hours this pond delivers</span><b><u>${hrs === null ? 'no pond needed' : `${n(hrs, 1)} h`}</u></b></div>
           <div class="eqrow"><span>Ceiling from inflow alone  = 24 × Qa / Qd</span><b><u>${n(demand.inflowCeilingHours, 1)} h</u></b></div>
-        </div>`;
-      if (demand.deficitCms <= 0) {
-        pd += finding('clear', `The driest month already carries ${n(demand.usableInflowCms, 2)} m³/s past the residual release, at or above the design flow. <b>No storage is needed to run at full output</b>; pondage here buys dispatch timing, not energy.`);
-      } else if (demand.inflowLimited) {
-        pd += finding('watch', `The basin holds ${n(demand.hoursSupported ?? 0, 1)} h of storage, but a dry-season day only delivers water for <b>${n(demand.inflowCeilingHours, 1)} h</b> at design flow however much is impounded. The scheme is <b>inflow-limited, not storage-limited</b> — the extra volume buys nothing.`);
-      } else if (hrs !== null && hrs >= PONDAGE_REFERENCE_HOURS) {
-        pd += finding('clear', `The pond covers <b>${n(hrs, 1)} h</b> of peaking at design flow, above the ${PONDAGE_REFERENCE_HOURS} h reference. The site supports a peaking run-of-river operation.`);
-      } else {
-        pd += finding('watch', `The pond covers only <b>${n(hrs ?? 0, 1)} h</b> at design flow, below the ${PONDAGE_REFERENCE_HOURS} h reference. A larger structure or a lower peaking target would be needed.`);
-      }
-      pd += '<p class="eqnote">One average day, level pool: no ramping, spill, turbine minimum, drawdown rule or flushing allowance.</p>';
+        </div><p class="eqnote">One average day, level pool: no ramping, spill, turbine minimum,
+        drawdown rule or flushing allowance.</p>`;
     }
-    sec.push(pd);
     if (pond.stageCurve?.length) {
-      stageAppendix = table(
+      stageAppendix += table(
         'Stage, area and storage at the intake',
         ['Retained level m', 'Water area ha', 'Storage million m³'],
         pond.stageCurve.map((p) => [n(p.retainedHeightM, 1), n(p.areaM2 / 10000, 2), n(p.volumeM3 / 1e6, 3)])
@@ -1498,17 +1580,11 @@ export function deskStudyHtml(
         : null;
 
     let ps =
-      H('WHERE ALONG THE REACH THE STORAGE IS') +
-      `<p>The pondage above is the answer at the intake, which was placed for head and flow. A
-      Himalayan valley narrows and widens every few hundred metres, so the same ${n(sw.damHeightM, 1)} m
-      of retained water holds a different pond a few hundred metres up or down. The screen is
-      repeated at ${sw.points.length} positions and ranked by <b>storage held per metre of dam</b> —
-      not by storage, because volume grows downstream with the valley whatever the site is like, and
-      a sweep ranked on it would point at the far end of the reach every time.</p>` +
-      chartBlock(
-        pondagePositionSvg(sw),
-        `Storage per metre of dam at ${n(sw.damHeightM, 1)} m retained, along the reach. Hollow bars reached the edge of the terrain window and are minima.`
-      ) +
+      '<h2>Pondage position screen</h2>' +
+      `<p>The same level-pool method was repeated at ${sw.points.length} positions. Results are ranked
+      by storage per metre of inferred dam span so that the comparison does not simply favour the
+      downstream end of the valley.</p>` +
+      `<figure class="cw appendix-figure">${pondagePositionSvg(sw)}<figcaption>Appendix figure · Storage per metre of inferred dam span at ${n(sw.damHeightM, 1)} m retained level. Hollow bars are terrain-window lower bounds.</figcaption></figure>` +
       table(
         'Pondage against position',
         ['Position', 'Water area', 'Storage', 'Dam span', 'Per metre of dam'],
@@ -1524,15 +1600,12 @@ export function deskStudyHtml(
     ps += gain && gain >= 1.25
       ? finding(
           'watch',
-          `<b>Moving the intake ${n(Math.abs(best!.offsetKm), 2)} km ${best!.offsetKm > (cur?.offsetKm ?? 0) ? 'downstream' : 'upstream'} would hold ${n(gain, 1)}× the water per metre of dam</b> — ` +
-            `${n(best!.volumePerDamMetreM3!, 0)} m³/m against ${n(cur!.volumePerDamMetreM3!, 0)} at the sited position, for ${n(best!.volumeM3 / 1e6, 3)} Mm³ behind a ${n(best!.damLengthM!, 0)} m span. ` +
-            'Head and flow decided this intake and storage did not get a vote; on a scheme that needs pondage to reach its dry-season energy, it should. ' +
-            '<b>It is a trade, not an instruction:</b> the intake sets the head, so a move downstream buys storage and gives up gross head and the energy that goes with it. Re-run the layout at the new intake before believing either half.'
+          `<b>A comparison position ${n(Math.abs(best!.offsetKm), 2)} km ${best!.offsetKm > (cur?.offsetKm ?? 0) ? 'downstream' : 'upstream'} has ${n(gain, 1)}× the screened storage per metre of inferred dam span.</b> This is not a relocation recommendation; head, energy, access, geology and inundation would all need to be re-screened at that position.`
         )
       : best && cur && best.i === cur.i
-        ? finding('clear', '<b>The sited intake is already the best pondage position screened.</b> No move up or down this reach holds more water per metre of dam.')
+        ? finding('clear', '<b>The intake position ranks highest among the desktop pondage comparisons.</b> The result remains subject to DEM resolution and survey verification.')
         : gain
-          ? finding('note', `The best position screened holds ${n(gain, 2)}× the water per metre of dam of the sited one — inside the noise of a 30 m terrain screen, so there is no case for moving the intake on storage grounds.`)
+          ? finding('note', `The strongest comparison differs by ${n(gain, 2)}×, which is not considered material at ${n(pond?.resolutionM ?? 30, 0)} m terrain resolution.`)
           : finding('note', 'No position screened returned a pond bounded inside its terrain window, so the positions cannot be ranked against each other.');
 
     ps += `<p class="eqnote">A screen on top of a screen: every limitation of the pondage section
@@ -1542,18 +1615,36 @@ export function deskStudyHtml(
     are drawn hollow. What this ranks is positions against each other on one consistent basis; it
     does not size any of them. Terrain source: ${esc(sw.source)}.</p>`;
 
-    sec.push(ps);
+    stageAppendix += ps;
   }
 
   // ---- 07 alternatives -----------------------------------------------------
   if (c.schemes.length > 1) {
     sec.push(
-      H('ALTERNATIVE LAYOUTS') +
-        `<p>${c.evaluated} layouts were evaluated along this reach; the ${Math.min(10, c.schemes.length)}
-        strongest are tabulated in the appendices. The selected layout is the one described throughout.</p>`
+      H('SCHEME LAYOUT ALTERNATIVES') +
+        `<p>An automated reach search was used to identify comparison layouts. Three materially
+        different candidates are retained in the main report; they are alternatives for field
+        reconnaissance, not ranked designs.</p>` +
+        table(
+          'Shortlisted desktop layout alternatives',
+          ['Alternative', 'Indicative capacity', 'Annual energy', 'Net head', 'Waterway'],
+          c.schemes.slice(0, 3).map((layout, index) => [
+            `${index + 1}${layout === s ? '  (reference)' : ''}`,
+            `${n(layout.capacityMW, 1)} MW`,
+            `${n(layout.energyGwh, 1)} GWh`,
+            `${n(layout.netHeadM, 0)} m`,
+            `${n(layout.waterwayKm, 1)} km`,
+          ])
+        ) +
+        finding(
+          'note',
+          '<b>Alternative ranking excludes constructability and cost.</b> Survey control, geology, access, headworks siting, land requirements and power evacuation may change the preferred corridor.'
+        )
     );
     app.push(
       A('ALTERNATIVE LAYOUTS CONSIDERED') +
+        `<p>${c.evaluated} automated candidates were screened. The table retains the leading model
+        outputs for traceability; it is not a design ranking.</p>` +
         table(
           'Alternative layouts',
           ['#', 'Capacity MW', 'Energy GWh', 'Net head m', 'Waterway km', 'Turbine'],
