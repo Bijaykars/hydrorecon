@@ -5,11 +5,11 @@
  * redistribution. These four came through a private channel with provenance
  * that has not been established, and the municipality boundaries carry an
  * explicit HERMES term: non-commercial use only, no redistribution without
- * consent. pipeline/build-local-gis.mjs writes them to public/local/, which
+ * consent. pipeline/build-local-gis.mjs writes them to sources/local/, which
  * .gitignore excludes.
  *
  * So this module is written for their ABSENCE first. A fresh clone has no
- * public/local/, every fetch here 404s, every function returns null, and the
+ * sources/local/, every fetch here 404s, every function returns null, and the
  * app behaves exactly as it did before these existed. That is not a fallback
  * bolted on afterwards — it is the normal case, and the loaded case is the
  * exception.
@@ -117,20 +117,34 @@ export async function localContextAt(lat: number, lon: number): Promise<LocalCon
    * Isohyet bands nest: a 4000 mm core sits inside the 3000 mm band that
    * contains it. The smallest containing band is the specific one, so it wins.
    */
+  /**
+   * "Smallest" is AREA, not latitude span.
+   *
+   * Ranking on `maxLat - minLat` ignores longitude entirely, so a band that is
+   * short and very wide beat one that is taller and much smaller overall. At
+   * (27.04, 86.04) it chose the 2,000 mm band, planar area 0.736 deg², over the
+   * 1,800 mm band at 0.686 — the wrong rainfall for the site, decided by an
+   * unrelated dimension of a bounding box.
+   *
+   * The shoelace formula over the rings gives the real polygon area, and
+   * summing absolute ring areas keeps a band with holes from scoring as tiny.
+   */
+  const ringArea = (r: number[]) => {
+    let sum = 0;
+    for (let i = 0; i + 3 < r.length; i += 2) {
+      // Rings are [lat, lon, lat, lon, …]; the sign cancels in the absolute.
+      sum += r[i + 1] * r[i + 2] - r[i + 3] * r[i];
+    }
+    return Math.abs(sum) / 2;
+  };
+
   let annualRainMm: number | null = null;
   let tightest = Infinity;
   for (const b of g.bands) {
     if (!inside(lat, lon, b.rings)) continue;
-    let lo = 99;
-    let hi = -99;
-    for (const r of b.rings) {
-      for (let i = 0; i < r.length; i += 2) {
-        if (r[i] < lo) lo = r[i];
-        if (r[i] > hi) hi = r[i];
-      }
-    }
-    if (hi - lo < tightest) {
-      tightest = hi - lo;
+    const area = b.rings.reduce((sum, r) => sum + ringArea(r), 0);
+    if (area < tightest) {
+      tightest = area;
       annualRainMm = b.mm;
     }
   }

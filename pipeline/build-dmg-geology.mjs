@@ -14,7 +14,7 @@ import { renameSync, rmSync, writeFileSync } from 'node:fs';
 const PAGE = 'https://dmgnepal.gov.np/en/resources/geological-maps-150000-4749';
 const OUT = 'src/data/nepal-geology-maps.json';
 const TMP = `${OUT}.tmp`;
-const UA = 'Ghatta/0.2 (open-source hydropower screening; github.com/Bijaykars)';
+const UA = 'HydroRecon/0.2 (open-source hydropower screening; github.com/Bijaykars)';
 
 const clean = (html) =>
   html

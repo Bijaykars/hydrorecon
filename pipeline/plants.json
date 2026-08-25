@@ -1,7 +1,7 @@
 {
-  "_what": "Ten built Nepali run-of-river plants used to validate Ghatta against reality. Coordinates and specifications were researched independently of the app — nothing here was chosen to make the comparison look good, and the derivations are stated so they can be re-checked.",
+  "_what": "Ten built Nepali run-of-river plants used to validate HydroRecon against reality. Coordinates and specifications were researched independently of the app — nothing here was chosen to make the comparison look good, and the derivations are stated so they can be re-checked.",
   "_coordinateNote": "intake/powerhouse are [lat, lon]. 'derived' means the point was placed on the OSM-mapped stream at the published waterway length upstream of the powerhouse — the DEM was never consulted, so the head comparison stays independent. 'approx' means village-level accuracy.",
-  "_excluded": "Jhimruk and Andhikhola divert water through a ridge into a different valley; Ghatta deliberately models same-valley schemes only, so they cannot be run. Kulekhani is storage, not run-of-river.",
+  "_excluded": "Jhimruk and Andhikhola divert water through a ridge into a different valley; HydroRecon deliberately models same-valley schemes only, so they cannot be run. Kulekhani is storage, not run-of-river.",
   "plants": [
     {
       "name": "Upper Tamakoshi",
@@ -26,7 +26,7 @@
       "powerhouse": [27.93094, 83.61509],
       "powerhouseSource": "Wikipedia infobox: powerhouse at Beltari; matches OSM plant polygon",
       "actual": { "capacityMW": 144, "designQ": 141, "head": 115, "headBasis": "net", "energyGwh": 842 },
-      "note": "44 m high dam raises the intake level well above the riverbed; Ghatta models a low weir, so it should under-read the head here by roughly the dam height.",
+      "note": "44 m high dam raises the intake level well above the riverbed; HydroRecon models a low weir, so it should under-read the head here by roughly the dam height.",
       "sources": [
         "https://en.wikipedia.org/wiki/Kaligandaki_A_Hydroelectric_Power_Station",
         "https://www.adb.org/features/kali-gandaki-hydroelectric-project-report-card"
@@ -54,7 +54,7 @@
       "powerhouse": [27.8763, 84.5393],
       "powerhouseSource": "OSM: 'Marsyangdi Hydro Power' plant polygon at Aanbukhaireni",
       "actual": { "capacityMW": 69, "designQ": 91.5, "head": 90.5, "headBasis": "net", "energyGwh": 462.5 },
-      "note": "Design flow is 3 turbines at 30.5 m³/s each. Peaking plant: its dam ponds the river well above the bed, and Ghatta models a low weir reading the riverbed — so an under-read head here is the model being honest about what it measures, not a terrain error.",
+      "note": "Design flow is 3 turbines at 30.5 m³/s each. Peaking plant: its dam ponds the river well above the bed, and HydroRecon models a low weir reading the riverbed — so an under-read head here is the model being honest about what it measures, not a terrain error.",
       "sources": ["https://en.wikipedia.org/wiki/Marsyangdi_Hydropower_Station"]
     },
     {
@@ -119,7 +119,7 @@
       "powerhouse": [29.685, 80.6498],
       "powerhouseSource": "OSM: 'Chameliya HEP' plant polygon",
       "actual": { "capacityMW": 30, "designQ": 36, "head": 103.7, "headBasis": "gross", "energyGwh": 184.2 },
-      "note": "Far-western Nepal — the test that the data holds outside the famous central basins. Six-hour peaking: the dam ponds the river above the bed Ghatta reads, and pondage lets the design flow exceed what a pure run-of-river Q40 would be.",
+      "note": "Far-western Nepal — the test that the data holds outside the famous central basins. Six-hour peaking: the dam ponds the river above the bed HydroRecon reads, and pondage lets the design flow exceed what a pure run-of-river Q40 would be.",
       "sources": ["https://en.wikipedia.org/wiki/Chameliya_Khola_Hydropower_Station"]
     },
     {

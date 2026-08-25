@@ -19,12 +19,25 @@ import type { EngineeringReadiness } from './readiness.ts';
 import type { HazardScreen } from './hazards.ts';
 import type { FaultScreen } from './faults.ts';
 import type { GeologyScreen } from './geology.ts';
+import { GEOLOGY_UNITS_LICENSE, type GeologyTraverse } from './geology-units.ts';
 import type { UpstreamConnectivityScreen } from './connectivity.ts';
 import { isAdvancedDoedStage, type CascadeScreen } from './cascade.ts';
 import type { RegionMode } from './region.ts';
 import type { HydestScreen } from './engine/hydest.ts';
+import type { MhspScreen } from './engine/mhsp.ts';
+import type { ShapeVerdict } from './engine/fdcshape.ts';
+import type { Uncertainty } from './engine/uncertainty.ts';
 import { UNIT_SENSITIVITY_GUIDANCE } from './engine/units.ts';
 import type { FlowChoice } from './engine/flowchoice.ts';
+import {
+  PONDAGE_METHOD,
+  pondageGeoJson,
+  type PondagePositionSweep,
+  type PondageResult,
+} from './pondage.ts';
+import { ROAD_ACCESS_METHOD, roadAccessGeoJson, type RoadAccessScreen } from './access.ts';
+import type { LandcoverScreen } from './landcover.ts';
+import type { DesignFlowSweep } from './engine/designflow.ts';
 import {
   NEA_ROR_PPA,
   NEPAL_EFLOW_POLICY,
@@ -41,11 +54,59 @@ export type ExportContext = {
   cascade: CascadeScreen | null;
   faults: FaultScreen | null;
   geology: GeologyScreen | null;
+  /**
+   * Units the waterway crosses on Nepal's own 1:1,000,000 sheet. Null means
+   * NOT RUN; a traverse whose `mappedKm` is short of `lengthKm` means the
+   * national map is blank there, which is a different statement and one the
+   * high country makes often.
+   */
+  geologyUnits: GeologyTraverse | null;
   hydest: HydestScreen | null;
+  /** The second published Nepali regression, shown beside the first. */
+  mhsp: MhspScreen | null;
+  /** Whether the flow-duration shape is plausible against the national band. */
+  flowShape: ShapeVerdict | null;
+  /**
+   * A far larger river beside the one this study picked.
+   *
+   * Non-null means the click may be on the wrong channel, and since flow scales
+   * with catchment area that is not a small error — it is the ratio of the two
+   * catchments. It was on screen and absent from the report, which is the wrong
+   * way round: the screen has the map beside it and the report does not.
+   */
+  ambiguity: { nearestKm2: number; mainKm2: number; mainKm: number; lat: number; lon: number } | null;
+  /** The full spread and what drives it, not just the endpoints in `band`. */
+  uncertainty: Uncertainty | null;
+  /**
+   * The daily record itself.
+   *
+   * The report draws a flow-duration curve and a monthly table, and neither can
+   * be recovered from summary statistics. Carrying the series means the report
+   * uses the engine's own buildFdc rather than a second implementation of it.
+   */
+  flow: { dates: string[]; values: number[] };
   flowChoice: FlowChoice | null;
+  /** Level-pool screen for the selected intake and user-selected dam height. */
+  pondage?: PondageResult | null;
+  /** The same screen repeated along the reach: where the storage actually is. */
+  pondageSweep?: PondagePositionSweep | null;
+  /** Nearest points on the live OSM car-routing graph for the selected layout. */
+  roadAccess?: RoadAccessScreen | null;
+  /** What the waterway crosses: forest, cropland, settlement. */
+  landcover?: LandcoverScreen | null;
+  /** The design-flow trade-off for the layout on screen. */
+  designSweep?: DesignFlowSweep | null;
   schemes: Scheme[];
   selected: Scheme | null;
-  path: { km: number; lat: number; lon: number; elevationM: number; meanCms: number }[];
+  /** `uplandKm2` is present at runtime (App passes StudyPoint) and the report reads it. */
+  path: {
+    km: number;
+    lat: number;
+    lon: number;
+    elevationM: number;
+    meanCms: number;
+    uplandKm2?: number;
+  }[];
   demSource: string;
   demResolutionM: number;
   flowYears: number;
@@ -65,6 +126,31 @@ export type ExportContext = {
    * valley at the selected intake has room, neither of which is per-scheme.
    */
   sediment: { source: SedimentSource | null; bench: BenchFit | null } | null;
+  /**
+   * Evidence the screen calculates and shows but the file used to drop.
+   *
+   * A downloaded handoff was losing the 475-year PGA, the earthquake history,
+   * the named protected areas and their regimes, and the private survey-sheet
+   * context — so a reviewer could see the readiness conclusion but not the
+   * values that produced it. Optional because a global-mode study has none of
+   * them, not because they are decoration.
+   */
+  seismic?: { pga475g: number | null; quakeCount: number; largest: string | null } | null;
+  conservation?: {
+    inside: { name: string; regime: string }[];
+    near: { name: string; regime: string; distanceKm: number }[];
+    hard: boolean;
+  } | null;
+  localGis?: { municipality: string | null; sheet: string | null; isohyetMm: number | null } | null;
+  /**
+   * Added intakes and the gain they buy, when the screen is showing a boosted
+   * headline. Without these the exported MW and GWh silently described the base
+   * scheme while the page described the combined one.
+   */
+  collectors?: {
+    gainFrac: number;
+    counted: { name: string | null; lat: number; lon: number; flowFrac: number }[];
+  } | null;
   /**
    * A measured record, when the engineer supplied one. Its presence changes what
    * the provenance header may claim: a file built on a gauge record must not say
@@ -89,13 +175,22 @@ export type ExportContext = {
 const stamp = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 
 /** Every line a reader needs to judge how much to trust the rows below. */
+/**
+ * The machine record that rides on every exported FILE.
+ *
+ * It was briefly rendered into the report as an appendix too, and reverted:
+ * every number in it is already stated in the body, in prose, next to the
+ * thing it describes. An appendix that repeats the report is not an appendix,
+ * it is eleven pages of noise. The data files are where an unedited record
+ * belongs, because nothing there has a body to repeat.
+ */
 function provenance(c: ExportContext): string[] {
   const lines = [
-    'Ghatta — run-of-river screening',
+    'HydroRecon — run-of-river screening',
     'https://github.com/Bijaykars  ·  MIT licence',
     `generated: ${stamp()}`,
     `study point: ${c.at.lat.toFixed(5)}, ${c.at.lon.toFixed(5)}`,
-    `mode: ${c.region === 'nepal' ? 'NEPAL â€” national datasets and rules enabled' : 'GLOBAL â€” physical open-data screening only'}`,
+    `mode: ${c.region === 'nepal' ? 'NEPAL — national datasets and rules enabled' : 'GLOBAL — physical open-data screening only'}`,
     ...(c.boundaryDistanceKm !== null && c.boundaryDistanceKm <= 10
       ? [`border warning: ${c.boundaryDistanceKm.toFixed(1)} km from the generalized country outline; verify jurisdiction from authoritative survey/control points`]
       : []),
@@ -112,6 +207,76 @@ function provenance(c: ExportContext): string[] {
     `terrain: ${c.demSource}, ~${Math.round(c.demResolutionM)} m sample spacing`,
     'terrain error: global DEMs carry roughly +/-10-16 m vertically in steep ground,',
     '  which propagates directly into head and therefore into capacity',
+    ...(c.pondage
+      ? [
+          `PONDAGE LEVEL-POOL SCREEN: ${c.pondage.damHeightM.toFixed(1)} m retained height; ${(
+            c.pondage.areaM2 / 10_000
+          ).toFixed(2)} ha; ${(c.pondage.volumeM3 / 1_000_000).toFixed(3)} million m3${
+            c.pondage.edgeLimited ? '; DEM-window edge reached, so area and storage are minima' : ''
+          }`,
+          `  terrain: ${c.pondage.source}; ~${Math.round(c.pondage.resolutionM)} m cells; full-supply level ${c.pondage.waterLevelM.toFixed(1)} m`,
+          ...(c.pondage.terrainComparison
+            ? [
+                `  second terrain: ${c.pondage.terrainComparison.source}; ${c.pondage.terrainComparison.edgeLimited ? '>=' : ''}${(c.pondage.terrainComparison.areaM2 / 10_000).toFixed(2)} ha; ${c.pondage.terrainComparison.edgeLimited ? '>=' : ''}${(c.pondage.terrainComparison.volumeM3 / 1_000_000).toFixed(3)} million m3`,
+                c.pondage.terrainComparison.edgeLimited
+                  ? '  two-terrain comparison: second pool reaches the 10 km DEM edge; values are unresolved minimums and no range is claimed'
+                  : `  two-terrain spread: ${c.pondage.terrainComparison.areaSpreadPct.toFixed(0)}% area; ${c.pondage.terrainComparison.volumeSpreadPct.toFixed(0)}% storage (diagnostic, not a confidence interval)`,
+              ]
+            : ['  second terrain: unavailable; result is not source-corroborated']),
+          ...(c.pondage.ruggedness
+            ? [
+                `  terrain ruggedness: ArcHydro/Riley TRI SD ${c.pondage.ruggedness.triStdDevM.toFixed(1)} m in a ${c.pondage.ruggedness.sampleRadiusKm.toFixed(1)} km radius; warning metric, not an error percentage`,
+              ]
+            : []),
+          `  method: connected 8-neighbour level-pool flood fill behind a finite inferred dam axis; ${PONDAGE_METHOD.grass}; ${PONDAGE_METHOD.whitebox}`,
+          '  limitation: terrain-only screening; no surveyed thalweg/abutments, bathymetry, freeboard, sediment, backwater hydraulics, stability, spillway or inundation clearance',
+        ]
+      : []),
+    ...(c.pondageSweep && c.pondageSweep.points.length >= 3
+      ? [
+          `PONDAGE POSITION SWEEP at ${c.pondageSweep.damHeightM.toFixed(1)} m retained, ${c.pondageSweep.points.length} of ${c.pondageSweep.asked} positions returning, source ${c.pondageSweep.source}: ` +
+            c.pondageSweep.points
+              .map((q: PondagePositionSweep['points'][number]) => `${q.offsetKm >= 0 ? '+' : ''}${q.offsetKm.toFixed(2)} km ${(q.volumeM3 / 1e6).toFixed(3)} Mm3 / dam ${q.damLengthM == null ? 'unbounded' : `${q.damLengthM.toFixed(0)} m`}${q.volumePerDamMetreM3 == null ? '' : ` / ${q.volumePerDamMetreM3.toFixed(0)} m3 per dam metre`}${q.edgeLimited ? ' (edge-limited, minimum)' : ''}`)
+              .join('; '),
+          c.pondageSweep.best
+            ? `  best storage per metre of dam: ${c.pondageSweep.best.offsetKm >= 0 ? '+' : ''}${c.pondageSweep.best.offsetKm.toFixed(2)} km from the intake`
+            : '  no position returned an unbounded pond, so none is ranked',
+          '  ranking metric is volume per metre of dam, because raw volume always grows downstream and would simply point at the far end of the reach; no cost model is applied',
+          '  a screen on top of a screen: every limitation of the level-pool pondage screen applies to every position here and compounds',
+        ]
+      : []),
+    ...(c.designSweep && c.designSweep.points.length >= 3
+      ? [
+          `DESIGN-FLOW SWEEP at one fixed layout, ${c.designSweep.points.length} sizes from Q${Math.round(c.designSweep.points[c.designSweep.points.length - 1].exceedance * 100)} to Q${Math.round(c.designSweep.points[0].exceedance * 100)}: ` +
+            c.designSweep.points
+              .map((p) => `Q${Math.round(p.exceedance * 100)} ${p.capacityMW.toFixed(3)} MW / ${p.energyGwh.toFixed(1)} GWh / dry6+6 ${((p.dryShareSixSix ?? 0) * 100).toFixed(1)}%${p.marginalHours === null ? '' : ` / marginal ${p.marginalHours.toFixed(0)} h`}`)
+              .join('; '),
+          c.designSweep.dryLimitSixSix
+            ? `  largest size clearing the NEA 30% dry bar: Q${Math.round(c.designSweep.dryLimitSixSix.exceedance * 100)} at ${c.designSweep.dryLimitSixSix.capacityMW.toFixed(3)} MW`
+            : '  no size screened clears the NEA 30% dry bar',
+          `  energy peaks at Q${Math.round(c.designSweep.maxEnergy.exceedance * 100)}, ${c.designSweep.maxEnergy.energyGwh.toFixed(1)} GWh`,
+          '  method: each size re-sizes its own waterway, re-selects its own turbine and dispatches the full daily record; no capital cost, discount rate or NPV is applied, so this is a physical trade-off and not an economic optimum',
+          '  the dry-share column reads 4-6 percentage points low against 74 DHM gauges (checks/dryshare-vs-gauges.mjs), so qualifying sizes are conservative',
+        ]
+      : []),
+    ...(c.landcover
+      ? [
+          `LAND COVER ALONG THE ALIGNMENT, ${c.landcover.waterwayKm.toFixed(2)} km sampled at ${c.landcover.cellM} m: ` +
+            c.landcover.along
+              .map((a) => `${a.label} ${a.km.toFixed(2)} km (${(a.share * 100).toFixed(0)}%)`)
+              .join('; '),
+          `  intake on ${c.landcover.intake ?? 'unclassified ground'}; powerhouse on ${c.landcover.powerhouse ?? 'unclassified ground'}`,
+          `  source: ${c.landcover.source}`,
+          `  limitation: ${c.landcover.limitation} Measured on the centreline only, so a right of way, spoil disposal and access track are not included and the forest figure is a floor.`,
+        ]
+      : []),
+    ...(c.roadAccess
+      ? [
+          `MOTOR-ROAD PROXIMITY SCREEN: intake ${c.roadAccess.intake ? `${c.roadAccess.intake.distanceM.toFixed(0)} m` : 'no car-graph road within 20 km'}; powerhouse ${c.roadAccess.powerhouse ? `${c.roadAccess.powerhouse.distanceM.toFixed(0)} m` : 'no car-graph road within 20 km'}`,
+          `  source/method: ${c.roadAccess.source}; ${ROAD_ACCESS_METHOD.osrm}; OpenStreetMap contributors (${ROAD_ACCESS_METHOD.osmCopyright})`,
+          `  limitation: ${c.roadAccess.limitation}`,
+        ]
+      : []),
     ...(c.region === 'nepal'
       ? [
           `Nepal context: DoED updated ${DOED_UPDATED} (bundled ${DOED_RETRIEVED}); ` +
@@ -139,7 +304,7 @@ function provenance(c: ExportContext): string[] {
             : []),
         ]
       : [
-          'country context: not assessed â€” Nepal-only DoED, DHM, grid, protected-area and PPA rules are disabled',
+          'country context: not assessed — Nepal-only DoED, DHM, grid, protected-area and PPA rules are disabled',
           'global inputs are limited to easily available open terrain, flow, river and basemap data',
         ]),
     ...(c.measured
@@ -167,6 +332,16 @@ function provenance(c: ExportContext): string[] {
     lines.push(
       `regional geology: Macrostrat point samples at intake, mid-reach and powerhouse; ${c.geology.regional.license}`,
       `  limitation: ${c.geology.regional.limitation}`
+    );
+  }
+  if (c.geologyUnits) {
+    const g = c.geologyUnits;
+    lines.push(
+      `national geology: ${g.source}, ${g.scale}, ${GEOLOGY_UNITS_LICENSE}`,
+      `  traverse: ${g.formationContacts} formation contact(s) over ${g.lengthKm.toFixed(1)} km; ${g.mappedKm.toFixed(1)} km mapped`,
+      `  intake on ${g.intake.name}; powerhouse on ${g.powerhouse.name}`,
+      `  contact chainages carry about ${g.contactErrorKm.toFixed(1)} km of positional error at this scale`,
+      `  limitation: ${g.limitation}`
     );
   }
   if (c.networkMeanCms !== null && !c.measured) {
@@ -227,6 +402,57 @@ function provenance(c: ExportContext): string[] {
       `  energy:   ${c.band.energyLow.toFixed(0)} - ${c.band.energyHigh.toFixed(0)} GWh/yr ` +
         `(reported ${c.selected.energyGwh.toFixed(0)})`,
       '  the single figures in the table below are midpoints, not measurements'
+    );
+  }
+  if (c.collectors && c.collectors.gainFrac > 0) {
+    lines.push(
+      '',
+      `COLLECTOR INTAKES: ${c.collectors.counted.length} added, raising design flow by ` +
+        `${(c.collectors.gainFrac * 100).toFixed(0)}%`,
+      ...c.collectors.counted.map(
+        (k) =>
+          `  ${k.name ?? 'tributary'} at ${k.lat.toFixed(5)}, ${k.lon.toFixed(5)} — ` +
+          `+${(k.flowFrac * 100).toFixed(0)}% of the main flow`
+      ),
+      '  the per-scheme rows below are the BASE plant. The combined figure shown on',
+      '  screen scales capacity and energy by the gain above and does NOT resize the',
+      '  waterway, so its head loss (which rises with the square of flow), turbine',
+      '  selection and residual release are those of the base scheme.'
+    );
+  }
+  if (c.seismic) {
+    lines.push(
+      '',
+      'SEISMIC CONTEXT at the selected reach:',
+      c.seismic.pga475g != null
+        ? `  peak ground acceleration, 475-year return: ${c.seismic.pga475g.toFixed(3)} g`
+        : '  peak ground acceleration: not available here',
+      `  recorded earthquakes in the catalogue nearby: ${c.seismic.quakeCount}`,
+      ...(c.seismic.largest ? [`  largest: ${c.seismic.largest}`] : [])
+    );
+  }
+  if (c.conservation) {
+    lines.push(
+      '',
+      c.conservation.hard
+        ? 'PROTECTED AREAS — HARD STOP: the layout falls inside a regime that does not permit this.'
+        : 'PROTECTED AREAS near the selected layout:',
+      ...c.conservation.inside.map((a) => `  INSIDE: ${a.name} (${a.regime})`),
+      ...c.conservation.near.map(
+        (a) => `  within ${a.distanceKm.toFixed(1)} km: ${a.name} (${a.regime})`
+      ),
+      '  boundaries are simplified; a site near one needs the gazetted boundary, not this.'
+    );
+  }
+  if (c.localGis) {
+    lines.push(
+      '',
+      'LOCAL CONTEXT (privately supplied survey layers, not redistributed):',
+      ...(c.localGis.municipality ? [`  municipality: ${c.localGis.municipality}`] : []),
+      ...(c.localGis.sheet ? [`  survey sheet: ${c.localGis.sheet}`] : []),
+      ...(c.localGis.isohyetMm != null
+        ? [`  isohyet band: ${c.localGis.isohyetMm} mm/yr`]
+        : [])
     );
   }
   if (c.hazards) {
@@ -340,7 +566,7 @@ function provenance(c: ExportContext): string[] {
       '',
       `FIELD INVESTIGATION CAMPAIGN (${c.readiness.tasks.length} work packages):`,
       ...c.readiness.tasks.flatMap((t, i) => [
-        `  ${i + 1}. [${t.priority}] ${t.discipline} â€” ${t.title}`,
+        `  ${i + 1}. [${t.priority}] ${t.discipline} — ${t.title}`,
         `     why: ${t.reason}`,
         `     deliverable: ${t.deliverable}`,
       ])
@@ -546,13 +772,32 @@ export function schemesToCsv(c: ExportContext): string {
     'intake_lon',
     'powerhouse_lat',
     'powerhouse_lon',
+    // Retained WATER LEVEL above the detected bed, which is what the UI
+    // controls and what the slider says. Structural dam height is that plus
+    // freeboard and any non-retaining crest allowance, neither of which this
+    // tool knows — so it must not be exported under that name.
+    'selected_pondage_retained_water_level_m',
+    'selected_pondage_area_ha',
+    'selected_pondage_storage_million_m3',
+    'selected_pondage_edge_limited',
+    'selected_pondage_second_terrain_source',
+    'selected_pondage_second_area_ha',
+    'selected_pondage_second_storage_million_m3',
+    'selected_pondage_second_edge_limited',
+    'selected_pondage_two_terrain_area_spread_pct',
+    'selected_pondage_two_terrain_storage_spread_pct',
+    'selected_pondage_tri_sd_m',
+    'selected_pondage_stage_curve_height_m_area_ha_storage_million_m3',
+    'selected_intake_motor_road_gap_m',
+    'selected_powerhouse_motor_road_gap_m',
     'why_kept',
   ];
   const rows = c.schemes.map((s) => {
     const d = desander({ designFlowCms: s.designFlowCms, netHeadM: s.netHeadM });
+    const chosen = Boolean(c.selected && s.i === c.selected.i && s.j === c.selected.j);
     return [
       `S${c.schemes.indexOf(s) + 1}`,
-      c.selected && s.i === c.selected.i && s.j === c.selected.j ? 'yes' : '',
+      chosen ? 'yes' : '',
       s.capacityMW.toFixed(3),
       s.energyGwh.toFixed(2),
       s.reliability?.p50Gwh.toFixed(2) ?? '',
@@ -605,6 +850,39 @@ export function schemesToCsv(c: ExportContext): string {
       s.intake.lon.toFixed(5),
       s.power.lat.toFixed(5),
       s.power.lon.toFixed(5),
+      chosen && c.pondage ? c.pondage.damHeightM.toFixed(1) : '',
+      chosen && c.pondage ? (c.pondage.areaM2 / 10_000).toFixed(3) : '',
+      chosen && c.pondage ? (c.pondage.volumeM3 / 1_000_000).toFixed(5) : '',
+      chosen && c.pondage ? (c.pondage.edgeLimited ? 'yes' : 'no') : '',
+      chosen && c.pondage?.terrainComparison ? c.pondage.terrainComparison.source : '',
+      chosen && c.pondage?.terrainComparison
+        ? (c.pondage.terrainComparison.areaM2 / 10_000).toFixed(3)
+        : '',
+      chosen && c.pondage?.terrainComparison
+        ? (c.pondage.terrainComparison.volumeM3 / 1_000_000).toFixed(5)
+        : '',
+      chosen && c.pondage?.terrainComparison
+        ? c.pondage.terrainComparison.edgeLimited
+          ? 'yes'
+          : 'no'
+        : '',
+      chosen && c.pondage?.terrainComparison
+        ? c.pondage.terrainComparison.areaSpreadPct.toFixed(1)
+        : '',
+      chosen && c.pondage?.terrainComparison
+        ? c.pondage.terrainComparison.volumeSpreadPct.toFixed(1)
+        : '',
+      chosen && c.pondage?.ruggedness ? c.pondage.ruggedness.triStdDevM.toFixed(2) : '',
+      chosen && c.pondage?.stageCurve
+        ? c.pondage.stageCurve
+            .map(
+              (point) =>
+                `${point.retainedHeightM.toFixed(2)}:${(point.areaM2 / 10_000).toFixed(3)}:${(point.volumeM3 / 1_000_000).toFixed(5)}`
+            )
+            .join('|')
+        : '',
+      chosen && c.roadAccess?.intake ? c.roadAccess.intake.distanceM.toFixed(1) : '',
+      chosen && c.roadAccess?.powerhouse ? c.roadAccess.powerhouse.distanceM.toFixed(1) : '',
       s.reasons.join('; '),
     ]
       .map(cell)
@@ -616,7 +894,7 @@ export function schemesToCsv(c: ExportContext): string {
 /** A field-ready work package register that can be assigned and costed. */
 export function fieldPlanToCsv(c: ExportContext): string {
   const head = [
-    '# Ghatta engineering field investigation plan',
+    '# HydroRecon engineering field investigation plan',
     `# generated: ${stamp()}`,
     `# study point: ${c.at.lat.toFixed(5)}, ${c.at.lon.toFixed(5)}`,
     `# mode: ${c.region}`,
@@ -740,6 +1018,43 @@ export function schemesToGeoJson(c: ExportContext): string {
       geometry: { type: 'Point', coordinates: [s.power.lon, s.power.lat] },
     });
   });
+
+  if (c.pondage) {
+    for (const feature of pondageGeoJson(c.pondage).features) {
+      features.push({
+        ...feature,
+        properties: {
+          ...feature.properties,
+          part:
+            feature.properties.kind === 'pondage'
+              ? 'possible level-pool pondage for selected intake'
+              : 'screened dam axis for selected intake',
+          terrain_source: c.pondage.source,
+          terrain_resolution_m: c.pondage.resolutionM,
+          interpretation:
+            'terrain-only screening geometry; not surveyed inundation, a dam design, storage guarantee or clearance',
+        },
+      });
+    }
+  }
+
+  if (c.roadAccess) {
+    for (const feature of roadAccessGeoJson(c.roadAccess).features) {
+      const properties = feature.properties ?? {};
+      features.push({
+        ...feature,
+        properties: {
+          ...properties,
+          part:
+            properties.kind === 'connector'
+              ? `${String(properties.role)} straight-line gap to motor-road graph`
+              : `${String(properties.role)} nearest motor-road graph point`,
+          source: c.roadAccess.source,
+          interpretation: c.roadAccess.limitation,
+        },
+      });
+    }
+  }
 
   for (const l of c.licences) {
     features.push({
@@ -976,21 +1291,54 @@ export function schemesToGeoJson(c: ExportContext): string {
   return JSON.stringify(
     {
       type: 'FeatureCollection',
-      ghatta: provenance(c),
-      ghatta_readiness: c.readiness,
-      ghatta_hydest: c.hydest,
-      ghatta_flow_choice: c.flowChoice,
-      ghatta_nea_ror_ppa: c.region === 'nepal' ? NEA_ROR_PPA : null,
-      ghatta_power_duration: POWER_DURATION_GUIDANCE,
-      ghatta_unit_count_sensitivity: UNIT_SENSITIVITY_GUIDANCE,
-      ghatta_nepal_environmental_flow: c.region === 'nepal'
+      hydrorecon: provenance(c),
+      hydrorecon_readiness: c.readiness,
+      hydrorecon_hydest: c.hydest,
+      hydrorecon_flow_choice: c.flowChoice,
+      hydrorecon_pondage: c.pondage
+        ? {
+            damHeightM: c.pondage.damHeightM,
+            bedElevationM: c.pondage.bedElevationM,
+            waterLevelM: c.pondage.waterLevelM,
+            areaM2: c.pondage.areaM2,
+            volumeM3: c.pondage.volumeM3,
+            meanDepthM: c.pondage.meanDepthM,
+            maxDepthM: c.pondage.maxDepthM,
+            upstreamLengthM: c.pondage.upstreamLengthM,
+            shorelineM: c.pondage.shorelineM,
+            damLengthM: c.pondage.damLengthM,
+            edgeLimited: c.pondage.edgeLimited,
+            damAxisLimited: c.pondage.damAxisLimited,
+            terrain: {
+              source: c.pondage.source,
+              resolutionM: c.pondage.resolutionM,
+              radiusKm: c.pondage.radiusKm,
+            },
+            terrainComparison: c.pondage.terrainComparison ?? null,
+            ruggedness: c.pondage.ruggedness ?? null,
+            stageCurve: c.pondage.stageCurve ?? null,
+            method: PONDAGE_METHOD,
+            interpretation:
+              'connected level-pool terrain screen; not surveyed storage, hydraulic modelling, dam design or inundation clearance',
+          }
+        : null,
+      hydrorecon_road_access: c.roadAccess
+        ? {
+            ...c.roadAccess,
+            method: ROAD_ACCESS_METHOD,
+          }
+        : null,
+      hydrorecon_nea_ror_ppa: c.region === 'nepal' ? NEA_ROR_PPA : null,
+      hydrorecon_power_duration: POWER_DURATION_GUIDANCE,
+      hydrorecon_unit_count_sensitivity: UNIT_SENSITIVITY_GUIDANCE,
+      hydrorecon_nepal_environmental_flow: c.region === 'nepal'
         ? {
             ...NEPAL_EFLOW_POLICY,
             selectedFractionOfLowestMonthlyMean: c.assumptions.residualFrac,
             selectedReleaseCms: c.selected?.residualCms ?? null,
           }
         : null,
-      ghatta_hazards: c.hazards
+      hydrorecon_hazards: c.hazards
         ? {
             radiusKm: c.hazards.radiusKm,
             total: c.hazards.total,
@@ -1003,7 +1351,7 @@ export function schemesToGeoJson(c: ExportContext): string {
             limitation: c.hazards.limitation,
           }
         : null,
-      ghatta_upstream_connectivity: c.upstreamConnectivity
+      hydrorecon_upstream_connectivity: c.upstreamConnectivity
         ? {
             target: c.upstreamConnectivity.target,
             lakeCandidates: c.upstreamConnectivity.lakes.length,
@@ -1017,7 +1365,7 @@ export function schemesToGeoJson(c: ExportContext): string {
             limitation: c.upstreamConnectivity.limitation,
           }
         : null,
-      ghatta_cascade: c.cascade
+      hydrorecon_cascade: c.cascade
         ? {
             upstreamCandidates: c.cascade.upstream.length,
             downstreamCandidates: c.cascade.downstream.length,
@@ -1033,7 +1381,7 @@ export function schemesToGeoJson(c: ExportContext): string {
             guidance: c.cascade.guidance,
           }
         : null,
-      ghatta_faults: c.faults
+      hydrorecon_faults: c.faults
         ? {
             radiusKm: c.faults.radiusKm,
             nearby: c.faults.nearby.length,
@@ -1060,7 +1408,7 @@ export function schemesToGeoJson(c: ExportContext): string {
             limitation: c.faults.limitation,
           }
         : null,
-      ghatta_geology: c.geology
+      hydrorecon_geology: c.geology
         ? {
             dmg: c.geology.dmg
               ? {
@@ -1110,5 +1458,5 @@ export function download(filename: string, mime: string, text: string) {
 }
 
 export function fileStem(at: { lat: number; lon: number }): string {
-  return `ghatta_${at.lat.toFixed(4)}_${at.lon.toFixed(4)}`;
+  return `hydrorecon_${at.lat.toFixed(4)}_${at.lon.toFixed(4)}`;
 }

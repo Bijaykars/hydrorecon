@@ -5,7 +5,7 @@
  *
  * The upstream dataset is a CC BY 4.0 Sentinel-2 inventory of unique glacial
  * lakes in Nepal and the parts of China and India that drain through Nepal's
- * Koshi, Gandaki and Karnali basins. Ghatta keeps only identifiers, basin and
+ * Koshi, Gandaki and Karnali basins. HydroRecon keeps only identifiers, basin and
  * classification fields, elevation, published expansion diagnostics and the
  * EPSG:4326 centroid. Lake polygons and model weights are intentionally not
  * bundled: the centroid layer is sufficient for a conservative river-network
@@ -26,7 +26,7 @@ const TABLE = 's2_20172024_tb_gloid_uniquelakes_centroids_v1_0';
 const OUT = 'src/data/nepal-glacial-lakes.json';
 const TMP_OUT = `${OUT}.tmp`;
 const TMP_GPKG = `${OUT}.gpkg.tmp`;
-const UA = 'Ghatta/0.2 (open-source hydropower screening; github.com/Bijaykars)';
+const UA = 'HydroRecon/0.2 (open-source hydropower screening; github.com/Bijaykars)';
 
 const response = await fetch(API, {
   headers: { accept: 'application/json', 'user-agent': UA },

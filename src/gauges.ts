@@ -133,7 +133,9 @@ const AGREE_RATIO = 1.5;
  * one whose catchment is closest in size to the site's.
  */
 export async function gaugesFor(
-  path: readonly { lat: number; lon: number }[],
+  /** The studied reach. `networkIndex` is required: proximity alone cannot
+   *  establish that a gauge and a site share a river. */
+  path: readonly { lat: number; lon: number; networkIndex: number }[],
   studyUplandKm2: number | null
 ): Promise<Gauge[]> {
   if (path.length === 0) return [];
@@ -151,9 +153,13 @@ export async function gaugesFor(
     w = Math.min(w, p.lon);
   }
 
+  // Longitude degrees shrink by cos(lat); one pad for both dropped gauges that
+  // were inside the search radius by haversine.
+  const lonPad = pad / Math.max(0.2, Math.cos((((n + s) / 2) * Math.PI) / 180));
+
   const near: { st: RawStation; distanceKm: number }[] = [];
   for (const st of RIVER_GAUGES) {
-    if (st.y > n + pad || st.y < s - pad || st.x > e + pad || st.x < w - pad) continue;
+    if (st.y > n + pad || st.y < s - pad || st.x > e + lonPad || st.x < w - lonPad) continue;
     let best = Infinity;
     for (const p of path) {
       const d = haversineKm([st.y, st.x], [p.lat, p.lon]);
@@ -189,7 +195,7 @@ export async function gaugesFor(
 async function resolve(
   st: RawStation,
   distanceKm: number,
-  path: readonly { lat: number; lon: number }[],
+  path: readonly { lat: number; lon: number; networkIndex: number }[],
   studyUplandKm2: number | null
 ): Promise<Gauge> {
   const head = path[0];
@@ -226,15 +232,43 @@ async function resolve(
   }
 
   let relation: Relation = 'nearby catchment';
-  // Does water measured at the gauge flow past the study site? Walk down from
-  // the gauge and see whether the walk passes the head of the study reach.
+  /**
+   * Does water measured at the gauge actually flow past the study site?
+   *
+   * PROXIMITY IS NOT CONNECTION. This used to call a gauge `upstream` whenever
+   * its downstream walk came within 1.5 km of the study head, and `downstream`
+   * whenever the study's own walk came within 1.5 km of the gauge. In a Nepali
+   * valley 1.5 km reaches across the floor to a different river: run over every
+   * bundled station, 66 of 403 `upstream` and 35 of 144 `downstream` labels had
+   * no path between them in the directed network at all, and 28 of those were
+   * still marked trustworthy. Bagmati at Sundarijal was declared connected to
+   * Dhobi Khola at Chabahil; Tadi at Rautar to Likhu at Pattawari.
+   *
+   * So proximity still finds the CANDIDATE — it has to, because both
+   * coordinates snap imperfectly — and the directed network then has to agree
+   * that one reach really is reachable from the other. Catchment area supplies
+   * the second, independent check: water cannot flow from a larger catchment
+   * into a smaller one, so an "upstream" gauge draining more than the site, or
+   * a "downstream" gauge draining less, contradicts its own label.
+   */
+  const studyReaches = new Set(path.map((p) => p.networkIndex));
   const fromGauge = await downstreamPath(st.y, st.x, MAX_SEARCH_KM + 10, 0.25).catch(() => null);
-  if (fromGauge?.some((p) => haversineKm([p.lat, p.lon], [head.lat, head.lon]) <= CONNECT_KM)) {
-    relation = 'upstream';
-  } else if (path.some((p) => haversineKm([st.y, st.x], [p.lat, p.lon]) <= CONNECT_KM)) {
-    // The study reach's own downstream walk passes the gauge.
-    relation = 'downstream';
-  }
+
+  const gaugeReachesStudy =
+    fromGauge?.some(
+      (p) =>
+        studyReaches.has(p.networkIndex) &&
+        haversineKm([p.lat, p.lon], [head.lat, head.lon]) <= CONNECT_KM
+    ) ?? false;
+  const gaugeReachSet = new Set(fromGauge?.map((p) => p.networkIndex) ?? []);
+  const studyReachesGauge = path.some(
+    (p) =>
+      gaugeReachSet.has(p.networkIndex) &&
+      haversineKm([st.y, st.x], [p.lat, p.lon]) <= CONNECT_KM
+  );
+
+  if (gaugeReachesStudy) relation = 'upstream';
+  else if (studyReachesGauge) relation = 'downstream';
 
   const areaRatio =
     studyUplandKm2 && uplandKm2 && uplandKm2 > 0 ? studyUplandKm2 / uplandKm2 : null;
@@ -254,12 +288,58 @@ async function resolve(
     warnLevelM: st.w ?? null,
     dangerLevelM: st.g ?? null,
     areaRatio,
+    /**
+     * Trustworthy needs the catchment to point the same way the label does.
+     *
+     * `areaRatio` is site/gauge. An UPSTREAM gauge must drain no more than the
+     * site does (ratio ≥ 1) and a DOWNSTREAM one no less (ratio ≤ 1). Twelve of
+     * 344 trusted recommendations contradicted their own direction — an alleged
+     * downstream gauge on a smaller catchment than the site it is downstream of
+     * — which is impossible and a reliable sign the relation is wrong however
+     * the snapping produced it. A small tolerance absorbs per-vertex sampling
+     * noise without admitting a genuine inversion.
+     */
     trustworthy:
       relation !== 'nearby catchment' &&
       areaRatio !== null &&
       areaRatio >= RATIO_LO &&
-      areaRatio <= RATIO_HI,
+      areaRatio <= RATIO_HI &&
+      (relation === 'upstream' ? areaRatio >= 0.95 : areaRatio <= 1.05),
   };
+}
+
+/**
+ * DHM's register name, made fit to print.
+ *
+ * 71 of the 1,115 station names carry the department's own working annotations
+ * rather than a station name: `Bahrabise_h`, `Bharatpur_closed`,
+ * `Bhairahawa_AWOS_28`, `delete_Chisapani(Karnali)`, and one that reads in full
+ * `Melung_need coordinate merging with Koshi-Meslung`. Those went straight into
+ * the desk study's gauge table and its chart, which is how a professional
+ * report ends up printing another organisation's TODO list.
+ *
+ * The raw string is NOT discarded — exports keep `name` exactly as bundled, so
+ * a reader can still match a row back to DHM's register. This is a display
+ * transform: underscores become spaces, and a trailing annotation is lifted off
+ * the name and returned separately so the caller can show it as what it is.
+ * Nothing is invented; if a name is only an annotation, it stays.
+ */
+const ANNOTATION = /^(h|hourly|snow|closed|aws|awos|old|new|temp|tbc|\d+)$/i;
+
+export function stationDisplayName(raw: string): { name: string; note: string | null } {
+  const trimmed = raw.trim();
+  // The whole-string cases: a name that IS an instruction.
+  const inline = trimmed.match(/^(.*?)_(need\s.*|delete.*)$/i);
+  if (inline) return { name: inline[1].replace(/_/g, ' ').trim(), note: inline[2].trim() };
+  if (/^delete[_\s]/i.test(trimmed)) {
+    return { name: trimmed.replace(/^delete[_\s]+/i, '').replace(/_/g, ' ').trim(), note: 'marked for deletion in the register' };
+  }
+  // Otherwise peel trailing `_token` groups only while they look like tags.
+  const parts = trimmed.split('_');
+  const notes: string[] = [];
+  while (parts.length > 1 && ANNOTATION.test(parts[parts.length - 1])) notes.unshift(parts.pop()!);
+  const name = parts.join(' ').trim();
+  return { name: name || trimmed, note: notes.length ? notes.join(' ') : null };
 }
 
 /** One line saying what to actually do with this station. */

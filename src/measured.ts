@@ -56,6 +56,27 @@ const MAX_PLAUSIBLE_CMS = 400_000;
 
 const DELIMS = [',', '\t', ';', '|'];
 
+/**
+ * Discharge units this parser will convert, largest trap first.
+ *
+ * The header used to be read as decoration only. A column titled
+ * "Discharge (cfs)" holding 35.3147 was taken as 35.3147 m³/s rather than
+ * 1 m³/s — a 35× error that looks entirely plausible on a Nepali river, and
+ * L/s and m³/day are wrong by 1,000× and 86,400×.
+ *
+ * Order matters: the patterns are tried in sequence and "m3/day" has to be
+ * tested before the bare "m3" that would otherwise swallow it.
+ */
+const UNITS: { pattern: RegExp; factor: number; label: string }[] = [
+  { pattern: /(m3|m³)\s*\/?\s*(d|day)/i, factor: 1 / 86_400, label: 'm³/day' },
+  { pattern: /\b(cfs|ft3|ft³|cubic\s*feet)/i, factor: 0.028_316_846_592, label: 'cubic feet per second' },
+  { pattern: /\b(l\/s|lps|litres?\s*\/?\s*s|liters?\s*\/?\s*s)/i, factor: 0.001, label: 'litres per second' },
+  { pattern: /\b(m3\/s|m³\/s|cumec|cms)\b/i, factor: 1, label: 'm³/s' },
+];
+
+const unitOf = (header: string | undefined) =>
+  header ? UNITS.find((u) => u.pattern.test(header)) ?? null : null;
+
 /** Which separator makes the rows most consistently wide? */
 function sniffDelimiter(lines: string[]): string {
   let best = ',';
@@ -74,6 +95,39 @@ function sniffDelimiter(lines: string[]): string {
   }
   // A single column of bare numbers is legitimate and has no delimiter at all.
   return bestScore < 0 ? '\n' : best;
+}
+
+/**
+ * Split one row, honouring RFC 4180 quoting.
+ *
+ * A plain `split(delim)` cannot see that `"Ganges, at Chatara"` is one field,
+ * and it turns the thousands separator in `1,234` into a column break — so a
+ * flow of 1,234 m³/s was read as 1 and every column after it shifted left. The
+ * `num()` helper below strips thousands separators, but only ever saw them
+ * when the delimiter was a tab or semicolon.
+ */
+function splitDelimited(line: string, delim: string): string[] {
+  if (!line.includes('"')) return line.split(delim);
+  const out: string[] = [];
+  let field = '';
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (quoted) {
+      if (c === '"') {
+        if (line[i + 1] === '"') {
+          field += '"'; // an escaped quote inside a quoted field
+          i++;
+        } else quoted = false;
+      } else field += c;
+    } else if (c === '"') quoted = true;
+    else if (c === delim) {
+      out.push(field);
+      field = '';
+    } else field += c;
+  }
+  out.push(field);
+  return out;
 }
 
 /** A number, tolerating thousands separators and stray currency-style spacing. */
@@ -109,10 +163,23 @@ function parseDateCell(raw: string, dayFirst: boolean | null): string | null {
   return null;
 }
 
-const iso = (y: number, mo: number, d: number): string | null =>
-  mo >= 1 && mo <= 12 && d >= 1 && d <= 31
-    ? `${String(y).padStart(4, '0')}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    : null;
+const isLeapYear = (y: number) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/**
+ * An ISO date, or null if the calendar has no such day.
+ *
+ * The month length is checked, not just `d <= 31`. Accepting 2023-02-31 meant
+ * JavaScript's own normalisation later moved it into March while code that
+ * slices the month out of the string still read "02" — the same reading
+ * belonging to two different months in two different calculations.
+ */
+const iso = (y: number, mo: number, d: number): string | null => {
+  if (!(mo >= 1 && mo <= 12) || !(d >= 1)) return null;
+  const len = mo === 2 && isLeapYear(y) ? 29 : DAYS_IN_MONTH[mo - 1];
+  if (d > len) return null;
+  return `${String(y).padStart(4, '0')}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+};
 
 /**
  * Nepali records are often dated in Bikram Sambat, and BS cannot be converted
@@ -149,7 +216,7 @@ export function parseMeasured(text: string): ParseResult {
   if (rawLines.length === 0) return { ok: false, error: 'The file is empty.' };
 
   const delim = sniffDelimiter(rawLines);
-  const rows = rawLines.map((l) => (delim === '\n' ? [l] : l.split(delim)));
+  const rows = rawLines.map((l) => (delim === '\n' ? [l] : splitDelimited(l, delim)));
 
   // A header is a first row whose cells are mostly non-numeric.
   const firstNumeric = rows[0].filter((c) => Number.isFinite(num(c))).length;
@@ -206,17 +273,21 @@ export function parseMeasured(text: string): ParseResult {
 
   // Settle DD/MM versus MM/DD from the column itself rather than by convention.
   let dayFirst: boolean | null = null;
+  let sawSlashDates = false;
   if (dateCol >= 0) {
     let sawBigFirst = false;
     let sawBigSecond = false;
     for (const r of body) {
       const m = /^(\d{1,2})[-/.](\d{1,2})[-/.]\d{4}$/.exec((r[dateCol] ?? '').trim());
       if (!m) continue;
+      sawSlashDates = true;
       if (+m[1] > 12) sawBigFirst = true;
       if (+m[2] > 12) sawBigSecond = true;
     }
     if (sawBigFirst) dayFirst = true;
     else if (sawBigSecond) dayFirst = false;
+    // dayFirst stays null when every row is ambiguous — parseDateCell still has
+    // to choose, and it chooses day-first, but the reader is told below.
   }
 
   const notes: string[] = [];
@@ -227,21 +298,36 @@ export function parseMeasured(text: string): ParseResult {
   let noData = 0;
   let negatives = 0;
 
+  /** Convert to m³/s when the header names a unit this parser knows. */
+  const unit = unitOf(header?.[valueCol]);
+
+  let badDates = 0;
+
   for (const r of body) {
-    const v = num(r[valueCol] ?? '');
-    if (!Number.isFinite(v)) {
+    const raw = num(r[valueCol] ?? '');
+    if (!Number.isFinite(raw)) {
       skipped++;
       continue;
     }
-    if (NO_DATA.has(v)) {
+    if (NO_DATA.has(raw)) {
       noData++;
       continue;
     }
+    const v = unit ? raw * unit.factor : raw;
     if (Math.abs(v) > MAX_PLAUSIBLE_CMS) {
       skipped++;
       continue;
     }
-    if (v < 0) negatives++;
+    /**
+     * A negative discharge is a sensor flag, not water. Kept as a value it
+     * flowed into the monthly minimum, made the environmental release negative,
+     * and the engine — which SUBTRACTS that release — then added the water back:
+     * a 1 m³/s river with one -100 month produced 11 m³/s of design flow.
+     */
+    if (v < 0) {
+      negatives++;
+      continue;
+    }
 
     let d: string | null = null;
     if (dateCol >= 0) {
@@ -249,6 +335,17 @@ export function parseMeasured(text: string): ParseResult {
       d = parseDateCell(cell, dayFirst);
       const y = /^(\d{4})/.exec(cell) ?? /(\d{4})$/.exec(cell);
       if (y) bsYears.push(+y[1]);
+      /**
+       * A value whose date could not be read is dropped, not kept with a blank
+       * date. Keeping it meant gap-filling later discarded the undated row and
+       * INTERPOLATED across the hole it left — so a real reading of 100 was
+       * replaced by an invented 2, and the note said only that one day had been
+       * filled. Losing the value is honest; inventing one is not.
+       */
+      if (cell && !d) {
+        badDates++;
+        continue;
+      }
     }
     dates.push(d ?? '');
     values.push(v);
@@ -300,10 +397,35 @@ export function parseMeasured(text: string): ParseResult {
       (usableDates ? `, dated from column ${dateCol + 1}` : ', with no usable dates') +
       `. Separator: ${delim === '\n' ? 'single column' : delim === '\t' ? 'tab' : `"${delim}"`}.`
   );
+  if (unit && unit.factor !== 1)
+    notes.push(
+      `Column header names ${unit.label}; every value was multiplied by ` +
+        `${unit.factor} to reach m³/s. Check this is what the file means.`
+    );
+  else if (!unit)
+    notes.push(
+      'No unit could be read from the header, so the values are taken as m³/s. ' +
+        'If the file is in cfs, litres per second or m³/day, retitle the column ' +
+        'and re-import — nothing here can detect the difference from the numbers alone.'
+    );
   if (noData > 0) notes.push(`${noData} no-data markers dropped, not read as zero.`);
   if (skipped > 0) notes.push(`${skipped} rows could not be read and were skipped.`);
+  if (badDates > 0)
+    notes.push(
+      `${badDates} rows had a value but an unreadable date and were dropped rather ` +
+        'than interpolated over.'
+    );
   if (negatives > 0)
-    notes.push(`${negatives} negative values kept as recorded — they yield no power.`);
+    notes.push(
+      `${negatives} negative values dropped — discharge cannot be negative, and a ` +
+        'sensor flag left in the record would inflate the usable flow.'
+    );
+  if (dateCol >= 0 && dayFirst === null && sawSlashDates)
+    notes.push(
+      'Dates are written D/M/Y or M/D/Y and nothing in the column settles which — ' +
+        'no first field exceeded 12. They have been read DAY first. If the file is ' +
+        'American, the months are wrong; re-save as YYYY-MM-DD to be certain.'
+    );
   if (cadence === 'monthly')
     notes.push(
       'Monthly cadence detected. A flow-duration curve from monthly means understates ' +

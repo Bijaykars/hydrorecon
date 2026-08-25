@@ -1,6 +1,6 @@
 # Nepal ROR PPA reference energy value
 
-Ghatta values the selected scheme's already-dispatched wet and dry energy at the published Nepal
+HydroRecon values the selected scheme's already-dispatched wet and dry energy at the published Nepal
 Electricity Authority run-of-river base rates. This closes a useful arithmetic loop for early
 screening while deliberately stopping short of a revenue, cash-flow or bankability model.
 
@@ -13,7 +13,7 @@ The official [NEA PPA tariff page](https://www.nea.org.np/en/pages/ppa-tarrif-ra
 | Wet | NPR 4.80/kWh |
 | Dry | NPR 8.40/kWh |
 
-The decision offers two seasonal tests already calculated by Ghatta:
+The decision offers two seasonal tests already calculated by HydroRecon:
 
 - 6 wet + 6 dry months, requiring at least 30% dry-season energy; and
 - 8 wet + 4 dry months, requiring at least 15% dry-season energy.
@@ -49,7 +49,7 @@ The result is labelled **gross reference energy value at published NEA base rate
 - revenue, EBITDA, cash flow, NPV, IRR, LCOE or a bankability conclusion; or
 - a forecast of escalation or future tariff policy.
 
-Ghatta applies no escalation. The Board decision describes 3% simple escalation for eight years
+HydroRecon applies no escalation. The Board decision describes 3% simple escalation for eight years
 for eligible capacity, but the app does not know the project's PPA vintage, COD, escalation year
 or negotiated terms. For a screened scheme above 100 MW, the app warns that the decision allows a
 lower base rate where return on equity exceeds 17%; project-specific review is mandatory.

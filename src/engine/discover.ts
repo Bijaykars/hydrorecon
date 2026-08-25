@@ -157,6 +157,21 @@ const MAX_LEN_KM = 14;
 const MAX_SLOPE_M_PER_KM = 250;
 
 /**
+ * How far downstream a scheme may reach, km.
+ *
+ * It lives here rather than in the app because the validation harness must use
+ * the SAME number, and it did not: the app searched 22 km while the harness
+ * traced 40, so every measured figure came from a scheme no user could have
+ * been shown. It also dominated the result. Capacity grows monotonically with
+ * distance — further down means more head and more catchment — so a search that
+ * keeps the most energetic candidate always stops at the far end of whatever
+ * window it is given. Across the fleet the chosen waterway was 40.6 km at the
+ * median and never below 29, which is not a distribution but a clamp reading
+ * back the constant that produced it.
+ */
+export const SEARCH_KM = 22;
+
+/**
  * Rank by more than one thing, then keep only what nothing else beats outright.
  *
  * A scheme survives when no other scheme is at least as good on every axis and
@@ -197,6 +212,10 @@ export function evaluate(
   if (!Number.isFinite(zi) || !Number.isFinite(zj)) return null;
 
   const qAtClick = qAtClickPre ?? flowAtExceedance(buildFdc(series), exceedance);
+  // An empty or unusable record gives NaN here, and `NaN <= 0` is false — so
+  // without this the non-finite flow would run the whole way through and come
+  // out as a scheme with NaN power rather than as no scheme at all.
+  if (!Number.isFinite(qAtClick)) return null;
 
   /**
    * How much of the daily record actually arrives at THIS intake.
@@ -237,22 +256,43 @@ export function evaluate(
     grossHeadM: Math.max(0, gross),
     alongRiverM: waterwayKm * 1000,
   });
+  // Losses at or past the whole drop: there is no scheme here to report.
+  if (waterway?.lossExceedsHead) return null;
   const headLossFrac = waterway ? waterway.lossFrac : input.headLossFrac;
   const netForSelection = Math.max(0, gross) * (1 - headLossFrac);
   // Pick the machine for this duty point, then let its part-load curve drive
   // every day of the record. `efficiency` is the generator/transformer train
   // that sits behind the runner.
   const curve = turbineCurve(qDesign, netForSelection);
+  /**
+   * No machine, no scheme.
+   *
+   * When head and flow fall outside every turbine envelope the selector returns
+   * null, and this used to substitute the generator/transformer efficiency for
+   * the WHOLE conversion — arithmetically a 100% efficient runner. A 2,500 m,
+   * 9 m³/s duty point that no manufacturer builds for came back as 208 MW at a
+   * plant factor of 1, with the turbine row simply absent from the panel.
+   *
+   * Rejecting is the honest answer: the search drops the candidate, and a
+   * hand-dragged pair reports no result rather than an impossible one.
+   */
+  if (!curve) return null;
 
   const params: PlantParams = {
     grossHeadM: Math.max(0, gross),
     headLossFrac,
-    // Rated power uses the machine's own best-point efficiency when known.
-    efficiency: curve ? curve.peak * efficiency : efficiency,
+    /**
+     * Rated power is evaluated ON THE CURVE at design flow, not at the curve's
+     * best point. Peak efficiency generally occurs below full gate — for the
+     * audited Francis duty point it is 0.8989 against 0.8656 at design flow —
+     * so charging rated capacity at the peak made nameplate 3.8% higher than
+     * the efficiency the dispatch actually integrates.
+     */
+    efficiency: curve.at(qDesign) * efficiency,
     designFlowCms: qDesign,
     residualFlowCms: residualCms * ratio,
-    minFlowFrac: curve ? curve.minFlowFrac : input.minFlowFrac,
-    ...(curve ? { efficiencyAt: (q: number) => curve.at(q) * efficiency } : {}),
+    minFlowFrac: curve.minFlowFrac,
+    efficiencyAt: (q: number) => curve.at(q) * efficiency,
   };
   const scaled = ratio === 1 ? series : series.map((v) => v * ratio);
   const e = annualEnergy(scaled, params);
@@ -318,8 +358,16 @@ export function evaluate(
     plantFactor: e.grossPlantFactor,
     slopeMPerKm: gross / waterwayKm,
     gwhPerKm: e.gwhPerYear / waterwayKm,
-    turbine: curve?.type ?? null,
-    turbinePeak: curve?.peak ?? efficiency,
+    turbine: curve.type,
+    /**
+     * Runner efficiency AT DESIGN FLOW — the same factor rated capacity used,
+     * so the panel's `Q × H × η` line reproduces the MW beside it. It formerly
+     * carried the curve's peak (a different number from the one multiplied in)
+     * and, with no curve, the generator efficiency — which the panel then
+     * multiplied by the generator efficiency again, displaying 92% for a 96%
+     * calculation.
+     */
+    turbinePeak: curve.at(qDesign),
     waterway,
     powerDuration: duration
       ? {
@@ -351,8 +399,11 @@ export function discover(input: SchemeInput): DiscoverResult {
   if (n < 8) return { schemes: [], evaluated: 0, fdcAtClick };
 
   const spacingKm = path[1].km - path[0].km || 0.12;
-  const minSteps = Math.max(2, Math.round(MIN_LEN_KM / spacingKm));
-  const maxSteps = Math.max(minSteps + 1, Math.round(MAX_LEN_KM / spacingKm));
+  // Round UP to the minimum, DOWN from the maximum, so both bounds hold. With
+  // 0.12 km spacing, rounding to nearest made the 0.4 km floor three steps —
+  // 0.36 km — and the search then offered it as the shortest waterway.
+  const minSteps = Math.max(2, Math.ceil(MIN_LEN_KM / spacingKm));
+  const maxSteps = Math.max(minSteps + 1, Math.floor(MAX_LEN_KM / spacingKm) + 1);
   // Coarse stride keeps this interactive: ~every 500 m rather than every sample.
   const stride = Math.max(1, Math.round(0.5 / spacingKm));
 

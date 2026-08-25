@@ -43,7 +43,7 @@ if (!ROOT || !existsSync(ROOT)) {
   console.error('usage: node pipeline/build-local-gis.mjs "<path to the GIS folder>"');
   process.exit(1);
 }
-const OUT_DIR = "public/local";
+const OUT_DIR = "sources/local";
 if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
 
 // ---------------------------------------------------------------------------

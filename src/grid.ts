@@ -222,7 +222,20 @@ export function gridSubstationsGeoJson(): GeoJSON.FeatureCollection {
     features: GRID.subs.map((sub, index) => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [sub.x, sub.y] },
-      properties: { id: index, name: sub.n ?? 'Mapped substation', kv: sub.kv },
+      properties: {
+        id: index,
+        name: sub.n ?? 'Mapped substation',
+        kv: sub.kv,
+        kind: sub.k ?? '',
+        inferred: sub.i === 1 ? 1 : 0,
+        // What the map labels at working zoom: the name if OSM has one, and
+        // the voltage either way — the voltage is the engineering fact.
+        label: sub.n
+          ? `${sub.n}${sub.kv ? ` · ${sub.kv} kV` : ''}`
+          : sub.kv
+            ? `${sub.kv} kV`
+            : '',
+      },
     })),
   };
 }

@@ -1,6 +1,6 @@
 # Nepal environmental-flow policy-floor screen
 
-Ghatta prevents a Nepal study from using less than 10% of the lowest monthly average discharge as
+HydroRecon prevents a Nepal study from using less than 10% of the lowest monthly average discharge as
 its desktop environmental release. This is a legal-policy floor for screening, not an ecological
 flow assessment and not approval to construct or operate a diversion.
 
@@ -16,7 +16,7 @@ is retained as a second official source. Both were reviewed on 13 August 2026.
 
 ## Calculation
 
-For the active measured or modelled discharge record, Ghatta first calculates a mean for every
+For the active measured or modelled discharge record, HydroRecon first calculates a mean for every
 represented calendar month and takes the lowest monthly mean. The screening release is:
 
 ```text
@@ -45,7 +45,7 @@ An approved release regime needs project evidence that this desktop model does n
 - measurement location, accuracy, telemetry, reporting and compliance arrangements; and
 - the current approved EIA and licence/PPA conditions.
 
-Ghatta therefore leaves the legal/environmental gate open and writes these requirements into the
+HydroRecon therefore leaves the legal/environmental gate open and writes these requirements into the
 field investigation plan. CSV provenance records the selected fraction, source and non-claim.
 GeoJSON additionally records the selected scheme's release in cubic metres per second. Global mode
 exports no Nepal policy object and leaves its residual-flow minimum at zero so the host-country rule

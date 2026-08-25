@@ -107,8 +107,8 @@ const cascadeScreen = (direction: CascadeDirection): CascadeScreen => ({
   directAdvancedRecords: 0,
   registry: {
     geolocatedRecords: 1169,
-    canonicalRecords: 1167,
-    duplicateRowsCollapsed: 2,
+    canonicalRecords: 1168,
+    duplicateRowsCollapsed: 1,
     updated: '2026-08-01',
     retrieved: '2026-08-13',
     source: 'https://doed.gov.np/',

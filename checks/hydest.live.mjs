@@ -103,35 +103,35 @@ const [geoDownload] = await Promise.all([
 const geoPath = await geoDownload.path();
 if (!geoPath) throw new Error('GeoJSON download has no readable path');
 const geo = JSON.parse(await readFile(geoPath, 'utf8'));
-if (!geo.ghatta_hydest) throw new Error('GeoJSON omitted regional hydrology');
-if (geo.ghatta_hydest.floods?.length !== 7) throw new Error('GeoJSON omitted return periods');
-if (!/not selected design floods/i.test(geo.ghatta_hydest.provenance?.interpretation ?? '')) {
+if (!geo.hydrorecon_hydest) throw new Error('GeoJSON omitted regional hydrology');
+if (geo.hydrorecon_hydest.floods?.length !== 7) throw new Error('GeoJSON omitted return periods');
+if (!/not selected design floods/i.test(geo.hydrorecon_hydest.provenance?.interpretation ?? '')) {
   throw new Error('GeoJSON regional-hydrology non-claim missing');
 }
-if (!/^[a-f0-9]{64}$/.test(geo.ghatta_hydest.provenance?.bundle?.output?.sha256 ?? '')) {
+if (!/^[a-f0-9]{64}$/.test(geo.hydrorecon_hydest.provenance?.bundle?.output?.sha256 ?? '')) {
   throw new Error('GeoJSON output checksum missing');
 }
-if (!geo.ghatta_flow_choice?.authority) throw new Error('GeoJSON omitted the selected flow authority');
-if (geo.ghatta_nea_ror_ppa?.wetNprPerKwh !== 4.8 || geo.ghatta_nea_ror_ppa?.dryNprPerKwh !== 8.4) {
+if (!geo.hydrorecon_flow_choice?.authority) throw new Error('GeoJSON omitted the selected flow authority');
+if (geo.hydrorecon_nea_ror_ppa?.wetNprPerKwh !== 4.8 || geo.hydrorecon_nea_ror_ppa?.dryNprPerKwh !== 8.4) {
   throw new Error('GeoJSON omitted the official NEA base-rate metadata');
 }
-if (!/not a PPA entitlement/i.test(geo.ghatta_nea_ror_ppa?.interpretation ?? '')) {
+if (!/not a PPA entitlement/i.test(geo.hydrorecon_nea_ror_ppa?.interpretation ?? '')) {
   throw new Error('GeoJSON PPA non-claim missing');
 }
-if (!/ESHA 2004.*section 3\.7/i.test(geo.ghatta_power_duration?.reference ?? '')) {
+if (!/ESHA 2004.*section 3\.7/i.test(geo.hydrorecon_power_duration?.reference ?? '')) {
   throw new Error('GeoJSON power-duration method metadata missing');
 }
-if (geo.ghatta_unit_count_sensitivity?.unitCounts?.join(',') !== '1,2,3,4' ||
-    !/not a selected unit arrangement/i.test(geo.ghatta_unit_count_sensitivity?.interpretation ?? '')) {
+if (geo.hydrorecon_unit_count_sensitivity?.unitCounts?.join(',') !== '1,2,3,4' ||
+    !/not a selected unit arrangement/i.test(geo.hydrorecon_unit_count_sensitivity?.interpretation ?? '')) {
   throw new Error('GeoJSON unit-count sensitivity method/non-claim missing');
 }
-if (geo.ghatta_nepal_environmental_flow?.minimumFractionOfLowestMonthlyMean !== 0.1) {
+if (geo.hydrorecon_nepal_environmental_flow?.minimumFractionOfLowestMonthlyMean !== 0.1) {
   throw new Error('GeoJSON omitted the Nepal environmental-flow policy floor');
 }
-if (geo.ghatta_nepal_environmental_flow?.selectedFractionOfLowestMonthlyMean < 0.1) {
+if (geo.hydrorecon_nepal_environmental_flow?.selectedFractionOfLowestMonthlyMean < 0.1) {
   throw new Error('GeoJSON exported a sub-policy Nepal environmental-flow fraction');
 }
-if (!/higher of at least 10%.*EIA-required minimum/is.test(geo.ghatta_nepal_environmental_flow?.interpretation ?? '')) {
+if (!/higher of at least 10%.*EIA-required minimum/is.test(geo.hydrorecon_nepal_environmental_flow?.interpretation ?? '')) {
   throw new Error('GeoJSON environmental-flow higher-EIA rule missing');
 }
 const chosenLine = geo.features.find((feature) =>
@@ -169,7 +169,7 @@ if (!unitSensitivity.some((scenario) =>
 if (!(chosenLine?.properties?.residual_flow_m3s >= 0)) {
   throw new Error('selected scheme GeoJSON omitted its environmental release');
 }
-if (Math.abs(chosenLine.properties.residual_flow_m3s - geo.ghatta_nepal_environmental_flow.selectedReleaseCms) > 0.001) {
+if (Math.abs(chosenLine.properties.residual_flow_m3s - geo.hydrorecon_nepal_environmental_flow.selectedReleaseCms) > 0.001) {
   throw new Error('selected scheme release disagrees with environmental-flow export metadata');
 }
 if (chosenLine.properties.capacity_MW > 100 && !/above the posted-rate 100 MW boundary/i.test(pageText)) {
@@ -235,9 +235,9 @@ const [globalDownload] = await Promise.all([
 const globalPath = await globalDownload.path();
 if (!globalPath) throw new Error('global GeoJSON download has no readable path');
 const globalGeo = JSON.parse(await readFile(globalPath, 'utf8'));
-if (globalGeo.ghatta_hydest !== null) throw new Error('global GeoJSON inherited Nepal regional hydrology');
-if (globalGeo.ghatta_nea_ror_ppa !== null) throw new Error('global GeoJSON inherited Nepal PPA metadata');
-if (globalGeo.ghatta_nepal_environmental_flow !== null) throw new Error('global GeoJSON inherited Nepal environmental-flow policy');
+if (globalGeo.hydrorecon_hydest !== null) throw new Error('global GeoJSON inherited Nepal regional hydrology');
+if (globalGeo.hydrorecon_nea_ror_ppa !== null) throw new Error('global GeoJSON inherited Nepal PPA metadata');
+if (globalGeo.hydrorecon_nepal_environmental_flow !== null) throw new Error('global GeoJSON inherited Nepal environmental-flow policy');
 const globalScheme = globalGeo.features.find((feature) => feature.properties?.part === 'diverted reach');
 if (globalScheme?.properties?.NEA_8plus4_gross_base_rate_reference_million_NPR_per_year !== null) {
   throw new Error('global scheme inherited a Nepal PPA reference value');
@@ -260,21 +260,21 @@ if (relevantFailures.length) throw new Error(`failed requests:\n${relevantFailur
 
 console.log(JSON.stringify({
   nepalPanel: {
-    months: geo.ghatta_hydest.months.length,
-    returnPeriods: geo.ghatta_hydest.floods.length,
+    months: geo.hydrorecon_hydest.months.length,
+    returnPeriods: geo.hydrorecon_hydest.floods.length,
     terminology: 'regional estimates; explicit non-design claim',
     sourceLinks: true,
   },
-  exports: { geojsonProvenance: true, fieldPlanRequirements: true, flowAuthority: geo.ghatta_flow_choice.authority },
+  exports: { geojsonProvenance: true, fieldPlanRequirements: true, flowAuthority: geo.hydrorecon_flow_choice.authority },
   ppaReference: {
-    ratesNprPerKwh: [geo.ghatta_nea_ror_ppa.wetNprPerKwh, geo.ghatta_nea_ror_ppa.dryNprPerKwh],
+    ratesNprPerKwh: [geo.hydrorecon_nea_ror_ppa.wetNprPerKwh, geo.hydrorecon_nea_ror_ppa.dryNprPerKwh],
     bothSeasonOptionsVisible: true,
     explicitNonRevenueClaim: true,
   },
   environmentalFlow: {
     nepalMinimumFraction: nepalResidual.min,
-    selectedFraction: geo.ghatta_nepal_environmental_flow.selectedFractionOfLowestMonthlyMean,
-    releaseCms: geo.ghatta_nepal_environmental_flow.selectedReleaseCms,
+    selectedFraction: geo.hydrorecon_nepal_environmental_flow.selectedFractionOfLowestMonthlyMean,
+    releaseCms: geo.hydrorecon_nepal_environmental_flow.selectedReleaseCms,
     higherEiaRule: true,
     globalPolicyIsolation: true,
   },
@@ -293,7 +293,7 @@ console.log(JSON.stringify({
     noCostOrRecommendationClaim: true,
   },
   mobile,
-  globalMode: 'regional panel absent and ghatta_hydest null',
+  globalMode: 'regional panel absent and hydrorecon_hydest null',
   consoleErrors: consoleErrors.length,
   failedRequests: relevantFailures.length,
 }, null, 2));

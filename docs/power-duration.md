@@ -1,6 +1,6 @@
 # Daily hydrological power-duration screen
 
-Ghatta reports the power equalled or exceeded on 90% and 95% of usable daily record values for
+HydroRecon reports the power equalled or exceeded on 90% and 95% of usable daily record values for
 every retained layout. These figures answer a different question from P90 annual energy:
 
 - **daily P90/P95 output** ranks dispatched power across individual record days; and
@@ -8,7 +8,7 @@ every retained layout. These figures answer a different question from P90 annual
 
 The [ESHA 2004 *Guide on How to Develop a Small Hydropower Plant*, section
 3.7](https://energypedia.info/images/c/ca/Part_1_guide_on_how_to_develop_a_small_hydropower_plant-_final1.pdf)
-uses 90–95% availability of power as the screening range when discussing firm energy. Ghatta uses
+uses 90–95% availability of power as the screening range when discussing firm energy. HydroRecon uses
 those exceedances as an empirical hydrological screen but deliberately does not call the result firm
 capacity.
 
@@ -25,7 +25,7 @@ net head(Q) = gross head × [1 - design-loss fraction × (Q / design Q)²]
 power(Q) = ρ × g × turbine flow × net head(Q) × part-load efficiency(Q)
 ```
 
-The daily powers are sorted by exceedance using the same Weibull plotting positions as Ghatta's
+The daily powers are sorted by exceedance using the same Weibull plotting positions as HydroRecon's
 flow-duration curve. P90 is the power equalled or exceeded on 90% of usable days; P95 uses 95%.
 The result also records the number of evaluated days and the fraction with zero output. A dry-day
 turbine shutdown remains zero rather than being interpolated into fictitious generation.

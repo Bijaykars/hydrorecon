@@ -182,7 +182,16 @@ export function annualMeanCms(input: HydestInput): number | null {
  * low flows are where model error is proportionally largest.
  */
 export function driestMonthFlow(input: HydestInput): { month: number; cms: number } | null {
-  const all = drySeasonFlows(input);
+  /**
+   * Search every month the regression can answer, not only the rainfall-free
+   * five. With MMP present all twelve are available, and restricting the scan
+   * to January–May meant a genuine November or December minimum could never be
+   * reported: across 34,669 complete bundled inputs, 31 had their true modelled
+   * minimum outside that window, overstating the dry-season floor by up to 13%.
+   * Without MMP `allMonthlyFlows` returns exactly the five, so this is the same
+   * answer as before wherever it was previously correct.
+   */
+  const all = allMonthlyFlows(input);
   if (all.length === 0) return null;
   return all.reduce((a, b) => (b.cms < a.cms ? b : a));
 }

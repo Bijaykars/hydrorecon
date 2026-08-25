@@ -30,7 +30,7 @@ const ENDPOINTS = [
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass-api.de/api/interpreter',
 ];
-const UA = 'Ghatta/0.2 (open-source hydropower screening; github.com/Bijaykars)';
+const UA = 'HydroRecon/0.2 (open-source hydropower screening; github.com/Bijaykars)';
 const OUT = 'src/data/nepal-protected.json';
 
 /** Below this a polygon is a village pond tagged nature_reserve, not a park. */

@@ -126,7 +126,7 @@ that file grows with every new formula).
 
 ### 2.6 Naming
 
-"RiverPower" described a screening toy. Proposal: **Ghatta** (घट्ट — the traditional Nepali water
+"RiverPower" described a screening toy. Proposal: **HydroRecon** (घट्ट — the traditional Nepali water
 mill) — short, Nepali, hydropower-rooted; subtitle "open hydropower engineering workbench".
 Alternatives: *Prabaha* (प्रवाह, flow), or plain *Hydro Workbench*. Trivial to change; the plan
 uses "the workbench" throughout.

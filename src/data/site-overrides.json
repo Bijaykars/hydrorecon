@@ -1,0 +1,15 @@
+{
+ "_what": "Catchment areas pinned from a named document, overriding what the mapped network and MERIT infer at that point. Inputs only — never an output, never a capacity, never anything fitted to make a prediction match a built plant.",
+ "_rule": "An entry needs a source a stranger could check. 'It looked wrong' is not a source; a licence document, a feasibility study, a DHM publication or a published headworks figure is. Anything without one belongs in the code as a documented failure, not in here as a correction.",
+ "_whyNotMore": "Nepal's public gauge records carry flows, not catchment areas, so there is no bulk import to do here. This table grows one sourced document at a time and is deliberately small.",
+ "overrides": [
+  {
+   "name": "Upper Tamakoshi headworks",
+   "lat": 27.924,
+   "lon": 86.2139,
+   "radiusKm": 1.5,
+   "uplandKm2": 1745,
+   "source": "Upper Tamakoshi Hydropower Project, published headworks catchment 1745 km2; position is OSM 'Upper Tamakoshi Headworks Diversion Dam' (way centre), the same coordinate pipeline/plants.json cites. MERIT reads about 1741 km2 here, so this entry changes almost nothing and exists as the worked example of the format."
+  }
+ ]
+}

@@ -56,9 +56,24 @@ await ok('the official bundle has a stable, explicit duplicate-lifecycle audit',
   const all = await loadLicences();
   const canonical = canonicalDoedProjects(all);
   assert.equal(all.length, 1169);
-  assert.equal(canonical.length, 1167);
-  assert.equal(all.length - canonical.length, 2);
+  /**
+   * ONE collapse, not two.
+   *
+   * Keying on name and capacity alone merged two genuinely different survey
+   * applications — licence 10327 (Nicholas Energy, Lapha Gad) and 10403
+   * (Namaste Energy, Lapatgad), both "Laphagad Hydropower Project, 4.6 MW" —
+   * and quietly deleted one from every cascade and neighbour screen. Adding the
+   * river to the key keeps them apart while still collapsing the one real
+   * lifecycle pair, Isuwa Pror Cascade-2 moving from survey to construction.
+   */
+  assert.equal(canonical.length, 1168);
+  assert.equal(all.length - canonical.length, 1);
   assert.equal(new Set(canonical.map(doedProjectKey)).size, canonical.length);
+
+  // The two Laphagad applications must both survive, on their own licences.
+  const laphagad = canonical.filter((p) => /laphagad/i.test(p.name));
+  assert.equal(laphagad.length, 2, 'two distinct Laphagad applications must not be merged');
+  assert.equal(new Set(laphagad.map((p) => p.licenceNo)).size, 2);
 });
 
 await ok('the bundled directed screen separates direct, upstream and downstream records', async () => {
@@ -87,7 +102,7 @@ await ok('the bundled directed screen separates direct, upstream and downstream 
     assert.ok(screen.upstream.length > 50, 'a high-order Kali Gandaki reach should discover many upstream candidates');
     assert.ok(screen.downstream.length > 0);
     assert.equal(screen.registry.geolocatedRecords, 1169);
-    assert.equal(screen.registry.canonicalRecords, 1167);
+    assert.equal(screen.registry.canonicalRecords, 1168);
     assert.equal(screen.directReachRecords, direct.length);
     const directKeys = new Set(direct.map(doedProjectKey));
     const candidates = [...screen.upstream, ...screen.downstream];

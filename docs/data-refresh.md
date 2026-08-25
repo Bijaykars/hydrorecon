@@ -1,6 +1,6 @@
 # Data refresh and integrity policy
 
-Ghatta is a screening tool, so a stale contextual layer is less dangerous than
+HydroRecon is a screening tool, so a stale contextual layer is less dangerous than
 an incomplete layer that silently says “nothing here.” Builders therefore fail
 closed: the existing verified bundle remains in place until a complete new
 extract has been assembled and checked.

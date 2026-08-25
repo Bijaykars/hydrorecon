@@ -1,6 +1,6 @@
 # Engineering-geology source screen
 
-Ghatta now answers two narrow desk-study questions before an engineer goes to the field:
+HydroRecon now answers two narrow desk-study questions before an engineer goes to the field:
 
 1. Which official Nepal Department of Mines and Geology (DMG) 1:50,000 map publications have
    catalog footprints touching the selected river reach?
@@ -18,7 +18,7 @@ official preview links. DMG describes the images as low-resolution publication i
 usable-quality maps are available as hard-copy purchase products, and says digital versions cannot
 currently be purchased. The same page is marked "All Rights Reserved."
 
-For that reason, Ghatta bundles only factual catalog metadata and derived sheet footprints. It does
+For that reason, HydroRecon bundles only factual catalog metadata and derived sheet footprints. It does
 not copy, tile, trace geological contacts from, or redistribute the preview images. A matching
 result is a named product for the engineer to obtain under DMG's current terms.
 
@@ -33,7 +33,7 @@ geologically unmapped or unexplored by DMG. Therefore:
 ## Footprint derivation and coordinate handling
 
 DMG titles publish either the Nepal Survey Department grid (`2785 02`, `2884 15`, including A-D
-quarter sheets and lower halves) or legacy Survey of India codes (`62 P/15`, `72 E/2`). Ghatta
+quarter sheets and lower halves) or legacy Survey of India codes (`62 P/15`, `72 E/2`). HydroRecon
 derives the rectangular footprint from those identifiers. The modern layout is checked against the
 official Survey Department [topographic sheet index](https://www.dos.gov.np/download/download/nepalese-journal-on-geoinformatics-vol-3/downloads);
 legacy codes are checked against the official Survey of India indexing system and DMG's own map
@@ -46,7 +46,7 @@ coordinates.
 
 The snapshot stores footprints as EPSG:4326 bounds in explicit `[west, south, east, north]` order.
 Reach/rectangle matching is topological and includes a reach on a sheet edge; it performs no metric
-distance calculation in geographic coordinates. Existing distance analyses elsewhere in Ghatta use
+distance calculation in geographic coordinates. Existing distance analyses elsewhere in HydroRecon use
 local metric frames, not Web Mercator.
 
 Refresh with:
@@ -61,7 +61,7 @@ the snapshot. `checks/geology.check.ts` then validates coordinates and intersect
 
 ## Macrostrat regional samples
 
-Ghatta calls Macrostrat's keyless geologic-map API at only three named points: intake, midpoint and
+HydroRecon calls Macrostrat's keyless geologic-map API at only three named points: intake, midpoint and
 powerhouse. It preserves the returned map/source IDs, unit name, lithology, age fields, licence and
 original source reference. Macrostrat provides its data under CC BY 4.0 and requires attribution to
 Macrostrat plus the original source returned by the API.
@@ -83,7 +83,7 @@ The result cannot establish:
 
 Nepal's Water Resources Research and Development Center publishes an official
 [rainfall-induced landslide susceptibility app](https://wrerc.gov.np/content/39/rainfall-induced-landslide-susceptibility-map-of-nepal/).
-Ghatta links it as a separate evidence source but does not import its raster/classes because an
+HydroRecon links it as a separate evidence source but does not import its raster/classes because an
 explicit reusable data licence and supported export were not identified. Engineers should inspect
 it together with inventory, terrain connectivity, rainfall, river erosion, roads, geology, faults and
 field evidence; susceptibility is not runout, frequency, magnitude or design action.

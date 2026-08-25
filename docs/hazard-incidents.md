@@ -1,6 +1,6 @@
 # Nepal BIPAD recorded-incident screen
 
-Ghatta uses the Government of Nepal [BIPAD incident API](https://bipadportal.gov.np/api/)
+HydroRecon uses the Government of Nepal [BIPAD incident API](https://bipadportal.gov.np/api/)
 to answer one narrow, useful question:
 
 > Which approved, verified natural-hazard reports are mapped close enough to this proposed layout
@@ -42,7 +42,7 @@ The result is an investigation inventory:
 - incident history alone never triggers a stop decision.
 
 For floods and GLOFs, Euclidean proximity is particularly incomplete. A distant upstream source can
-matter while a nearby point in another catchment does not. Ghatta therefore also runs a conservative
+matter while a nearby point in another catchment does not. HydroRecon therefore also runs a conservative
 directed HydroRIVERS candidate screen for relevant report points and open glacial-lake centroids.
 That added topology does not prove that the report is the source, that material entered the channel,
 or that an outburst/flood wave reaches the project. See [the upstream connectivity method](upstream-connectivity.md).

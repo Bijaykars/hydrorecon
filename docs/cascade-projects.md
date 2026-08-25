@@ -8,7 +8,7 @@ Hydropower engineers need two different answers from the Department of Electrici
 2. Which other registered projects may sit upstream or downstream on the directed river network
    and therefore deserve hydraulic, operating, emergency-response or cumulative-impact review?
 
-Ghatta keeps these questions separate. A nearby coordinate range can be a direct legal/layout
+HydroRecon keeps these questions separate. A nearby coordinate range can be a direct legal/layout
 constraint. A network relationship inferred from a published midpoint is only a discovery lead.
 
 ## Direct reach screen
@@ -59,7 +59,7 @@ scope are checked. Candidate relations never create an automatic stop.
 
 CSV and GeoJSON exports retain direction, route distance, midpoint snap, published-range diagonal,
 stage, source dates, thresholds and the non-claim. GeoJSON contains both midpoint points and the
-retained generalized HydroRIVERS routes under `ghatta_cascade` provenance.
+retained generalized HydroRIVERS routes under `hydrorecon_cascade` provenance.
 
 ## What it does not establish
 
@@ -92,7 +92,7 @@ The engineering need is also visible in Nepal Electricity Authority's
 [Generation Directorate 2021/22 report](https://www.nea.org.np/admin/assets/uploads/annual_publications/Generation_2021-22.pdf),
 which describes Kulekhani III as a cascade using regulated Kulekhani II tailrace flow plus natural
 tributary flow. That documented example supports the need for interface analysis; it is not used to
-calibrate or validate Ghatta's midpoint classifier.
+calibrate or validate HydroRecon's midpoint classifier.
 
 `checks/cascade.check.ts` protects lifecycle deduplication, official bundle counts, separation of
 direct/upstream/downstream records, direction labels, snap/route thresholds, geometry caps and

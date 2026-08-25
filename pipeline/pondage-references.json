@@ -1,0 +1,28 @@
+{
+  "_what": "Surveyed reservoirs with published stage/area/storage figures, for scoring the pondage screen against something real rather than against a synthetic fixture.",
+  "_why": "Every other headline number in HydroRecon is measured against reality — flow against 69 DHM gauges, capacity against 104 commissioned plants, head against two terrain products. Pondage was measured against an 18-cell bowl whose answer was true by construction. This is the reference set that changes that.",
+  "_caution": "A modern DEM over an EXISTING reservoir samples the water surface, not the drowned valley. So these sites test the fill, the barrier and the shoreline integration against a real, complex shoreline at a known level; they cannot test the stage-storage relation below that level, because no bathymetry is present in the raster. Read `test` on each entry for what it is actually claiming.",
+  "reservoirs": [
+    {
+      "name": "Kulekhani (Indrasarobar)",
+      "river": "Kulekhani Khola",
+      "country": "Nepal",
+      "dam": { "lat": 27.590278, "lon": 85.155833 },
+      "damCoordinateNote": "27°35′25″N 85°9′21″E as published, converted to decimal degrees.",
+      "commissioned": 1982,
+      "fullSupplyLevelM": 1530,
+      "surfaceAreaKm2": 2.2,
+      "grossStorageMm3": 85.3,
+      "liveStorageMm3": 73.3,
+      "inactiveStorageMm3": 12.0,
+      "catchmentKm2": 126,
+      "damHeightM": 114,
+      "damCrestLengthM": 397,
+      "source": "https://en.wikipedia.org/wiki/Kulekhani_Reservoir",
+      "sourceRetrieved": "2026-08-24",
+      "sourceNote": "Secondary source compiling World Bank project documentation. Good enough to falsify a screening tool by a factor of two; NOT good enough to calibrate one. Replace with the NEA/DoED design report if it can be obtained.",
+      "test": "area-at-known-level",
+      "testNote": "The reservoir predates every DEM the app uses, so the raster carries its water surface as a flat plateau. Filling from a seed in that plateau to the plateau's own elevation should reproduce the published 2.2 km2 surface area. That scores the connected fill, the dam barrier and the area integration against a real shoreline. It does not score storage: the volume below the water surface is not in the raster, so a predicted storage here is a lower bound on the published 85.3 Mm3 by construction, not an error."
+    }
+  ]
+}

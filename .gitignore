@@ -28,4 +28,61 @@ pipeline/.cache/
 
 # Private GIS layers — supplied through a private channel, licences unverified,
 # HERMES local units are explicitly non-redistributable. Local use only.
-public/local/
+# Served by a dev-only Vite route so they never reach dist/ (they used to).
+sources/local/
+
+# Private DHM daily discharge records — supplied privately, not redistributable.
+# The derived index in src/data/dhm-records.json travels; the records do not.
+sources/dhm/
+
+# MERIT Hydro tiles — licensed to one user under CC-BY-NC 4.0 via a registered
+# download, and the terms forbid redistributing the originals. The derived
+# per-vertex catchment areas travel; the GeoTIFFs do not.
+sources/merit-hydro/
+
+# GloFAS reanalysis subset for Nepal. Large, ECMWF's to distribute, and
+# reproducible from pipeline/fetch-glofas-nepal.py.
+sources/glofas/
+
+# GEDTM30 is CC-BY-4.0 and redistributable; this is a ~1 GB derived raster kept
+# out of the repository for size, not for licence. pipeline/build-gedtm-nepal.py
+# rebuilds it from the public COG.
+sources/gedtm/
+
+# ESA WorldCover is CC-BY-4.0 and redistributable; this is a ~600 MB derived
+# raster kept out of the repository for size, not for licence.
+# pipeline/build-worldcover-nepal.py rebuilds it from the public COGs.
+sources/worldcover/
+
+# Nepal DMG province geological maps, rendered to tiles. Free downloads from the
+# publishing department, but DMG sells printed sheets: derived tiles stay local.
+# pipeline/build-dmg-geology.py rebuilds them.
+sources/geology/
+
+# Private and supplied layers. CLAUDE.md has always CLAIMED these two were
+# ignored and they were not — 200 MB of supplied data sat one `git add -A`
+# away from the history. Found by `git check-ignore` while adding the RDS
+# rules below; the lesson is that a claim in a document is not a rule on disk.
+sources/gem-pga/
+sources/icimod-pdgl/
+
+# ICIMOD RDS downloads. All CC-BY-4.0 and re-downloadable from rds.icimod.org
+# with one sign-in, so these are gitignored for SIZE, not licence — FRTC's
+# forest-type raster alone unpacks to 4.2 GB.
+sources/icimod-rds/
+sources/icimod-geology/
+
+# Rendered desk studies. pipeline/render-report.mjs makes one for any site;
+# they are 2.5 MB of a specific place and belong to a session, not the repo.
+report.pdf
+*.report.pdf
+
+# Build and scratch artefacts, not source.
+pipeline/__pycache__/
+tmp/
+checks/.osm-snapped.json
+
+# Dated safety copies of accumulated measurement output. The live file is
+# tracked because CLAUDE.md's accuracy table rests on it; its backups are a
+# local undo, not history.
+src/data/*.backup-*.json

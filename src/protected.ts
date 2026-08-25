@@ -45,6 +45,12 @@ export type ProtectedHit = {
    * where inside and outside cannot honestly be distinguished.
    */
   nearEdge: boolean;
+  /**
+   * Distance to the boundary, km — set only by `protectedNear`, where the point
+   * is outside. `edgeDistDeg` already scales longitude by cos(lat), so its
+   * degrees convert straight to km.
+   */
+  distanceKm?: number;
 };
 
 /** Roughly the simplification tolerance, in degrees. */
@@ -124,7 +130,14 @@ export function protectedNear(lat: number, lon: number, km = 3): ProtectedHit[] 
     if (inside(lat, lon, a.rings)) continue;
     const d = edgeDistDeg(lat, lon, a.rings);
     if (d <= tol) {
-      out.push({ name: a.n, regime: a.r, kind: a.k, areaKm2: a.a, nearEdge: true });
+      out.push({
+        name: a.n,
+        regime: a.r,
+        kind: a.k,
+        areaKm2: a.a,
+        nearEdge: true,
+        distanceKm: d * 111.32,
+      });
     }
   }
   return out;

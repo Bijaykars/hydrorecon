@@ -53,6 +53,7 @@ const CACHE = 'pipeline/.cache';
 const ZIP = `${CACHE}/hybas_as_lev12.zip`;
 const RIVERS = 'public/nepal-rivers.dat';
 const OUT = 'public/nepal-hypso.dat';
+const ELEV_OUT = 'public/nepal-elev.dat';
 
 /** Same window the bundled river network covers. */
 const COVER = { west: 79.9, south: 26.2, east: 88.4, north: 30.6 };
@@ -284,6 +285,17 @@ console.log(`  ${((covered / (NX * NY)) * 100).toFixed(1)}% of the window falls 
 const nBasins = basins.length;
 const cellsTotal = new Float64Array(nBasins);
 const cellsBelow = CONTOURS.map(() => new Float64Array(nBasins));
+/**
+ * Area-weighted elevation, for the catchment's AVERAGE ALTITUDE.
+ *
+ * The Modified HYDEST regression that Nepali offices run takes average
+ * catchment altitude as an input, with a coefficient of about 1.4 on its
+ * logarithm — so a 20% error in the altitude is a 28% error in the flow, and it
+ * cannot be estimated from the two contour fractions this file already writes.
+ * Every cell's elevation is already in hand at this point in the sweep and was
+ * being thrown away after the contour test; accumulating it costs one addition.
+ */
+const cellsElev = new Float64Array(nBasins);
 
 console.log(`sampling terrain at z${DEM_ZOOM}…`);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -383,6 +395,7 @@ for (let row = 0; row < NY; row++) {
     const z = elevAt(lat, COVER.west + (c + 0.5) * STEP);
     if (!Number.isFinite(z)) continue;
     cellsTotal[bi] += w;
+    cellsElev[bi] += z * w;
     for (let k = 0; k < CONTOURS.length; k++) if (z < CONTOURS[k]) cellsBelow[k][bi] += w;
   }
 }
@@ -399,12 +412,17 @@ const order = basins.map((_, i) => i).sort((a, b) => basins[b].sort - basins[a].
 
 const accTotal = Float64Array.from(cellsTotal);
 const accBelow = cellsBelow.map((v) => Float64Array.from(v));
+const accElev = Float64Array.from(cellsElev);
 for (const i of order) {
   const d = byId.get(basins[i].next);
   if (d === undefined) continue; // flows out of the window, or terminal
   accTotal[d] += accTotal[i];
   for (let k = 0; k < CONTOURS.length; k++) accBelow[k][d] += accBelow[k][i];
+  accElev[d] += accElev[i];
 }
+
+/** Mean elevation of the accumulated catchment, metres. */
+const meanElev = Float64Array.from(accTotal, (t, i) => (t > 0 ? accElev[i] / t : NaN));
 
 const fracs = CONTOURS.map((_, k) =>
   Float64Array.from(accTotal, (t, i) => (t > 0 ? accBelow[k][i] / t : NaN))
@@ -436,6 +454,7 @@ for (let i = 0; i < count; i++) {
 }
 
 const out = Buffer.alloc(count * 2);
+const elevOut = new Uint16Array(count);
 let attached = 0;
 for (let i = 0; i < count; i++) {
   let x = 0;
@@ -460,13 +479,19 @@ for (let i = 0; i < count; i++) {
   const row = Math.floor((lastLat - COVER.south) / STEP);
   let f5 = NaN;
   let f3 = NaN;
+  let mz = NaN;
   if (col >= 0 && col < NX && row >= 0 && row < NY) {
     const bi = cellBasin[row * NX + col];
     if (bi >= 0) {
       f5 = fracs[0][bi];
       f3 = fracs[1][bi];
+      mz = meanElev[bi];
     }
   }
+  // Metres, rounded. 0 is the sentinel for "unknown" — no Nepali catchment has
+  // a mean elevation of zero, and the app falls back to leaving the office's
+  // regression unavailable rather than guessing one.
+  elevOut[i] = Number.isFinite(mz) ? Math.max(1, Math.min(9000, Math.round(mz))) : 0;
   // 255 is the sentinel for "unknown"; 0-254 maps onto 0..1.
   out[i * 2] = Number.isFinite(f5) ? Math.round(Math.max(0, Math.min(1, f5)) * 254) : 255;
   out[i * 2 + 1] = Number.isFinite(f3) ? Math.round(Math.max(0, Math.min(1, f3)) * 254) : 255;
@@ -474,5 +499,24 @@ for (let i = 0; i < count; i++) {
 }
 
 writeFileSync(OUT, out);
+/**
+ * Average catchment altitude ships as its own file rather than as extra bytes
+ * in the hypsometry record. Two pipelines already negotiate the stride of that
+ * record and a third claimant is how stride bugs are born; a separate optional
+ * file follows what nepal-upa.dat does, and the app works unchanged when it is
+ * absent.
+ */
+const eb = Buffer.alloc(8 + count * 2);
+eb.writeUInt32LE(0x4e455031, 0); // 'NEP1'
+eb.writeUInt32LE(count, 4);
+for (let i = 0; i < count; i++) eb.writeUInt16LE(elevOut[i], 8 + i * 2);
+writeFileSync(ELEV_OUT, eb);
+const known = elevOut.filter((v) => v > 0);
+console.log(
+  `wrote ${ELEV_OUT}: ${known.length}/${count} reaches with a mean catchment altitude` +
+    (known.length
+      ? `, median ${[...known].sort((a, b) => a - b)[known.length >> 1]} m`
+      : '')
+);
 console.log(`wrote ${OUT}: ${count} reaches, ${(out.length / 1024).toFixed(1)} KB`);
 console.log(`  with hypsometry: ${attached} (${((attached / count) * 100).toFixed(1)}%)`);

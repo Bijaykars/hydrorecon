@@ -1,10 +1,10 @@
-# Ghatta — run-of-river screening
+# HydroRecon — run-of-river screening
 
 ![MIT](https://img.shields.io/badge/license-MIT-blue) ![no backend](https://img.shields.io/badge/backend-none-success) ![no API keys](https://img.shields.io/badge/API%20keys-none-success) ![checks](https://img.shields.io/badge/checks-287%20passing-brightgreen)
 
 **Click a river. Get the schemes worth studying.**
 
-One click on any river in the world. Ghatta walks 22 km downstream along the real channel, reads
+One click on any river in the world. HydroRecon walks 22 km downstream along the real channel, reads
 the terrain and every complete calendar year in its requested flow window, and searches roughly a thousand intake and powerhouse
 positions — then hands back the handful that represent genuine trade-offs, each with a turbine
 selected for its duty point and every number traceable to its source.
@@ -13,7 +13,7 @@ No backend, no account, no API key. Every request goes from your browser to a pu
 app runs on a static host. The public Open-Meteo endpoint is for non-commercial use; commercial
 deployments need an Open-Meteo subscription or a self-hosted compatible service.
 
-![Ghatta](docs/screenshot.png)
+![HydroRecon](docs/screenshot.png)
 
 ## How it works
 
@@ -35,7 +35,7 @@ option and 15% under the 8+4-month option. These are produced by the same turbin
 flow and scheme-specific hydraulic loss as the headline energy—there is no simplified second
 calculation. Nepal-only rules never appear on a foreign site.
 
-For each option, Ghatta also shows the gross energy value at NEA's published 4.80 wet / 8.40 dry
+For each option, HydroRecon also shows the gross energy value at NEA's published 4.80 wet / 8.40 dry
 NPR/kWh base rates. It applies no escalation and never calls this contracted revenue, NPV, LCOE or
 bankability. Schemes above the posted-rate 100 MW boundary carry an explicit negotiated-rate
 warning. See [the PPA reference-value method](docs/nepal-ppa-reference-value.md).
@@ -54,6 +54,23 @@ sensitivity shows how low-flow shutdown and energy could change, with no free co
 recommendation. See [the power-duration method](docs/power-duration.md).
 
 The URL holds the whole session, so a link reproduces the exact study.
+
+## How much pondage and how close is a motor road?
+
+For the selected intake, a 2–60 m retained-level control now delineates the connected upstream
+level pool on the same 30 m terrain already used by the study. It reports possible water area,
+terrain storage, backwater reach and an inferred bank-to-bank dam-axis span, and draws the screened
+cells on the map. The window expands when the water touches its edge; an unresolved result remains
+visibly a minimum. The app also sweeps a stage–area–storage curve, repeats the full pool on a second
+terrain chain, and reports a 5 km terrain-ruggedness diagnostic. The two-DEM span is source
+sensitivity, not a confidence interval; accurate capacity still requires a surveyed bare-earth DTM
+and thalweg/abutment control.
+
+The intake and powerhouse are also snapped to a live OpenStreetMap-derived car-routing graph. The
+map and panel show the straight-line gap to each road and link to the snapped OSM position. This is
+a motor-road proximity floor, not a buildable access alignment or proof of road condition. Both
+screens and their caveats travel into CSV and GeoJSON. See [the pondage and road-access
+method](docs/pondage-road-access.md).
 
 ## Nepal first, globally honest
 
@@ -86,7 +103,7 @@ transients, costs and risks. See [the readiness method](docs/engineering-readine
 
 ## What does Nepal's regional hydrology say?
 
-At Nepal reaches with catchment inputs, Ghatta evaluates the legacy WECS/DHM 1990 monthly-flow
+At Nepal reaches with catchment inputs, HydroRecon evaluates the legacy WECS/DHM 1990 monthly-flow
 regression and the full Q2–Q500 regional flood series. It uses the monthly regime as an independent
 Nepal-specific magnitude cross-check, shows disagreement instead of averaging it away, and carries
 every area/rainfall input, equation, return period, source and limitation into CSV and GeoJSON.
@@ -142,7 +159,7 @@ method](docs/fault-screen.md).
 Nepal mode matches the selected reach against the current official DMG catalog of 41 published
 1:50,000 map products. It shows only the publications and derived sheet footprints that touch the
 reach, carries the named maps into the field plan and exports, and links the official previews.
-Usable maps are hard-copy DMG products: Ghatta does not bundle or trace the all-rights-reserved
+Usable maps are hard-copy DMG products: HydroRecon does not bundle or trace the all-rights-reserved
 imagery. A no-match means no product was identified in that online catalog, not no geology.
 
 At intake, mid-reach and powerhouse, the app also samples open CC BY 4.0 Macrostrat regional
@@ -169,7 +186,7 @@ bundle contains 1,175 records from the register updated July 31, 2026; 1,169 hav
 usable coordinates. Operating and construction records sort first, but survey
 records and applications remain visible.
 
-DoED publishes coordinate ranges, not project alignments. Ghatta retains those
+DoED publishes coordinate ranges, not project alignments. HydroRecon retains those
 ranges and measures proximity to the range instead of an invented point; the
 midpoint is used only for the map marker and the guarded directed-network screen below. A clear result is shown explicitly, with
 the source update and bundle dates, and every panel links back to the live register.
@@ -346,7 +363,7 @@ OpenDroneMap (Python/C++), OpenFOAM (C++). These need a backend or a WASM runtim
 
 ## Licence
 
-[MIT](LICENSE) for Ghatta code. Bundled data keeps its upstream licence; in particular,
+[MIT](LICENSE) for HydroRecon code. Bundled data keeps its upstream licence; in particular,
 `src/data/nepal-faults.json` is a GEM-derived **CC BY-SA 4.0** dataset, with attribution and source
 revision embedded in the file and documented in [the fault method](docs/fault-screen.md).
 `src/data/nepal-geology-maps.json` contains DMG catalog facts and derived footprints only. The DMG

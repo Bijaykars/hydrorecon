@@ -3,6 +3,8 @@ import { fieldPlanToCsv, schemesToCsv, schemesToGeoJson, type ExportContext } fr
 import type { Scheme } from '../src/engine/discover.ts';
 import type { CascadeScreen } from '../src/cascade.ts';
 import { HYDEST_PROVENANCE, type HydestScreen } from '../src/engine/hydest.ts';
+import type { PondageResult } from '../src/pondage.ts';
+import type { RoadAccessScreen } from '../src/access.ts';
 
 let passed = 0;
 const ok = (n: string, f: () => void) => { f(); passed++; console.log(`  ok  ${n}`); };
@@ -25,6 +27,8 @@ const ctx = (over: Partial<ExportContext> = {}): ExportContext => ({
   cascade: null,
   faults: null,
   geology: null,
+  geologyUnits: null,
+  ambiguity: null,
   hydest: null,
   flowChoice: null,
   schemes: [scheme()], selected: null,
@@ -45,6 +49,83 @@ const hydest = (): HydestScreen => ({
   provenance: HYDEST_PROVENANCE,
 });
 
+const pondage = (): PondageResult => ({
+  damHeightM: 12,
+  bedElevationM: 1000,
+  waterLevelM: 1012,
+  areaM2: 18_000,
+  volumeM3: 90_000,
+  meanDepthM: 5,
+  maxDepthM: 12,
+  shorelineM: 900,
+  upstreamLengthM: 750,
+  damLengthM: 84,
+  seedMovedM: 30,
+  floodedCells: 1,
+  flooded: new Uint8Array([1]),
+  grid: {
+    center: { lat: 28.1, lon: 84.4 },
+    rows: 1,
+    cols: 1,
+    elevations: new Float32Array([1000]),
+    cellSizeM: 30,
+    north: 28.1002,
+    south: 28.0998,
+    east: 84.4002,
+    west: 84.3998,
+    source: 'Test DEM',
+    zoom: 12,
+    resolutionM: 30,
+    tilesFetched: 1,
+  },
+  edgeLimited: false,
+  damAxisLimited: false,
+  damAxis: {
+    from: { lat: 28.0997, lon: 84.4 },
+    to: { lat: 28.1003, lon: 84.4 },
+  },
+  floodedBounds: { north: 28.1002, south: 28.0998, east: 84.4002, west: 84.3998 },
+  source: 'Test DEM',
+  resolutionM: 30,
+  radiusKm: 3,
+  terrainComparison: {
+    source: 'Second test DEM',
+    bedElevationM: 1002,
+    waterLevelM: 1014,
+    areaM2: 21_000,
+    volumeM3: 120_000,
+    edgeLimited: false,
+    areaSpreadPct: 15.38,
+    volumeSpreadPct: 28.57,
+  },
+  ruggedness: { triMeanM: 6, triStdDevM: 2.5, sampleRadiusKm: 5, sampledCells: 100 },
+  stageCurve: [
+    { retainedHeightM: 0, waterLevelM: 1000, areaM2: 0, volumeM3: 0, edgeLimited: false },
+    { retainedHeightM: 12, waterLevelM: 1012, areaM2: 18_000, volumeM3: 90_000, edgeLimited: false },
+  ],
+});
+
+const roadAccess = (): RoadAccessScreen => ({
+  intake: {
+    role: 'intake',
+    site: { lat: 28.1, lon: 84.4 },
+    road: { lat: 28.101, lon: 84.399 },
+    distanceM: 142.5,
+    name: 'Test Road',
+    osmNodeIds: [1, 2],
+  },
+  powerhouse: {
+    role: 'powerhouse',
+    site: { lat: 28.0, lon: 84.5 },
+    road: { lat: 28.002, lon: 84.501 },
+    distanceM: 260,
+    name: null,
+    osmNodeIds: [3, 4],
+  },
+  source: 'OpenStreetMap car-routing graph via OSRM nearest',
+  limitation: 'Straight-line lower bound only.',
+});
+
 const cascade = (): CascadeScreen => ({
   upstream: [{
     name: 'Upper Test HEP', river: 'Test Khola', district: 'Test', capacityMW: 25,
@@ -57,7 +138,7 @@ const cascade = (): CascadeScreen => ({
   }],
   downstream: [], directReachRecords: 0, directAdvancedRecords: 0,
   registry: {
-    geolocatedRecords: 1169, canonicalRecords: 1167, duplicateRowsCollapsed: 2,
+    geolocatedRecords: 1169, canonicalRecords: 1168, duplicateRowsCollapsed: 1,
     updated: '2026-08-01', retrieved: '2026-08-13', source: 'https://doed.gov.np/',
   },
   network: {
@@ -126,8 +207,8 @@ ok('cascade candidates export topology, official guidance and non-claims without
   assert.ok(csv.includes(screen.guidance.study));
 
   const geo = JSON.parse(schemesToGeoJson(ctx({ cascade: screen })));
-  assert.equal(geo.ghatta_cascade.upstreamCandidates, 1);
-  assert.equal(geo.ghatta_cascade.registry.canonicalRecords, 1167);
+  assert.equal(geo.hydrorecon_cascade.upstreamCandidates, 1);
+  assert.equal(geo.hydrorecon_cascade.registry.canonicalRecords, 1168);
   const candidates = geo.features.filter((feature: any) =>
     feature.geometry.type === 'Point' && /project.*candidate/i.test(feature.properties.part)
   );
@@ -140,7 +221,7 @@ ok('cascade candidates export topology, official guidance and non-claims without
 ok('GeoJSON is valid and geometry-complete', () => {
   const j = JSON.parse(schemesToGeoJson(ctx()));
   assert.equal(j.type, 'FeatureCollection');
-  assert.ok(Array.isArray(j.ghatta) && j.ghatta.length > 10, 'provenance must ride along');
+  assert.ok(Array.isArray(j.hydrorecon) && j.hydrorecon.length > 10, 'provenance must ride along');
   const parts = j.features.map((f: any) => f.properties.part).sort();
   assert.deepEqual(parts, ['diverted reach', 'intake', 'powerhouse']);
   for (const f of j.features) {
@@ -203,6 +284,33 @@ ok('the sediment finding travels with the file, warning included', () => {
   assert.ok(Number(at('desander_bench_needed_m')) > 0, 'bench requirement must be exported');
 });
 
+ok('pondage and motor-road screening survive CSV and spatial export', () => {
+  const selected = scheme();
+  const c = ctx({
+    schemes: [selected],
+    selected,
+    pondage: pondage(),
+    roadAccess: roadAccess(),
+  });
+  const csv = schemesToCsv(c);
+  assert.match(csv, /PONDAGE LEVEL-POOL SCREEN/);
+  assert.match(csv, /MOTOR-ROAD PROXIMITY SCREEN/);
+  assert.ok(csv.includes('selected_pondage_storage_million_m3'));
+  assert.ok(csv.includes('selected_pondage_two_terrain_storage_spread_pct'));
+  assert.ok(csv.includes('Second test DEM'));
+  assert.ok(csv.includes('selected_intake_motor_road_gap_m'));
+
+  const geo = JSON.parse(schemesToGeoJson(c));
+  assert.equal(geo.hydrorecon_pondage.volumeM3, 90_000);
+  assert.equal(geo.hydrorecon_pondage.terrainComparison.volumeM3, 120_000);
+  assert.equal(geo.hydrorecon_pondage.ruggedness.triStdDevM, 2.5);
+  assert.equal(geo.hydrorecon_road_access.intake.distanceM, 142.5);
+  assert.ok(geo.features.some((f: any) => f.properties.part === 'possible level-pool pondage for selected intake'));
+  assert.ok(geo.features.some((f: any) => f.properties.part === 'screened dam axis for selected intake'));
+  assert.ok(geo.features.some((f: any) => f.properties.part === 'intake straight-line gap to motor-road graph'));
+  assert.ok(geo.features.some((f: any) => f.properties.part === 'powerhouse nearest motor-road graph point'));
+});
+
 ok('P90 and both NEA PPA tests survive CSV and GeoJSON export', () => {
   const selected = scheme({
     powerDuration: { p90MW: 4.2, p95MW: 2.8, zeroOutputFraction: 0.03, days: 7305 },
@@ -256,12 +364,12 @@ ok('P90 and both NEA PPA tests survive CSV and GeoJSON export', () => {
   assert.equal(line.properties.unit_count_sensitivity.length, 4);
   assert.equal(line.properties.unit_count_sensitivity[3].units, 4);
   assert.equal(line.properties.unit_count_sensitivity[3].dailyP95MW, 6.8);
-  assert.equal(geo.ghatta_nea_ror_ppa.postedRateCapacityUpToMW, 100);
-  assert.match(geo.ghatta_nea_ror_ppa.interpretation, /not a PPA entitlement/i);
-  assert.match(geo.ghatta_power_duration.reference, /ESHA 2004.*section 3\.7/i);
-  assert.match(geo.ghatta_power_duration.interpretation, /not contractual firm capacity/i);
-  assert.deepEqual(geo.ghatta_unit_count_sensitivity.unitCounts, [1, 2, 3, 4]);
-  assert.match(geo.ghatta_unit_count_sensitivity.interpretation, /not a selected unit arrangement/i);
+  assert.equal(geo.hydrorecon_nea_ror_ppa.postedRateCapacityUpToMW, 100);
+  assert.match(geo.hydrorecon_nea_ror_ppa.interpretation, /not a PPA entitlement/i);
+  assert.match(geo.hydrorecon_power_duration.reference, /ESHA 2004.*section 3\.7/i);
+  assert.match(geo.hydrorecon_power_duration.interpretation, /not contractual firm capacity/i);
+  assert.deepEqual(geo.hydrorecon_unit_count_sensitivity.unitCounts, [1, 2, 3, 4]);
+  assert.match(geo.hydrorecon_unit_count_sensitivity.interpretation, /not a selected unit arrangement/i);
 });
 
 ok('Nepal environmental-flow policy, selected release and EIA caveat survive every export', () => {
@@ -277,10 +385,10 @@ ok('Nepal environmental-flow policy, selected release and EIA caveat survive eve
   assert.match(field, /Policy source: https:\/\/doed\.gov\.np\//i);
 
   const geo = JSON.parse(schemesToGeoJson(c));
-  assert.equal(geo.ghatta_nepal_environmental_flow.minimumFractionOfLowestMonthlyMean, 0.1);
-  assert.equal(geo.ghatta_nepal_environmental_flow.selectedFractionOfLowestMonthlyMean, 0.1);
-  assert.equal(geo.ghatta_nepal_environmental_flow.selectedReleaseCms, 0.5);
-  assert.match(geo.ghatta_nepal_environmental_flow.interpretation, /higher of at least 10%.*EIA-required minimum/i);
+  assert.equal(geo.hydrorecon_nepal_environmental_flow.minimumFractionOfLowestMonthlyMean, 0.1);
+  assert.equal(geo.hydrorecon_nepal_environmental_flow.selectedFractionOfLowestMonthlyMean, 0.1);
+  assert.equal(geo.hydrorecon_nepal_environmental_flow.selectedReleaseCms, 0.5);
+  assert.match(geo.hydrorecon_nepal_environmental_flow.interpretation, /higher of at least 10%.*EIA-required minimum/i);
   const line = geo.features.find((feature: any) => feature.properties.part === 'diverted reach');
   assert.equal(line.properties.residual_flow_m3s, 0.5);
 });
@@ -305,8 +413,8 @@ ok('global exports disable Nepal-only context and PPA results', () => {
   const line = geo.features.find((f: any) => f.properties.part === 'diverted reach');
   assert.equal(line.properties.NEA_8plus4_meets_15pct, null);
   assert.equal(line.properties.NEA_8plus4_gross_base_rate_reference_million_NPR_per_year, null);
-  assert.equal(geo.ghatta_nea_ror_ppa, null);
-  assert.equal(geo.ghatta_nepal_environmental_flow, null);
+  assert.equal(geo.hydrorecon_nea_ror_ppa, null);
+  assert.equal(geo.hydrorecon_nepal_environmental_flow, null);
 });
 
 ok('the field-plan export carries gates, priorities and deliverables', () => {
@@ -356,8 +464,8 @@ ok('BIPAD history and its non-probabilistic meaning survive CSV and GeoJSON', ()
   assert.match(csv, /BIPAD incidents: approved \+ verified records/);
 
   const geo = JSON.parse(schemesToGeoJson(c));
-  assert.equal(geo.ghatta_hazards.total, 1);
-  assert.match(geo.ghatta_hazards.limitation, /not hazard probability/);
+  assert.equal(geo.hydrorecon_hazards.total, 1);
+  assert.match(geo.hydrorecon_hazards.limitation, /not hazard probability/);
   const incident = geo.features.find((feature: any) => feature.properties.part === 'BIPAD incident report');
   assert.equal(incident.properties.incident_id, 372);
   assert.equal(incident.properties.verified, true);
@@ -413,9 +521,9 @@ ok('upstream candidates preserve source flags, route metrics, attribution and no
   assert.match(csv, /CC BY 4\.0/);
 
   const geo = JSON.parse(schemesToGeoJson(c));
-  assert.equal(geo.ghatta_upstream_connectivity.lakeCandidates, 1);
-  assert.equal(geo.ghatta_upstream_connectivity.lakeRoutesIncluded, 1);
-  assert.equal(geo.ghatta_upstream_connectivity.incidentRoutesIncluded, 0);
+  assert.equal(geo.hydrorecon_upstream_connectivity.lakeCandidates, 1);
+  assert.equal(geo.hydrorecon_upstream_connectivity.lakeRoutesIncluded, 1);
+  assert.equal(geo.hydrorecon_upstream_connectivity.incidentRoutesIncluded, 0);
   const lake = geo.features.find((feature: any) =>
     feature.properties.part === 'GLO glacial-lake centroid connectivity candidate'
   );
@@ -458,9 +566,9 @@ ok('fault provenance, share-alike licence and mapped-reach caveat survive every 
   assert.match(csv, /not surveyed waterway crossing or seismic design action/);
 
   const geo = JSON.parse(schemesToGeoJson(c));
-  assert.equal(geo.ghatta_faults.crossings, 1);
-  assert.equal(geo.ghatta_faults.commit, faults.commit);
-  assert.equal(geo.ghatta_faults.license, 'CC BY-SA 4.0');
+  assert.equal(geo.hydrorecon_faults.crossings, 1);
+  assert.equal(geo.hydrorecon_faults.commit, faults.commit);
+  assert.equal(geo.hydrorecon_faults.license, 'CC BY-SA 4.0');
   const fault = geo.features.find(
     (feature: any) => feature.properties.part === 'GEM regional active-fault trace'
   );
@@ -468,6 +576,53 @@ ok('fault provenance, share-alike licence and mapped-reach caveat survive every 
   assert.equal(fault.properties.intersects_selected_mapped_river_reach, true);
   assert.equal(fault.properties.nearest_reach_chainage_km, 2.7);
   assert.deepEqual(fault.geometry.coordinates[0], [84, 28]);
+});
+
+/**
+ * The national traverse has to reach provenance carrying its own limits.
+ *
+ * This fixture omitted `geologyUnits` entirely for a while and nothing caught
+ * it, because `checks/` is outside tsconfig's `include` and node strips types
+ * without checking them. A missing field then reads as `undefined`, every
+ * `if (c.geologyUnits)` goes quiet, and the export loses a whole source with
+ * no test failing. Hence an explicit `null` above and a populated case here.
+ */
+ok('the national geology traverse reaches provenance with its scale and error', () => {
+  const unit = (code: string, name: string) => ({
+    code, name, named: name.length > 3, noData: false, offSheet: false,
+  });
+  const from = unit('015', 'Kushma Formation');
+  const to = unit('016', 'Ulleri Formation');
+  const c = ctx({
+    geologyUnits: {
+      runs: [
+        { unit: from, fromKm: 0, toKm: 4, lengthKm: 4 },
+        { unit: to, fromKm: 4, toKm: 9, lengthKm: 5 },
+      ],
+      contacts: [{ atKm: 4, from, to, withinFormation: false }],
+      formationContacts: 1,
+      coverageEdges: 0,
+      lengthKm: 9,
+      mappedKm: 9,
+      intake: from,
+      powerhouse: to,
+      contactErrorKm: 0.5,
+      scale: '1:1,000,000',
+      source: 'ICIMOD RDS, Geology of Nepal (DMG 1994)',
+      limitation: 'Regional belt map; cannot place a portal.',
+    },
+  });
+  // The provenance header rides on the scheme CSV, not the field plan.
+  const csv = schemesToCsv(c);
+  assert.match(csv, /national geology/i);
+  assert.match(csv, /1:1,000,000/);
+  assert.match(csv, /1 formation contact/i);
+  assert.match(csv, /Kushma Formation/);
+  assert.match(csv, /Ulleri Formation/);
+  // The positional error must travel with the number, or a reader takes a
+  // chainage off a 1:1,000,000 map as if it were surveyed.
+  assert.match(csv, /0\.5 km of positional error/i);
+  assert.match(csv, /cannot place a portal/i);
 });
 
 ok('geology exports preserve DMG rights, Macrostrat licence and non-claims', () => {
@@ -515,8 +670,8 @@ ok('geology exports preserve DMG rights, Macrostrat licence and non-claims', () 
   assert.match(csv, /not a surveyed contact or foundation condition/i);
 
   const geo = JSON.parse(schemesToGeoJson(c));
-  assert.equal(geo.ghatta_geology.dmg.matches, 1);
-  assert.equal(geo.ghatta_geology.regional.license, 'CC-BY 4.0');
+  assert.equal(geo.hydrorecon_geology.dmg.matches, 1);
+  assert.equal(geo.hydrorecon_geology.regional.license, 'CC-BY 4.0');
   const sheet = geo.features.find((feature: any) =>
     feature.properties.part === 'DMG published 1:50,000 geology sheet footprint'
   );
@@ -550,10 +705,10 @@ ok('regional hydrology exports every input, return period, equation and non-clai
   assert.match(field, /doed\.gov\.np\/content\/31\/design-guidelines-for-headworks/i);
 
   const geo = JSON.parse(schemesToGeoJson(c));
-  assert.equal(geo.ghatta_hydest.input.below3000Km2, 600);
-  assert.deepEqual(geo.ghatta_hydest.floods.map((flood: any) => flood.t), [2, 10, 20, 50, 100, 200, 500]);
-  assert.match(geo.ghatta_hydest.provenance.interpretation, /not selected design floods/i);
-  assert.match(geo.ghatta_hydest.provenance.bundle.output.sha256, /^[a-f0-9]{64}$/);
+  assert.equal(geo.hydrorecon_hydest.input.below3000Km2, 600);
+  assert.deepEqual(geo.hydrorecon_hydest.floods.map((flood: any) => flood.t), [2, 10, 20, 50, 100, 200, 500]);
+  assert.match(geo.hydrorecon_hydest.provenance.interpretation, /not selected design floods/i);
+  assert.match(geo.hydrorecon_hydest.provenance.bundle.output.sha256, /^[a-f0-9]{64}$/);
 });
 
 ok('flow provenance names the authority actually used instead of always claiming network flow', () => {
@@ -573,8 +728,8 @@ ok('flow provenance names the authority actually used instead of always claiming
   assert.match(csv, /screening fallback, not an observation/i);
   assert.doesNotMatch(csv, /magnitude below is taken from the mapped network/i);
   const geo = JSON.parse(schemesToGeoJson(c));
-  assert.equal(geo.ghatta_flow_choice.authority, 'hydest');
-  assert.equal(geo.ghatta_flow_choice.targetMeanCms, 10);
+  assert.equal(geo.hydrorecon_flow_choice.authority, 'hydest');
+  assert.equal(geo.hydrorecon_flow_choice.targetMeanCms, 10);
 });
 
 console.log(`\n${passed} export checks passed\n`);

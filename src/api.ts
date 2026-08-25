@@ -24,6 +24,15 @@ export const GLOFAS_END = `${LAST_COMPLETE_YEAR}-12-31`;
 
 // v2 excludes incomplete calendar years. Keeping v1 responses would silently
 // reintroduce the partial-year bias this version exists to remove.
+/**
+ * NOT RENAMED WITH THE APP.
+ *
+ * This is a localStorage key holding up to 180 days of cached discharge. The
+ * name changed to HydroRecon; changing this string would orphan every cached
+ * series and re-fetch the lot from a free, donation-funded service that this
+ * project has gone to some trouble not to hammer. The prefix is an internal
+ * key, not a brand, and it stays until there is a reason to bump the version.
+ */
 const CACHE_PREFIX = 'ghatta:glofas:v2:';
 const CACHE_INDEX = `${CACHE_PREFIX}index`;
 const COOLDOWN_KEY = `${CACHE_PREFIX}cooldown`;
@@ -38,6 +47,107 @@ const quantize = (lat: number, lon: number) => ({
   lon: Math.round(lon / CELL_DEG) * CELL_DEG,
 });
 
+/**
+ * ONLY NEPAL IS FETCHED. Everywhere else is refused before a request is made.
+ *
+ * The discharge service is free, shared and donation-funded, and this app was
+ * spending its quota on questions it had no business asking: every click
+ * anywhere on Earth cost a twenty-year daily archive. Sweeping the licensed
+ * plant list exhausted the day's allowance in an afternoon and earned a
+ * twelve-hour pause, which stopped the measurement work outright.
+ *
+ * The box is the one the bundled river network covers and the one the local
+ * GloFAS store was downloaded for, so this is not an arbitrary fence: outside
+ * it there is no river network, no hypsometry, no rainfall and no regional
+ * regression either. A flow number there was never going to be worth much.
+ *
+ * The cost is real and deliberate: the app's global mode no longer fetches
+ * flow. Terrain, head and the scheme geometry still work anywhere. One constant
+ * reverses this if that trade ever stops being worth it.
+ */
+const NEPAL_BOX = { west: 79.9, south: 26.2, east: 88.4, north: 30.6 };
+const insideNepal = (lat: number, lon: number) =>
+  lat >= NEPAL_BOX.south && lat <= NEPAL_BOX.north && lon >= NEPAL_BOX.west && lon <= NEPAL_BOX.east;
+
+const OUTSIDE =
+  'Flow data is limited to Nepal, so the shared discharge service is never asked for more ' +
+  'than this tool needs. Terrain and head still work here.';
+
+/**
+ * The local GloFAS store, when the dev server is offering one.
+ *
+ * Open-Meteo serves GloFAS and the store IS GloFAS, downloaded from ECMWF for
+ * Nepal (pipeline/fetch-glofas-nepal.py), so where both hold a cell they agree
+ * and neither the developer nor the shared free service pays for the difference.
+ *
+ * THEY ARE NOT IDENTICAL, AND THAT WAS ASSUMED FOR A WHILE. This is the raw
+ * grid and it carries nulls the served product does not: at Mistri Khola's cell
+ * it holds about 90% of the days in every year, so no year cleared the 99%
+ * complete-year bar and a site that had a result before the store existed began
+ * reporting no river.
+ *
+ * AND THE MISSING DAYS ARE SEASONAL, which is why the bar must not simply be
+ * lowered to admit them: 68% of January is absent from that cell, 29% of
+ * December, none of the monsoon, in runs averaging ten days and reaching 39.
+ * Dropping them and building a flow-duration curve removes the LOW flows
+ * preferentially — overstating dry-season yield and firm energy, the dangerous
+ * direction. So `hasCompleteYear` gates the store instead: a cell it covers
+ * thinly falls through to the network, exactly as an uncovered cell always did.
+ * The store may be cheaper than the service; it may not be worse.
+ *
+ * Absent in a production build, where the route does not exist — hence the
+ * content check rather than a status check. A static host answers an unknown
+ * path with index.html and a 200, and parsing that as a flow series would be a
+ * silent, confident lie.
+ */
+async function localResponse(
+  lat: number,
+  lon: number,
+  signal?: AbortSignal
+): Promise<Response | null> {
+  try {
+    const res = await fetch(`/glofas?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`, { signal });
+    if (!res.ok) return null;
+    if (!(res.headers.get('content-type') ?? '').includes('json')) return null;
+    const j = await res.json();
+    if (!j?.daily?.river_discharge?.length) return null;
+    // Handed back as a Response so every caller below parses one shape.
+    return new Response(JSON.stringify(j), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Does this response hold at least one substantially complete calendar year?
+ *
+ * Used to decide whether the local store can answer a cell at all. The store is
+ * the raw ECMWF grid and carries nulls the served product fills, so a cell it
+ * holds thinly must fall through to the network rather than be reported as a
+ * river with no usable record.
+ */
+async function hasCompleteYear(res: Response): Promise<boolean> {
+  try {
+    const j = (await res.json()) as {
+      daily: { time: string[]; river_discharge: (number | null)[] };
+    };
+    const dates: string[] = [];
+    const values: number[] = [];
+    for (let i = 0; i < j.daily.time.length; i++) {
+      const v = j.daily.river_discharge[i];
+      if (v === null || v === undefined) continue;
+      dates.push(j.daily.time[i]);
+      values.push(v);
+    }
+    return completeCalendarYears(dates, values).years.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 type Stored = { savedAt: number; data: DischargeSeries };
 
 function readStored(key: string): Stored | null {
@@ -49,11 +159,25 @@ function readStored(key: string): Stored | null {
   }
 }
 
-function writeStored(key: string, data: DischargeSeries) {
+/**
+ * @param scratch A probe rather than a site the engineer asked about.
+ *
+ * The shape audit samples the eight neighbouring cells to see whether one of
+ * them fits Nepal's seasonal regime better. That is nine entries for one
+ * question, against a cache that holds twelve — so an audit used to evict very
+ * nearly every site studied earlier, and each of those then had to be fetched
+ * from Open-Meteo again. The cache was spending the quota it exists to save.
+ *
+ * Probes are still stored, because re-auditing the same site should be free.
+ * They just join at the BACK of the index instead of the front, so they are the
+ * first things dropped and can never push out a site someone actually studied.
+ */
+function writeStored(key: string, data: DischargeSeries, scratch = false) {
   try {
     localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({ savedAt: Date.now(), data }));
     const prior = JSON.parse(localStorage.getItem(CACHE_INDEX) ?? '[]') as string[];
-    const next = [key, ...prior.filter((k) => k !== key)].slice(0, CACHE_MAX);
+    const rest = prior.filter((k) => k !== key);
+    const next = (scratch ? [...rest, key] : [key, ...rest]).slice(0, CACHE_MAX);
     localStorage.setItem(CACHE_INDEX, JSON.stringify(next));
     for (const old of prior) if (!next.includes(old)) localStorage.removeItem(CACHE_PREFIX + old);
   } catch {
@@ -96,12 +220,25 @@ export function completeCalendarYears(
   values: readonly number[],
   minCoverage = 0.99
 ): { dates: string[]; values: number[]; years: number[] } {
+  /**
+   * COMPLETENESS IS UNIQUE CALENDAR DAYS, not row count.
+   *
+   * Counting rows meant 365 copies of 2021-01-01 passed as a complete year with
+   * coverage 1.0 and produced an annual-energy figure and interannual spread
+   * from a single day's flow. Any repeated or malformed timestamp inflated the
+   * count the same way, and every downstream statistic that says "complete
+   * year" inherited it.
+   */
+  const seen = new Set<string>();
   const counts = new Map<number, number>();
   const valid: { date: string; value: number; year: number }[] = [];
   for (let i = 0; i < Math.min(dates.length, values.length); i++) {
     const value = values[i];
     const date = dates[i];
-    const year = Number(date?.slice(0, 4));
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    if (seen.has(date)) continue;
+    seen.add(date);
+    const year = Number(date.slice(0, 4));
     if (!Number.isInteger(year) || !Number.isFinite(value)) continue;
     valid.push({ date, value, year });
     counts.set(year, (counts.get(year) ?? 0) + 1);
@@ -123,8 +260,11 @@ export function completeCalendarYears(
 export async function fetchDischarge(
   lat: number,
   lon: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  /** True for a neighbourhood probe: cached, but first in line to be evicted. */
+  scratch = false
 ): Promise<DischargeSeries> {
+  if (!insideNepal(lat, lon)) throw new Error(OUTSIDE);
   const cell = quantize(lat, lon);
   const key = `${cell.lat.toFixed(2)},${cell.lon.toFixed(2)}`;
   const stored = readStored(key);
@@ -150,8 +290,22 @@ export async function fetchDischarge(
     // Open-Meteo has renamed these before (`glofas_v4_consolidated` was retired),
     // so a rejected model name falls back to the service default rather than
     // taking the whole app down.
-    let res = await fetch(`${base}&models=${MODEL}`, { signal });
-    if (res.status === 400) res = await fetch(base, { signal });
+    /**
+     * The store is a SOURCE, and where it is thinner than the service it must
+     * not be the last word.
+     *
+     * The raw ECMWF grid carries nulls the served product does not: at Mistri
+     * Khola's cell the store holds about 90% of days in every year, so the 99%
+     * complete-year rule rejected all twenty and the site — which had a result
+     * before the store existed — began reporting no river at all. The store's
+     * purpose is to spare a donation-funded service, not to answer worse than
+     * it does, so a cell it cannot cover completely falls through to the
+     * network exactly as an uncovered cell already did.
+     */
+    let local = await localResponse(cell.lat, cell.lon, signal);
+    if (local && !(await hasCompleteYear(local.clone()))) local = null;
+    let res = local ?? (await fetch(`${base}&models=${MODEL}`, { signal }));
+    if (!local && res.status === 400) res = await fetch(base, { signal });
 
     if (res.status === 429) {
       const body = await res.text().catch(() => '');
@@ -206,7 +360,7 @@ export async function fetchDischarge(
       elevationM: j.elevation,
       from: 'network',
     };
-    writeStored(key, data);
+    writeStored(key, data, scratch);
     return data;
   })().finally(() => inFlight.delete(key));
 
@@ -230,7 +384,10 @@ export async function probeNeighbours(
     for (let dx = -1; dx <= 1; dx++) {
       if (dx === 0 && dy === 0) continue;
       try {
-        const s = await fetchDischarge(lat + dy * CELL_DEG, lon + dx * CELL_DEG);
+        // scratch: eight probe cells must not evict the engineer's own studies
+        // from a 12-entry cache. auditShape already passes this; this path did
+        // not, so one probe could push three real sites out.
+        const s = await fetchDischarge(lat + dy * CELL_DEG, lon + dx * CELL_DEG, undefined, true);
         out.push({
           lat: s.cell.lat,
           lon: s.cell.lon,
@@ -262,14 +419,27 @@ export async function fetchDischargeYears(
   years = 40,
   signal?: AbortSignal
 ): Promise<DischargeSeries> {
+  if (!insideNepal(lat, lon)) throw new Error(OUTSIDE);
   const cell = quantize(lat, lon);
   const start = `${LAST_COMPLETE_YEAR - (years - 1)}-01-01`;
   const base =
     `https://flood-api.open-meteo.com/v1/flood?latitude=${cell.lat.toFixed(4)}` +
     `&longitude=${cell.lon.toFixed(4)}&daily=river_discharge` +
     `&start_date=${start}&end_date=${GLOFAS_END}`;
-  let res = await fetch(`${base}&models=${MODEL}`, { signal });
-  if (res.status === 400) res = await fetch(base, { signal });
+  /**
+   * The local store holds ONE fixed window and ignores the range asked for.
+   *
+   * It covers 2006-2025 — about 20 years, the same span an ordinary request
+   * already gets — so answering a 40-year audit from it returns exactly the
+   * record the site was already using, while the completion text promised
+   * deeper droughts and rarer floods. That is the audit reporting evidence it
+   * did not obtain. Where the store cannot cover the request, the network can,
+   * so the request goes there.
+   */
+  const wantsMoreThanStore = years > 20;
+  const local = wantsMoreThanStore ? null : await localResponse(cell.lat, cell.lon, signal);
+  let res = local ?? (await fetch(`${base}&models=${MODEL}`, { signal }));
+  if (!local && res.status === 400) res = await fetch(base, { signal });
   if (res.status === 429) throw new Error('Open-Meteo asked us to pause — try the audit again in a few minutes.');
   if (!res.ok) throw new Error(`Flow history unavailable (HTTP ${res.status}).`);
   const j = (await res.json()) as {
@@ -310,9 +480,58 @@ export async function fetchDischargeYears(
  * and 404s past it. Both are 30 m DEMs over Nepal, so profile sampling is capped
  * at the first zoom that actually resolves that native posting.
  */
+export const TERRAIN_SOURCE_IDS = [
+  'Re:Earth Mapterhorn',
+  'AWS Terrain Tiles',
+  'GEDTM30 bare earth',
+] as const;
+
+export type TerrainSourceId = (typeof TERRAIN_SOURCE_IDS)[number];
+
+export const GEDTM_SOURCE_ID: TerrainSourceId = TERRAIN_SOURCE_IDS[2];
+
+/**
+ * Mapterhorn screens every site. Measured, not assumed.
+ *
+ * `npm run probe:dem` samples all three products at 120 shared river reaches
+ * and solves for each one's own head error with the three-cornered-hat
+ * estimator: Mapterhorn 2.4 m, GEDTM30 5.0 m, AWS 7.4 m. Mapterhorn and GEDTM30
+ * share a Copernicus parent so the absolute metres are soft, but the order
+ * between those two is not — subtracting their solutions cancels the shared
+ * covariance exactly and leaves how far each sits from AWS, 7.8 m against 8.9 m.
+ */
+export const PRIMARY_TERRAIN_SOURCE_ID: TerrainSourceId = TERRAIN_SOURCE_IDS[0];
+
+/**
+ * Which two products cross-check a site — GEDTM30 second where it exists.
+ *
+ * AWS held this slot and lost it on measurement. Against the same 120 reaches
+ * every pair involving AWS carries an RMSE near 86 m against a sigma under 9,
+ * while the one pair that excludes it runs RMSE 6.9 m against sigma 5.6 m. The
+ * catastrophic disagreements this project has always attributed to "voids and
+ * gorge artifacts" are AWS's voids specifically; the GEDTM30 Nepal cut has
+ * 100% coverage and none. A second opinion whose own error is smaller and whose
+ * tail is absent is a better second opinion.
+ *
+ * It does NOT change any headline number. The primary stays Mapterhorn, so the
+ * area, storage and head a site reports are the same either way; what changes
+ * is the spread quoted beside them, which is now measuring terrain rather than
+ * measuring AWS's dropouts.
+ *
+ * ASYNC, AND FALLING BACK, because the GEDTM30 store is served by a dev-only
+ * Vite route. A production build has no `/gedtm` and would otherwise be left
+ * with no second source at all — the cross-check would vanish silently, which
+ * is worse than a weaker one. Every result already carries `source`, so the
+ * reader is told which second opinion they actually got.
+ */
+export async function screenTerrainSources(): Promise<readonly TerrainSourceId[]> {
+  const gedtm = await gedtmMeta();
+  return [PRIMARY_TERRAIN_SOURCE_ID, gedtm ? GEDTM_SOURCE_ID : TERRAIN_SOURCE_IDS[1]];
+}
+
 const DEM_SOURCES = [
   {
-    id: 'Re:Earth Mapterhorn',
+    id: TERRAIN_SOURCE_IDS[0],
     url: (z: number, x: number, y: number) =>
       `https://terrain.reearth.land/terrarium/elevation/${z}/${x}/${y}.png`,
     tilePx: 512,
@@ -320,7 +539,7 @@ const DEM_SOURCES = [
     nativeM: 30,
   },
   {
-    id: 'AWS Terrain Tiles',
+    id: TERRAIN_SOURCE_IDS[1],
     url: (z: number, x: number, y: number) =>
       `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`,
     tilePx: 256,
@@ -460,11 +679,19 @@ export async function traceDownhill(
   maxKm = 22,
   stepKm = 0.15
 ): Promise<TracedPath | null> {
-  // A generous tile patch around the click, at a zoom that keeps the count sane.
-  const spanDeg = maxKm / 111;
+  /**
+   * A generous tile patch around the click, at a zoom that keeps the count sane.
+   *
+   * Longitude degrees are narrower than latitude ones by cos(lat), so using one
+   * span for both made the east-west window short: at 28°N a nominal 22 km
+   * half-width covered 19.4 km, and a trace permitted to run 22 km could leave
+   * the fetched raster before it got there.
+   */
+  const latSpanDeg = maxKm / 111;
+  const lonSpanDeg = latSpanDeg / Math.max(0.2, Math.cos((lat * Math.PI) / 180));
   const corners = [
-    { lat: lat - spanDeg, lon: lon - spanDeg },
-    { lat: lat + spanDeg, lon: lon + spanDeg },
+    { lat: lat - latSpanDeg, lon: lon - lonSpanDeg },
+    { lat: lat + latSpanDeg, lon: lon + lonSpanDeg },
   ];
   let terrain:
     | {
@@ -570,6 +797,61 @@ export type ElevationProfile = {
   source: string;
   zoom: number;
   /** Ground sample distance of the tiles actually used, metres. */
+  resolutionM: number;
+  tilesFetched: number;
+};
+
+/**
+ * A square, locally metric DEM window for two-dimensional terrain questions.
+ *
+ * Profiles answer elevation along a line. Pondage needs every cell around a
+ * proposed dam, with a real cell area in square metres. The grid is centred on
+ * `center`; its middle cell is exactly that coordinate, rows run north to south,
+ * and columns west to east. Geographic bounds are retained only for drawing the
+ * result back on the web map — all area/volume arithmetic uses `cellSizeM`.
+ */
+/**
+ * Geometry of the local GEDTM30 extract, as written by
+ * pipeline/build-gedtm-nepal.py. Fetched once; absent in a production build,
+ * which is what makes the source quietly unavailable rather than broken.
+ */
+type GedtmMeta = {
+  rows: number;
+  cols: number;
+  pixelDeg: number;
+  west: number;
+  north: number;
+  scale: number;
+  offset: number;
+  nodata: number;
+  nativeM: number;
+};
+
+let gedtmMetaPromise: Promise<GedtmMeta | null> | null = null;
+
+function gedtmMeta(): Promise<GedtmMeta | null> {
+  // The catch has to cover the PARSE, not just the request. A build with no
+  // /gedtm route usually answers with the SPA's index.html and a cheerful 200,
+  // so `r.ok` is true and it is `json()` that rejects. Chaining the catch after
+  // the then is what makes both shapes of "not here" come back as null.
+  gedtmMetaPromise ??= fetch('/gedtm/meta')
+    .then((r) => (r.ok ? (r.json() as Promise<GedtmMeta>) : null))
+    .catch(() => null);
+  return gedtmMetaPromise;
+}
+
+export type TerrainWindow = {
+  center: { lat: number; lon: number };
+  rows: number;
+  cols: number;
+  elevations: Float32Array;
+  cellSizeM: number;
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+  source: string;
+  zoom: number;
   resolutionM: number;
   tilesFetched: number;
 };
@@ -706,6 +988,441 @@ export function fetchPathProfile(
     PATH_TILE_BUDGET,
     onlySource
   );
+}
+
+/** Maximum DEM tiles one pondage window may ask a source for. */
+const TERRAIN_WINDOW_TILE_BUDGET = 64;
+
+/**
+ * Fetch a two-dimensional DEM window without first materialising hundreds of
+ * thousands of point objects.
+ *
+ * The terrain servers expose an interpolated Web-Mercator image pyramid. We
+ * stop at the first zoom that resolves the native 30 m DEM, then sample a local
+ * 30 m grid. A higher image zoom would make the pixels smaller but would not add
+ * measured terrain. If the requested window crosses too many tiles, the zoom is
+ * reduced until the request is bounded.
+ */
+/**
+ * A terrain window sampled from the local GEDTM30 extract.
+ *
+ * Same contract as the tile path: the caller has already fixed the centre,
+ * spacing and bounds, and this only fills in elevations. That matters more than
+ * it looks — pondage.ts re-runs its second source against the FIRST source's
+ * dam axis and indexes both grids by cell, which is only meaningful while every
+ * source produces the identical geometry.
+ *
+ * The store is a plain uint16 raster in geographic coordinates, so this pulls
+ * the covering rectangle in one request and interpolates between pixel CENTRES
+ * — the half-pixel shift is the difference between a bilinear read and a
+ * nearest-neighbour one dressed up as bilinear.
+ */
+async function gedtmTerrainWindow(g: {
+  center: { lat: number; lon: number };
+  rows: number;
+  cols: number;
+  halfCells: number;
+  cellSizeM: number;
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+  metresPerDegreeLat: number;
+  metresPerDegreeLon: number;
+}): Promise<TerrainWindow> {
+  const meta = await gedtmMeta();
+  if (!meta) throw new Error('The local GEDTM30 store is not available.');
+
+  const px = meta.pixelDeg;
+  // Fractional pixel-centre indices of the window corners, then one cell of
+  // margin so the bilinear stencil at the edge has its four neighbours.
+  const fx = (lon: number) => (lon - meta.west) / px - 0.5;
+  const fy = (lat: number) => (meta.north - lat) / px - 0.5;
+  const col0 = Math.floor(fx(g.west)) - 1;
+  const col1 = Math.ceil(fx(g.east)) + 1;
+  const row0 = Math.floor(fy(g.north)) - 1;
+  const row1 = Math.ceil(fy(g.south)) + 1;
+  if (col0 < 0 || row0 < 0 || col1 >= meta.cols || row1 >= meta.rows) {
+    throw new Error('The GEDTM30 store does not cover this window.');
+  }
+
+  const wCols = col1 - col0 + 1;
+  const wRows = row1 - row0 + 1;
+  const res = await fetch(
+    `/gedtm/window?row0=${row0}&col0=${col0}&rows=${wRows}&cols=${wCols}`
+  );
+  if (!res.ok) throw new Error(`The GEDTM30 store refused the window (${res.status}).`);
+  const raw = new Uint16Array(await res.arrayBuffer());
+  if (raw.length !== wRows * wCols) throw new Error('The GEDTM30 window came back the wrong size.');
+
+  const at = (r: number, c: number) => {
+    const v = raw[r * wCols + c];
+    return v === meta.nodata ? NaN : v / meta.scale + meta.offset;
+  };
+
+  const elevations = new Float32Array(g.rows * g.cols);
+  for (let row = 0; row < g.rows; row++) {
+    const lat = g.center.lat + ((g.halfCells - row) * g.cellSizeM) / g.metresPerDegreeLat;
+    const y = fy(lat) - row0;
+    const yi = Math.floor(y);
+    const ty = y - yi;
+    for (let col = 0; col < g.cols; col++) {
+      const lon = g.center.lon + ((col - g.halfCells) * g.cellSizeM) / g.metresPerDegreeLon;
+      const x = fx(lon) - col0;
+      const xi = Math.floor(x);
+      const tx = x - xi;
+      const a = at(yi, xi);
+      const b = at(yi, xi + 1);
+      const c = at(yi + 1, xi);
+      const d = at(yi + 1, xi + 1);
+      elevations[row * g.cols + col] =
+        a * (1 - tx) * (1 - ty) + b * tx * (1 - ty) + c * (1 - tx) * ty + d * tx * ty;
+    }
+  }
+  if (!elevations.some(Number.isFinite)) {
+    throw new Error('The GEDTM30 window holds no data at this location.');
+  }
+
+  return {
+    center: g.center,
+    rows: g.rows,
+    cols: g.cols,
+    elevations,
+    cellSizeM: g.cellSizeM,
+    north: g.north,
+    south: g.south,
+    east: g.east,
+    west: g.west,
+    source: GEDTM_SOURCE_ID,
+    // Not a tile pyramid. Zero says "no zoom applies" rather than implying one.
+    zoom: 0,
+    resolutionM: meta.nativeM,
+    tilesFetched: 1,
+  };
+}
+
+export async function fetchTerrainWindow(
+  center: { lat: number; lon: number },
+  radiusKm: number,
+  requestedCellSizeM = 30,
+  onlySource?: TerrainSourceId
+): Promise<TerrainWindow> {
+  if (!Number.isFinite(center.lat) || !Number.isFinite(center.lon)) {
+    throw new Error('Terrain window needs a finite latitude and longitude.');
+  }
+  if (!(radiusKm > 0) || !(requestedCellSizeM > 0)) {
+    throw new Error('Terrain window radius and cell size must be positive.');
+  }
+
+  const sources =
+    onlySource && onlySource !== GEDTM_SOURCE_ID
+      ? DEM_SOURCES.filter((source) => source.id === onlySource)
+      : DEM_SOURCES;
+  if (sources.length === 0) throw new Error(`Unknown terrain source: ${onlySource}`);
+
+  // Both current sources have a nominal 30 m native grid. Sampling more finely
+  // would manufacture cells and, worse, make the area look more precise.
+  const nativeM = Math.max(...sources.map((s) => s.nativeM));
+  const cellSizeM = Math.max(requestedCellSizeM, nativeM);
+  const halfCells = Math.ceil((radiusKm * 1000) / cellSizeM);
+  const rows = halfCells * 2 + 1;
+  const cols = rows;
+  const halfSpanM = (halfCells + 0.5) * cellSizeM;
+  const metresPerDegreeLat = 111_320;
+  const cos = Math.max(0.01, Math.cos((center.lat * Math.PI) / 180));
+  const metresPerDegreeLon = metresPerDegreeLat * cos;
+  const north = center.lat + halfSpanM / metresPerDegreeLat;
+  const south = center.lat - halfSpanM / metresPerDegreeLat;
+  const east = center.lon + halfSpanM / metresPerDegreeLon;
+  const west = center.lon - halfSpanM / metresPerDegreeLon;
+
+  // Asked for by name only. There is no fallback to the tile sources here: a
+  // silent substitution would turn "GEDTM30 scored X" into "something scored X".
+  if (onlySource === GEDTM_SOURCE_ID) {
+    return gedtmTerrainWindow({
+      center,
+      rows,
+      cols,
+      halfCells,
+      cellSizeM,
+      north,
+      south,
+      east,
+      west,
+      metresPerDegreeLat,
+      metresPerDegreeLon,
+    });
+  }
+
+  for (const src of sources) {
+    // An explicit comparison is allowed one direct attempt even if an earlier
+    // automatic request cooled the source down. Otherwise the "second DEM"
+    // audit could silently turn into the primary DEM again.
+    if (!onlySource && sourceIsCoolingDown(src.id)) continue;
+
+    const maxUsefulZoom = demAnalysisZoom(src.tilePx, src.maxZoom, src.nativeM, center.lat);
+    let zoom = 8;
+    for (let z = maxUsefulZoom; z >= 8; z--) {
+      const x0 = Math.floor(lonToTileX(west, z));
+      const x1 = Math.floor(lonToTileX(east, z));
+      const y0 = Math.floor(latToTileY(north, z));
+      const y1 = Math.floor(latToTileY(south, z));
+      if ((x1 - x0 + 1) * (y1 - y0 + 1) <= TERRAIN_WINDOW_TILE_BUDGET) {
+        zoom = z;
+        break;
+      }
+    }
+
+    const x0 = Math.floor(lonToTileX(west, zoom));
+    const x1 = Math.floor(lonToTileX(east, zoom));
+    const y0 = Math.floor(latToTileY(north, zoom));
+    const y1 = Math.floor(latToTileY(south, zoom));
+    const tiles = new Map<string, ImageData | null>();
+    await Promise.all(
+      Array.from({ length: x1 - x0 + 1 }, (_, xi) => x0 + xi).flatMap((x) =>
+        Array.from({ length: y1 - y0 + 1 }, (_, yi) => y0 + yi).map(async (y) => {
+          tiles.set(`${x}/${y}`, await loadTile(src, zoom, x, y));
+        })
+      )
+    );
+    if ([...tiles.values()].some((tile) => tile === null)) {
+      coolDownSource(src.id);
+      continue;
+    }
+    demSourceUnavailableUntil.delete(src.id);
+
+    const elevations = new Float32Array(rows * cols);
+    for (let row = 0; row < rows; row++) {
+      const lat = center.lat + ((halfCells - row) * cellSizeM) / metresPerDegreeLat;
+      for (let col = 0; col < cols; col++) {
+        const lon = center.lon + ((col - halfCells) * cellSizeM) / metresPerDegreeLon;
+        elevations[row * cols + col] = elevationFromTiles(tiles, zoom, lat, lon);
+      }
+    }
+    if (!elevations.some(Number.isFinite)) continue;
+
+    return {
+      center,
+      rows,
+      cols,
+      elevations,
+      cellSizeM,
+      north,
+      south,
+      east,
+      west,
+      source: src.id,
+      zoom,
+      resolutionM: groundResolution(zoom, src.tilePx, center.lat, src.nativeM),
+      tilesFetched: tiles.size,
+    };
+  }
+
+  throw new Error('No terrain data covers the pondage window.');
+}
+
+/**
+ * Pull a coarse river line down onto the valley floor it actually follows.
+ *
+ * HydroRIVERS is derived at about 500 m, so on this app's own reaches a bend
+ * becomes a chord: straight runs measure 350 m at the median and up to 3.7 km.
+ * That is visible — an intake can only be dropped on a straight line where the
+ * river plainly curves — and it is not only cosmetic. A chord across a meander
+ * under-measures the waterway, so headrace and penstock lengths are understated,
+ * and elevations get sampled off the channel on the valley side.
+ *
+ * The terrain already knows where the river is: it is the lowest ground in the
+ * cross-section. So each point is offered a set of positions perpendicular to
+ * its own flow direction and moves to the lowest one. The DEM tiles are the
+ * same ones the profile needs anyway, so this costs decoding rather than
+ * network.
+ *
+ * NOT WIRED IN, AND THE REASON IS WORTH MORE THAN THE FUNCTION.
+ *
+ * Two versions were built and both were rejected against the ten built plants.
+ * The first took the lowest of nine samples per point independently, which is a
+ * minimum filter: it biased downward and seized side gullies, pushing a
+ * validated 145 m head to 322 m. The second, below, is a Viterbi pass that
+ * chooses the whole line at once and refuses to climb — it is genuinely
+ * smoother, cutting uphill steps in the profile from 121 to 49 on one reach.
+ * It still made head WORSE: mean absolute head error across the plants went
+ * from 39.3% to 62.7%, worse on six of nine.
+ *
+ * The diagnosis is the useful part. HEAD IS A DIFFERENCE OF TWO ELEVATIONS.
+ * Moving the whole line onto lower ground lowers both ends by roughly the same
+ * amount and cancels out; where it does not cancel, it is because one end
+ * happened to find deeper ground than the other, which is noise, not signal. So
+ * this technique cannot systematically improve head — it can only add variance
+ * to it. The head error in the validation set comes from somewhere else
+ * entirely: the published intake and powerhouse coordinates are not where the
+ * real works sit. For an engineer placing their own markers, head is already
+ * the drop between those markers at about +/-1.2%.
+ *
+ * What the snap DOES do correctly is horizontal: the line grows 7-14% longer as
+ * it recovers meanders the 500 m source data cut into chords, and that length is
+ * what a headrace has to span. If this is ever revived, it should be for
+ * waterway length and channel shape, with elevations left to the question they
+ * actually belong to.
+ *
+ * WHAT IT WILL NOT DO. The search is deliberately short, and lateral movement
+ * is rate-limited between neighbours, because the failure worth avoiding is
+ * hopping into an adjacent tributary or across a saddle — a smooth 200 m
+ * correction is a better line, a 600 m jump is a different river. Where the
+ * valley is broad and flat the lowest cell is close to arbitrary, and the
+ * result is then no worse than the line it started from.
+ */
+const VALLEY_SEARCH_M = 200;
+const VALLEY_STEPS = 4;
+/** How far the lateral correction may change between neighbouring points. */
+const VALLEY_SLEW_M = 90;
+/**
+ * What a metre of sideways movement costs against a metre of depth, and what a
+ * metre of climbing costs. Together these say: prefer the low ground, but not
+ * if reaching it means lurching across the valley or running uphill.
+ */
+const SLEW_COST_PER_M = 0.25;
+const RISE_COST = 3;
+
+export async function snapPathToValley(
+  path: { lat: number; lon: number; km: number }[],
+  onlySource?: string
+): Promise<{ path: { lat: number; lon: number; km: number }[]; profile: ElevationProfile; movedM: number } | null> {
+  if (path.length < 3) return null;
+  const offsets: number[] = [];
+  for (let k = -VALLEY_STEPS; k <= VALLEY_STEPS; k++) offsets.push((k * VALLEY_SEARCH_M) / VALLEY_STEPS);
+
+  // Perpendicular to the local flow direction, in degrees.
+  const candidates: { lat: number; lon: number; distanceKm: number }[] = [];
+  const perp: { dLat: number; dLon: number }[] = [];
+  for (let i = 0; i < path.length; i++) {
+    const a = path[Math.max(0, i - 1)];
+    const b = path[Math.min(path.length - 1, i + 1)];
+    const cos = Math.cos((path[i].lat * Math.PI) / 180) || 1;
+    let vx = (b.lon - a.lon) * cos;
+    let vy = b.lat - a.lat;
+    const len = Math.hypot(vx, vy) || 1;
+    vx /= len;
+    vy /= len;
+    // Rotate 90 degrees, then back to degrees of latitude and longitude.
+    perp.push({ dLat: vx / 111.32, dLon: -vy / (111.32 * cos) });
+    for (const off of offsets) {
+      candidates.push({
+        lat: path[i].lat + (perp[i].dLat * off) / 1000,
+        lon: path[i].lon + (perp[i].dLon * off) / 1000,
+        distanceKm: path[i].km,
+      });
+    }
+  }
+
+  /**
+   * The same tile budget as an unsnapped profile, deliberately.
+   *
+   * The offsets are only a couple of hundred metres, so they land almost
+   * entirely on tiles the profile needed anyway. Doubling the budget let
+   * pickZoom reach for a finer zoom instead, which multiplied the tile count
+   * and got the whole run rate-limited off the terrain service — every plant in
+   * the validation set failed with "no terrain data" at once.
+   */
+  const sampled = await sampleAlong(candidates, PATH_TILE_BUDGET, onlySource).catch(() => null);
+  if (!sampled || sampled.points.length !== candidates.length) return null;
+
+  /**
+   * Choose the whole line at once, not each point on its own.
+   *
+   * Taking the lowest of nine samples per point independently is a minimum
+   * filter: it biases downward wherever the terrain is noisy and will seize a
+   * side gully or a DEM pit, which is exactly how the first attempt pushed a
+   * validated 145 m head to 322 m. A river does not behave that way. It runs
+   * along a coherent floor and it never climbs.
+   *
+   * So this is a Viterbi pass over the lateral offsets, scoring a whole line:
+   *
+   *   cost(i,k) = z(i,k) + SLEW_COST x |lateral move| + RISE_COST x (climb)
+   *
+   * The elevation term still pulls toward the valley floor, the slew term makes
+   * the line bend rather than jump, and the rise term encodes the one thing
+   * that is certainly true of a river — it only goes down. A low cell reached
+   * by climbing, or by hopping the width of the search window, no longer wins.
+   */
+  const chosen: number[] = [];
+  const zAt = (i: number, k: number) => sampled.points[i * offsets.length + k]?.elevationM ?? NaN;
+
+  const cost: number[][] = [];
+  const back: number[][] = [];
+  cost.push(offsets.map((_, k) => (Number.isFinite(zAt(0, k)) ? zAt(0, k) : Infinity)));
+  back.push(offsets.map(() => 0));
+  for (let i = 1; i < path.length; i++) {
+    const row: number[] = [];
+    const from: number[] = [];
+    for (let k = 0; k < offsets.length; k++) {
+      const z = zAt(i, k);
+      if (!Number.isFinite(z)) {
+        row.push(Infinity);
+        from.push(0);
+        continue;
+      }
+      let best = Infinity;
+      let bestPrev = 0;
+      for (let k2 = 0; k2 < offsets.length; k2++) {
+        const prev = cost[i - 1][k2];
+        if (!Number.isFinite(prev)) continue;
+        const lateral = Math.abs(offsets[k] - offsets[k2]);
+        if (lateral > VALLEY_SLEW_M) continue;
+        const zPrev = zAt(i - 1, k2);
+        const climb = Number.isFinite(zPrev) ? Math.max(0, z - zPrev) : 0;
+        const c = prev + lateral * SLEW_COST_PER_M + climb * RISE_COST;
+        if (c < best) {
+          best = c;
+          bestPrev = k2;
+        }
+      }
+      row.push(Number.isFinite(best) ? best + z : Infinity);
+      from.push(bestPrev);
+    }
+    cost.push(row);
+    back.push(from);
+  }
+
+  // Walk back from the cheapest ending state.
+  let endK = 0;
+  let endBest = Infinity;
+  for (let k = 0; k < offsets.length; k++) {
+    if (cost[path.length - 1][k] < endBest) {
+      endBest = cost[path.length - 1][k];
+      endK = k;
+    }
+  }
+  if (!Number.isFinite(endBest)) return null;
+  for (let i = path.length - 1; i >= 0; i--) {
+    chosen[i] = endK;
+    endK = back[i][endK];
+  }
+  const movedTotal = chosen.reduce((sum, k) => sum + Math.abs(offsets[k]), 0);
+
+  // Rebuild the line, then re-measure it: a line that now follows the meander
+  // is longer than the chord it replaced, and that length is what a headrace
+  // has to span.
+  const out: { lat: number; lon: number; km: number }[] = [];
+  const points: ProfilePoint[] = [];
+  let km = 0;
+  for (let i = 0; i < path.length; i++) {
+    const off = offsets[chosen[i]];
+    const lat = path[i].lat + (perp[i].dLat * off) / 1000;
+    const lon = path[i].lon + (perp[i].dLon * off) / 1000;
+    if (i > 0) km += haversineKm([out[i - 1].lat, out[i - 1].lon], [lat, lon]);
+    out.push({ lat, lon, km });
+    points.push({
+      lat,
+      lon,
+      distanceKm: km,
+      elevationM: sampled.points[i * offsets.length + chosen[i]].elevationM,
+    });
+  }
+  return {
+    path: out,
+    profile: { ...sampled, points },
+    movedM: movedTotal / path.length,
+  };
 }
 
 /** A river walk covers far more ground than a penstock line. */

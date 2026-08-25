@@ -1,0 +1,57 @@
+{
+  "_what": "HydroRecon pondage screen against reservoirs with published figures.",
+  "_terrainSource": "GEDTM30 bare earth",
+  "_caution": "A modern DEM over an EXISTING reservoir samples the water surface, not the drowned valley. So these sites test the fill, the barrier and the shoreline integration against a real, complex shoreline at a known level; they cannot test the stage-storage relation below that level, because no bathymetry is present in the raster. Read `test` on each entry for what it is actually claiming.",
+  "_generated": "2026-08-24",
+  "reservoirs": [
+    {
+      "name": "Kulekhani (Indrasarobar)",
+      "ok": true,
+      "rasterWaterLevelM": 1533,
+      "rasterPlateauCells": 1111,
+      "publishedFullSupplyLevelM": 1530,
+      "detectedBedM": 1522.3934326171875,
+      "retainedHeightM": 10.6065673828125,
+      "areaAroundLevel": [
+        {
+          "levelM": 1530.5,
+          "areaKm2": 0.0882
+        },
+        {
+          "levelM": 1532.5,
+          "areaKm2": 0.1098
+        },
+        {
+          "levelM": 1533.5,
+          "areaKm2": 1.6884
+        },
+        {
+          "levelM": 1534.5,
+          "areaKm2": 1.7433
+        },
+        {
+          "levelM": 1536.5,
+          "areaKm2": 1.8567
+        }
+      ],
+      "predicted": {
+        "areaKm2": 1.6884,
+        "volumeMm3": 5.157885607910156,
+        "floodedCells": 1876,
+        "edgeLimited": false,
+        "damAxisLimited": false,
+        "damLengthM": 475.57421004843025,
+        "upstreamLengthM": 3197.2402484391696,
+        "seedMovedM": 94.86832980505139
+      },
+      "published": {
+        "areaKm2": 2.2,
+        "grossStorageMm3": 85.3,
+        "damCrestLengthM": 397
+      },
+      "source": "https://en.wikipedia.org/wiki/Kulekhani_Reservoir",
+      "terrainSource": "GEDTM30 bare earth",
+      "test": "area-at-known-level"
+    }
+  ]
+}

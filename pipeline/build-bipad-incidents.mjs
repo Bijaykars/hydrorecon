@@ -5,7 +5,7 @@
  *
  * BIPAD is the Government of Nepal's integrated disaster-information portal.
  * The public incident API carries locations, dates, approval/verification state
- * and much more. Ghatta deliberately keeps only the minimum needed to answer an
+ * and much more. HydroRecon deliberately keeps only the minimum needed to answer an
  * engineering screening question: what kinds of approved, verified incidents
  * have been recorded near this proposed layout, and when?
  *
@@ -27,7 +27,7 @@ const OFFICIAL = 'https://bipadportal.gov.np';
 // same public Django REST schema; it is useful when the production origin is
 // temporarily unreachable, as it was from the build network on 2026-08-13.
 const ENDPOINTS = [OFFICIAL, 'https://dev.bipadportal.gov.np'];
-const UA = 'Ghatta/0.2 (open-source hydropower screening; github.com/Bijaykars)';
+const UA = 'HydroRecon/0.2 (open-source hydropower screening; github.com/Bijaykars)';
 const CUTOFF = '2011-01-01';
 const PAGE = 1000;
 

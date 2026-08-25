@@ -79,8 +79,23 @@ export type CascadeScreen = {
 const normalize = (value: string): string =>
   value.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '');
 
-export const doedProjectKey = (project: Pick<DoedProject, 'name' | 'capacityMW'>): string =>
-  `${normalize(project.name)}|${project.capacityMW ?? 'na'}`;
+/**
+ * Identity for collapsing the same project carried in several licence tables.
+ *
+ * Name and capacity alone are not an identity. Two SEPARATE survey applications
+ * — licence 10327, Nicholas Energy on Lapha Gad, and licence 10403, Namaste
+ * Energy on Lapatgad — are both "Laphagad Hydropower Project, 4.6 MW", and
+ * merging them deleted a real project from every cascade and neighbour screen.
+ * The river disambiguates them, and it is the one attribute that cannot differ
+ * between two records of the SAME scheme moving from survey to construction.
+ *
+ * Promoter deliberately is not in the key: it legitimately changes when a
+ * licence transfers, and keying on it would split one project into two.
+ */
+export const doedProjectKey = (
+  project: Pick<DoedProject, 'name' | 'capacityMW'> & { river?: string }
+): string =>
+  `${normalize(project.name)}|${project.capacityMW ?? 'na'}|${normalize(project.river ?? '')}`;
 
 export const doedStageRank = (stage: Licence['stage']): number => {
   if (stage === 'Operating') return 0;

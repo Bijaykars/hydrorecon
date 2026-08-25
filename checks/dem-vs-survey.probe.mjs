@@ -38,10 +38,27 @@
  * `npm run check`, which must keep working on a plane.
  */
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { createServer } from 'vite';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright-core');
+
+/**
+ * GEDTM30, when the local extract has been built.
+ *
+ * The two products above are both radar SURFACE models read through a tile
+ * pyramid; GEDTM30 is a bare-earth DTM read out of a local raster. It cannot be
+ * added to SOURCES because it is not tiles, and it is optional because the
+ * store is a gigabyte that `npm run build:gedtm` produces on request.
+ *
+ * Sampling goes through the app's own fetchTerrainWindow rather than a
+ * reimplementation here, for the reason the header gives for using a browser at
+ * all: a check that reimplements the thing under test measures the copy.
+ */
+const GEDTM_ID = 'GEDTM30 bare earth';
+const GEDTM_AVAILABLE = existsSync('sources/gedtm/nepal-gedtm.bin');
+const PORT = 5198;
 
 /** The zoom a river-length profile normally lands on. */
 const ZOOM = 14;
@@ -65,7 +82,9 @@ const SOURCES = [
   },
 ];
 
-const all = JSON.parse(readFileSync('src/data/dhm-stations.json', 'utf8'));
+// The bundle gained a wrapper object after this probe was written; accept both.
+const raw = JSON.parse(readFileSync('src/data/dhm-stations.json', 'utf8'));
+const all = Array.isArray(raw) ? raw : (raw.stations ?? []);
 /** River gauges sit in valley bottoms — exactly where intakes and powerhouses go. */
 const gauges = all.filter((s) => s.r === 1 && Number.isFinite(s.x) && Number.isFinite(s.y));
 
@@ -184,10 +203,57 @@ function hydroRiversPairs(limit) {
   return out.filter((_, i) => i % step === 0).slice(0, limit);
 }
 
+const server = GEDTM_AVAILABLE
+  ? await createServer({ server: { port: PORT, strictPort: true }, logLevel: 'error' })
+  : null;
+if (server) await server.listen();
+
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage();
-// The tiles send ACAO:*, so any origin works.
-await page.goto('about:blank');
+// The tiles send ACAO:*, so any origin works. The local store does not: it is
+// served by the dev server, so that page has to be the origin when it is in use.
+await page.goto(server ? `http://localhost:${PORT}/` : 'about:blank', {
+  waitUntil: 'domcontentloaded',
+});
+
+/**
+ * Sample the local bare-earth store at every point, through the shipped reader.
+ *
+ * One tiny window per point: at a 50 m radius and 30 m spacing that is a 5x5
+ * grid whose centre cell sits exactly on the requested coordinate, so the
+ * request costs about a hundred bytes and the value is the same bilinear read
+ * the app performs. Lanes keep the round trips overlapped; they are local.
+ */
+async function sampleGedtm(points) {
+  return page.evaluate(
+    async ([pts, sourceId]) => {
+      const api = await import('/src/api.ts');
+      const out = new Array(pts.length).fill(null);
+      const LANES = 16;
+      await Promise.all(
+        Array.from({ length: LANES }, async (_, lane) => {
+          for (let i = lane; i < pts.length; i += LANES) {
+            try {
+              const g = await api.fetchTerrainWindow(
+                { lat: pts[i].y, lon: pts[i].x },
+                0.05,
+                30,
+                sourceId
+              );
+              const mid = ((g.rows - 1) / 2) * g.cols + (g.cols - 1) / 2;
+              const v = g.elevations[mid];
+              out[i] = Number.isFinite(v) ? v : null;
+            } catch {
+              out[i] = null;
+            }
+          }
+        })
+      );
+      return out;
+    },
+    [points.map((q) => ({ x: q.x, y: q.y })), GEDTM_ID]
+  );
+}
 
 /** Sample one source at every point, through the app's own decode. */
 async function sampleSource(url, pts) {
@@ -286,6 +352,44 @@ const pairIdx = pairs.map((p) => {
   return [i, j];
 });
 
+/**
+ * CROSS-SLOPE, the quantity a waterway alignment actually turns on.
+ *
+ * A headrace does not run down the river; it benches along the hillside above
+ * it. Whether that is a canal or a tunnel is decided by how steeply the ground
+ * falls ACROSS the alignment, and the cost per metre between those two answers
+ * differs by an order of magnitude.
+ *
+ * Absolute ground level cannot support that call — it carries a 5-95% spread of
+ * -14 to +6 m, several times the depth of any cut. A SLOPE is a difference over
+ * a short baseline, and radar DEM errors are strongly correlated at short
+ * range, so most of that error should cancel. Should. Measure it before
+ * building anything on it.
+ *
+ * For each reach midpoint, sample 100 m either side along the perpendicular, in
+ * both products, and compare the grades they imply.
+ */
+const CROSS_M = 100;
+const crossIdx = pairs.map((p) => {
+  const midLat = (p.A.y + p.B.y) / 2;
+  const midLon = (p.A.x + p.B.x) / 2;
+  const cos = Math.cos((midLat * Math.PI) / 180);
+  const dy = (p.B.y - p.A.y) * 111320;
+  const dx = (p.B.x - p.A.x) * 111320 * cos;
+  const len = Math.hypot(dx, dy) || 1;
+  const px = -dy / len;
+  const py = dx / len;
+  const off = (sign) => ({
+    y: midLat + (sign * CROSS_M * py) / 111320,
+    x: midLon + (sign * CROSS_M * px) / (111320 * cos),
+    n: p.A.n,
+  });
+  const c = pts.push({ y: midLat, x: midLon, n: p.A.n }) - 1;
+  const a = pts.push(off(-1)) - 1;
+  const b = pts.push(off(1)) - 1;
+  return [c, a, b];
+});
+
 console.log(
   `\nterrain error at z${ZOOM}\n` +
     `  ${gaugePts.length} DHM river gauges (of ${gauges.length}; the rest are coarser than ` +
@@ -295,7 +399,15 @@ console.log(
 
 const samples = [];
 for (const src of SOURCES) samples.push(await sampleSource(src.url, pts));
+const labels = SOURCES.map((src) => src.id);
+if (GEDTM_AVAILABLE) {
+  samples.push(await sampleGedtm(pts));
+  labels.push(GEDTM_ID);
+} else {
+  console.log('  (no local GEDTM30 store — run `npm run build:gedtm` to include it)\n');
+}
 await browser.close();
+if (server) await server.close();
 
 const ok2 = (v) => Number.isFinite(v) && v > -400;
 const rows = gaugePts
@@ -342,6 +454,63 @@ console.log(
     `  the record is the outlier. That is why it is not the headline number.`
 );
 
+{
+  /**
+   * MEASURE FROM THE CHANNEL OUTWARD, not bank to bank.
+   *
+   * The first version of this differenced the two offset points and divided by
+   * the full baseline, which measures how far the valley TILTS, not how steeply
+   * it rises. A symmetric V-valley scores near zero however steep its sides
+   * are, and the whole country came out at a 6% grade — the tell that the
+   * statistic was wrong, since Nepal is not flat.
+   *
+   * The gradient that matters is from the channel up each side. A canal is
+   * benched on ONE side, so the gentler of the two is what decides whether it
+   * can be built at all.
+   */
+  /**
+   * NEPAL ONLY, and it changes the answer completely.
+   *
+   * The bundled network reaches past the border onto the Tibetan plateau, and
+   * the reach sample is ordered by file position, so the first version of this
+   * measured cross-slopes at 31.1N and 4,900 m — genuinely flat ground, nowhere
+   * anyone builds a khola scheme. It reported a 5% typical hillside for the
+   * whole country, which is the second wrong number this check produced before
+   * it produced a right one.
+   */
+  const inNepal = (q) => q.y >= 26.2 && q.y <= 30.6 && q.x >= 79.9 && q.x <= 88.4;
+  const grade = (z0, z1) => (Math.abs(z1 - z0) / CROSS_M) * 100;
+  const slopes = crossIdx
+    .filter(([c]) => inNepal(pts[c]))
+    .map(([c, i, j]) => ({
+      a: Math.min(grade(samples[0][c], samples[0][i]), grade(samples[0][c], samples[0][j])),
+      b: Math.min(grade(samples[1][c], samples[1][i]), grade(samples[1][c], samples[1][j])),
+    }))
+    .filter((d) => Number.isFinite(d.a) && Number.isFinite(d.b));
+  if (slopes.length) {
+    const diff = stats(slopes.map((x) => x.a - x.b));
+    const mean = slopes.map((x) => (x.a + x.b) / 2).sort((p, q) => p - q);
+    const med = mean[mean.length >> 1];
+    // A canal can be benched below about 35 degrees, which is a 70% grade.
+    const CANAL_MAX_PCT = 70;
+    const disagree = slopes.filter((x) => x.a > CANAL_MAX_PCT !== x.b > CANAL_MAX_PCT).length;
+    console.log(
+      `
+cross-slope, channel to ${CROSS_M} m up the gentler bank, ${slopes.length} reaches` +
+        `
+  the two products differ by  median ${diff.median.toFixed(1)}%  sigma ${diff.sigma.toFixed(1)}%` +
+        `  5-95% ${diff.p05.toFixed(1)} to ${diff.p95.toFixed(1)}%` +
+        `
+  gentler-bank grade  p25 ${mean[Math.floor(mean.length * 0.25)].toFixed(0)}%  ` +
+        `median ${med.toFixed(0)}%  p75 ${mean[Math.floor(mean.length * 0.75)].toFixed(0)}%  ` +
+        `p90 ${mean[Math.floor(mean.length * 0.9)].toFixed(0)}%` +
+        `
+  they disagree on canal-vs-tunnel (${CANAL_MAX_PCT}% grade) for ` +
+        `${disagree}/${slopes.length} reaches (${((disagree / slopes.length) * 100).toFixed(0)}%)`
+    );
+  }
+}
+
 const hs = stats(headDisagree);
 const hr = stats(headRel);
 if (hs && hr) {
@@ -361,5 +530,130 @@ if (hs && hr) {
     `  -> DEM_HEAD_ERROR_M in src/engine/uncertainty.ts: measured ${Math.round(hs.sigma)} m.\n` +
       `     A floor, not a ceiling — two radar DEMs can share a bias and agree while both are wrong.`
   );
+}
+
+/**
+ * THREE PRODUCTS MAKE EACH ONE'S ERROR SOLVABLE.
+ *
+ * With two sources all you can measure is how far apart they are; nothing says
+ * which one is wrong. With three, and if their errors are independent, the
+ * pairwise spreads are
+ *
+ *     s2(A-B) = s2A + s2B      s2(A-C) = s2A + s2C      s2(B-C) = s2B + s2C
+ *
+ * three equations in three unknowns, so
+ *
+ *     s2A = ( s2(A-B) + s2(A-C) - s2(B-C) ) / 2
+ *
+ * and likewise for B and C. This is the three-cornered-hat estimator, standard
+ * in clock metrology and in satellite validation, and it is the only way to
+ * rank these products without truth data — which for Nepali river vertices does
+ * not exist. DHM's own station elevations were tried and rejected; the header
+ * says why.
+ *
+ * THE ASSUMPTION IS THE WHOLE RISK, and here it is known to be imperfect.
+ * Mapterhorn is a Copernicus build and GEDTM30 fuses Copernicus among its
+ * inputs, so those two share a parent and their errors are correlated. That
+ * makes their measured disagreement smaller than independence would predict,
+ * which pushes their solved variances DOWN and the odd one out UP. Read the
+ * ranking, not the absolute metres, and treat a negative variance as the
+ * estimator announcing that the independence it needs was not there.
+ *
+ * Robust sigma throughout, for the reason `stats` already gives: these
+ * distributions are heavy-tailed and RMSE would describe a rare gorge artifact
+ * rather than the typical reach.
+ */
+if (samples.length === 3) {
+  const drop = (k, [i, j]) => samples[k][i] - samples[k][j];
+  const usable = pairIdx.filter((ij, k) => {
+    const all = [0, 1, 2].flatMap((m) => [samples[m][ij[0]], samples[m][ij[1]]]);
+    return all.every(ok2) && Math.abs(drop(0, ij)) >= MIN_PAIR_DROP_M;
+  });
+
+  const pairSigma = (m, n) => {
+    const st = stats(usable.map((ij) => drop(m, ij) - drop(n, ij)));
+    return st ? st.sigma : NaN;
+  };
+  const sAB = pairSigma(0, 1);
+  const sAC = pairSigma(0, 2);
+  const sBC = pairSigma(1, 2);
+
+  /**
+   * THE MEDIAN IS THE ONE THAT SAYS WHETHER THIS IS A BARE-EARTH EFFECT.
+   *
+   * A wider sigma against both surface models has two completely different
+   * explanations and they demand opposite conclusions: GEDTM30 is noisier, or
+   * GEDTM30 is correctly stripping a canopy that both DSMs carry and both
+   * therefore agree about. Sigma alone cannot separate them.
+   *
+   * The MEDIAN can. Removing tree height is a systematic, one-signed
+   * correction, so if that is what is happening the point-level median against
+   * each surface model is clearly positive and roughly canopy-sized. If instead
+   * it is scatter, the median sits near zero and only the spread moves.
+   *
+   * Points first, because that is where a canopy offset lives. Head is a
+   * difference between two valley-bottom points, so a bias common to both ends
+   * cancels out of it — which is the whole reason head is the engine's number
+   * and absolute ground level is not.
+   */
+  const pointStat = (m, n) => {
+    const v = [];
+    for (let i = 0; i < pts.length; i++) {
+      if (ok2(samples[m][i]) && ok2(samples[n][i])) v.push(samples[m][i] - samples[n][i]);
+    }
+    return stats(v);
+  };
+  console.log(`\nPOINT disagreement between all three — a canopy offset would show up here`);
+  console.log(line(`${labels[0]} - ${labels[2]}`, pointStat(0, 2)));
+  console.log(line(`${labels[1]} - ${labels[2]}`, pointStat(1, 2)));
+  console.log(line(`${labels[0]} - ${labels[1]}`, pointStat(0, 1)));
+
+  const headStat = (m, n) => stats(usable.map((ij) => drop(m, ij) - drop(n, ij)));
+  console.log(`\nHEAD disagreement between all three, ${usable.length} shared reaches`);
+  console.log(line(`${labels[0]} - ${labels[1]}`, headStat(0, 1)));
+  console.log(line(`${labels[0]} - ${labels[2]}`, headStat(0, 2)));
+  console.log(line(`${labels[1]} - ${labels[2]}`, headStat(1, 2)));
+
+  const solve = (x, y, z) => (x * x + y * y - z * z) / 2;
+  const own = [
+    solve(sAB, sAC, sBC),
+    solve(sAB, sBC, sAC),
+    solve(sAC, sBC, sAB),
+  ];
+  console.log(`\nthree-cornered hat: each product's OWN head error, if their errors are independent`);
+  own.forEach((v, i) => {
+    console.log(
+      `  ${labels[i].padEnd(46)} ${
+        v >= 0 ? 'sigma ' + Math.sqrt(v).toFixed(1) + ' m' : 'NEGATIVE variance — errors are not independent'
+      }`
+    );
+  });
+  const ranked = own
+    .map((v, i) => ({ v, i }))
+    .filter((r) => r.v >= 0)
+    .sort((a, b) => a.v - b.v);
+  if (ranked.length === 3) {
+    console.log(
+      `  -> ranked best to worst: ${ranked.map((r) => labels[r.i]).join(', ')}.`
+    );
+    /**
+     * One comparison here is stronger than the rest and it is worth naming.
+     * Subtracting the two solutions, s2A - s2C = ( d2(A,B) - d2(B,C) ) / 2:
+     * the shared-parent covariance between A and C cancels exactly. So the
+     * Mapterhorn-vs-GEDTM30 ORDER is decided purely by which of them disagrees
+     * more with the independent third product, and it survives the correlation
+     * caveat that the absolute metres do not.
+     */
+    console.log(
+      `     Mapterhorn vs GEDTM30 is the robust half of that: their shared Copernicus\n` +
+        `     parent cancels when the two solutions are subtracted, leaving only how far\n` +
+        `     each sits from AWS (${sAB.toFixed(1)} m vs ${sBC.toFixed(1)} m).`
+    );
+  } else if (ranked.length < 3) {
+    console.log(
+      '  -> a negative variance means the shared-parent correlation above is real and large.' +
+        ' The pairwise rows are still valid; the decomposition is not.'
+    );
+  }
 }
 console.log();

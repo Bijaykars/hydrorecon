@@ -105,7 +105,7 @@ const [download] = await Promise.all([
 const downloadPath = await download.path();
 if (!downloadPath) throw new Error('GeoJSON download has no readable path');
 const geo = JSON.parse(await readFile(downloadPath, 'utf8'));
-if (geo.ghatta_cascade?.upstreamCandidates !== upstream || geo.ghatta_cascade?.downstreamCandidates !== downstream) {
+if (geo.hydrorecon_cascade?.upstreamCandidates !== upstream || geo.hydrorecon_cascade?.downstreamCandidates !== downstream) {
   throw new Error('GeoJSON cascade metadata differs from the visible screen');
 }
 const projectFeatures = geo.features.filter((feature) =>

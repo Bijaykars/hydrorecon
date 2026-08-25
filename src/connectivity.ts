@@ -88,14 +88,26 @@ export type UpstreamConnectivityScreen = {
   limitation: string;
 };
 
+/**
+ * Which lakes lead the list and keep their route geometry.
+ *
+ * ICIMOD's national assessment outranks a remotely-sensed expansion trend: a
+ * lake it placed on the 47-lake danger list has been judged on its dam, its
+ * source glacier and its surroundings, which no area time series can see.
+ * Rank I first, then the rest of the ranked list, then merely-expanding lakes.
+ */
 const lakePriority = (lake: ConnectedGlacialLake): number =>
-  lake.expansionSignificant === true &&
-  (lake.expansionRateKm2Yr ?? 0) > 0 &&
-  lake.timeSeriesOutlier !== true
-    ? 0
-    : lake.timeSeriesOutlier === true
-      ? 2
-      : 1;
+  lake.pdgl?.rank === 1
+    ? -2
+    : lake.pdgl
+      ? -1
+      : lake.expansionSignificant === true &&
+          (lake.expansionRateKm2Yr ?? 0) > 0 &&
+          lake.timeSeriesOutlier !== true
+        ? 0
+        : lake.timeSeriesOutlier === true
+          ? 2
+          : 1;
 
 function lakeConnection(connection: ChannelConnection<Source>): ConnectedGlacialLake | null {
   if (connection.source.sourceType !== 'lake' || connection.snapKm > LAKE_MAX_SNAP_KM) return null;

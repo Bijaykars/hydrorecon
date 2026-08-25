@@ -104,6 +104,22 @@ export type Desander = {
   particleMm: number;
   /** How fast that grain sinks, mm/s. */
   settlingMmS: number;
+  /**
+   * Through-velocity in the ONE chamber left running while its twin flushes.
+   *
+   * The section is sized for the full design flow at BASIN_VELOCITY_MS, then
+   * divided into bays. So while one bay is down for flushing, the other passes
+   * the whole flow through half the width and the velocity doubles — 0.60 m/s
+   * on the first site this was checked against, well outside the 0.2-0.4
+   * window this module says it is designing inside.
+   *
+   * That is not a sizing error, it is a real property of a two-bay basin that
+   * shares its section: during flushing it stops catching the target grain and
+   * passes coarser sand to the turbine. Sizing each bay for full flow would fix
+   * it and double the footprint, which is a feasibility decision and not a
+   * screening one. So it is REPORTED rather than hidden or designed away.
+   */
+  flushingVelocityMs: number | null;
   /** Settling zone alone, m. */
   settlingLengthM: number;
   /** Settling zone plus the inlet flare and outlet contraction — what gets built. */
@@ -163,8 +179,17 @@ export function desander(opts: { designFlowCms: number; netHeadM: number }): Des
     totalWidthM,
     depthM,
     bays,
+    flushingVelocityMs: bays > 1 ? q / ((waterWidthM / bays) * depthM) : null,
     benchNeededM: totalWidthM + ACCESS_WIDTH_M,
-    excavationM3: settlingLengthM * totalWidthM * depthM,
+    /**
+     * On the TOTAL length, not the settling length.
+     *
+     * The inlet flare and the outlet contraction are part of the structure and
+     * have to be dug out with it; charging excavation only to the settling
+     * length understated the first real site by 9% (202 m3 against 222 m3).
+     * A screening figure that is low in the cheap direction is the wrong error.
+     */
+    excavationM3: (settlingLengthM + inletM + outletM) * totalWidthM * depthM,
   };
 }
 

@@ -9,7 +9,7 @@
  * HimaTibetMap folds are excluded: this screen is for mapped active-fault
  * traces of seismogenic concern, not every structure in the source catalogue.
  *
- * The result is a CC BY-SA 4.0 derivative data file. Ghatta's MIT licence
+ * The result is a CC BY-SA 4.0 derivative data file. HydroRecon's MIT licence
  * continues to apply to code, not to this bundled dataset.
  */
 import { createHash } from 'node:crypto';
@@ -23,7 +23,7 @@ const REPOSITORY = 'https://github.com/GEMScienceTools/gem-global-active-faults'
 const LICENSE = `${REPOSITORY}/blob/${COMMIT}/LICENSE.txt`;
 const WINDOW = { west: 79.5, south: 25.5, east: 89, north: 31 };
 const EXCLUDED = new Set(['Syncline', 'Anticline']);
-const UA = 'Ghatta/0.2 (open-source hydropower screening; github.com/Bijaykars)';
+const UA = 'HydroRecon/0.2 (open-source hydropower screening; github.com/Bijaykars)';
 
 const r5 = (value) => Math.round(value * 1e5) / 1e5;
 const inside = ([x, y]) =>

@@ -1,6 +1,6 @@
 # Engineering readiness and field-investigation method
 
-Ghatta is a site-screening workbench. Its new readiness layer answers a different question from
+HydroRecon is a site-screening workbench. Its new readiness layer answers a different question from
 “how many megawatts?”:
 
 > What evidence do we actually have, what can stop this layout, and what must the engineering team
@@ -117,7 +117,7 @@ required deliverable. Triggers change the plan:
 - a non-standard turbine duty makes specialist electro-mechanical review P1.
 
 The UI shows the plan and the third download button exports it as CSV. The main CSV provenance and
-GeoJSON `ghatta_readiness` member carry the same gates so the engineering state survives outside the
+GeoJSON `hydrorecon_readiness` member carry the same gates so the engineering state survives outside the
 app.
 
 The direct DoED reach screen and the directed upstream/downstream screen are intentionally separate;

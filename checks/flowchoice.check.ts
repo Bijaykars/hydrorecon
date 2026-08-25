@@ -7,8 +7,9 @@
  * failures are pinned as cases.
  */
 import assert from 'node:assert/strict';
-import { chooseFlowMagnitude, DISAGREE_RATIO } from '../src/engine/flowchoice.ts';
+import { BLEND_BIAS_CORRECTION, chooseFlowMagnitude, DISAGREE_RATIO } from '../src/engine/flowchoice.ts';
 import { annualMeanCms, driestMonthFlow } from '../src/engine/hydest.ts';
+import { modifiedHydestAnnualMean } from '../src/engine/modified-hydest.ts';
 
 let passed = 0;
 const ok = (name: string, fn: () => void) => {
@@ -116,6 +117,85 @@ ok('outside Nepal there is no judge, and the network keeps its long-standing rol
   const c = chooseFlowMagnitude({ dates: s.dates, series: s.values, networkMeanCms: meanOf(s.values) / 200, hydest: null });
   assert.equal(c.authority, 'network');
   assert.match(c.note, /no independent judge/);
+});
+
+/**
+ * The office's regression judges when its four inputs are present, and the
+ * older one judges when they are not. The two must be distinguishable, or the
+ * swap is untestable and silently reversible.
+ */
+ok('Modified HYDEST takes over as judge when its inputs are supplied', () => {
+  const MOD = {
+    below3000Km2: 300,
+    below5000Km2: 340,
+    averageAltitudeM: 2600,
+    annualWetnessMm: 2000,
+  };
+  const target = modifiedHydestAnnualMean(MOD)!;
+  const s = shaped(target);
+  const mean = meanOf(s.values);
+  // The model sits on the office regression's annual mean; the network is 20x low.
+  const c = chooseFlowMagnitude({
+    dates: s.dates,
+    series: s.values.map((v) => (v * target) / mean),
+    networkMeanCms: target / 20,
+    hydest: HYDEST,
+    modified: MOD,
+  });
+  assert.equal(c.authority, 'model');
+  assert.ok(
+    c.judgeCms != null && Math.abs(c.judgeCms - target) / target < 1e-9,
+    `judge should be the Modified HYDEST mean ${target}, got ${c.judgeCms}`
+  );
+});
+
+/**
+ * When the two global sources agree, the magnitude is now their geometric mean
+ * with the regional regression rather than the network alone. The factor must
+ * be the geometric mean's ratio exactly, and must be absent when the regression
+ * has nothing to say — otherwise the blend is silently either always or never
+ * applied, and both failures look like working software.
+ */
+ok('agreement blends the network with the regional estimate', () => {
+  const MOD = {
+    below3000Km2: 300,
+    below5000Km2: 340,
+    averageAltitudeM: 2600,
+    annualWetnessMm: 2000,
+  };
+  const regional = modifiedHydestAnnualMean(MOD)!;
+  const s = shaped(regional);
+  const network = meanOf(s.values) * 1.5; // inside the 3x agreement range
+  const c = chooseFlowMagnitude({
+    dates: s.dates,
+    series: s.values,
+    networkMeanCms: network,
+    hydest: HYDEST,
+    modified: MOD,
+  });
+  assert.equal(c.authority, 'network');
+  /**
+   * The blend carries its measured bias correction.
+   *
+   * The geometric mean of the two sources reads 0.8727× against 69 DHM gauges,
+   * so the shipped magnitude includes the constant that recentres it. Asserting
+   * the raw geometric mean would pin the engine to a figure it is measured to
+   * be systematically low on.
+   */
+  const want = (Math.sqrt(network * regional) * BLEND_BIAS_CORRECTION) / network;
+  assert.ok(
+    c.magnitudeFactor != null && Math.abs(c.magnitudeFactor - want) / want < 1e-12,
+    `factor should be ${want}, got ${c.magnitudeFactor}`
+  );
+
+  // Without the regression there is nothing to blend, and nothing must change.
+  const plain = chooseFlowMagnitude({
+    dates: s.dates,
+    series: s.values,
+    networkMeanCms: network,
+    hydest: HYDEST,
+  });
+  assert.equal(plain.magnitudeFactor, undefined);
 });
 
 function meanOf(v: number[]): number {

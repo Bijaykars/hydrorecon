@@ -35,7 +35,7 @@ if (!ROOT || !existsSync(ROOT)) {
   console.error('usage: node pipeline/build-topo-index.mjs "<path to TOPOMAPS folder>"');
   process.exit(1);
 }
-const OUT_DIR = 'public/local';
+const OUT_DIR = 'sources/local';
 if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
 
 // --- Nepal Modified UTM-84 (Everest 1830 Adj. 1937) -> geodetic ------------
@@ -246,4 +246,4 @@ writeFileSync(
 console.log(`\nwrote ${OUT_DIR}/topo-index.json: ${sheets.length} sheets`);
 if (noWorld) console.log(`  ${noWorld} skipped: no world file`);
 if (noSize) console.log(`  ${noSize} skipped: unreadable JPEG header`);
-console.log(`\nAdd to .env.local so the dev server can find the scans:\n  GHATTA_TOPO_DIR=${ROOT}`);
+console.log(`\nAdd to .env.local so the dev server can find the scans:\n  HYDRORECON_TOPO_DIR=${ROOT}`);

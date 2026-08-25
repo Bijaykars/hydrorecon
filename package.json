@@ -1,5 +1,5 @@
 {
-  "name": "ghatta",
+  "name": "hydrorecon",
   "private": true,
   "version": "0.2.0",
   "type": "module",
@@ -13,7 +13,7 @@
     "check:live:cascade": "node checks/cascade.live.mjs",
     "check:live:hydest": "node checks/hydest.live.mjs",
     "typecheck": "tsc -b --noEmit",
-    "check": "node --experimental-strip-types --no-warnings checks/api.check.ts && node --experimental-strip-types --no-warnings checks/region.check.ts && node --experimental-strip-types --no-warnings checks/geology.check.ts && node --experimental-strip-types --no-warnings checks/faults.check.ts && node --experimental-strip-types --no-warnings checks/hazards.check.ts && node --experimental-strip-types --no-warnings checks/connectivity.check.ts && node --experimental-strip-types --no-warnings checks/cascade.check.ts && node --experimental-strip-types --no-warnings checks/context.check.ts && node --experimental-strip-types --no-warnings checks/hydro.check.ts && node --experimental-strip-types --no-warnings checks/units.check.ts && node --experimental-strip-types --no-warnings checks/plants.check.ts && node --experimental-strip-types --no-warnings checks/hydrogenerate.check.ts && node --experimental-strip-types --no-warnings checks/export.check.ts && node --experimental-strip-types --no-warnings checks/readiness.check.ts && node --experimental-strip-types --no-warnings checks/gauges.check.ts && node --experimental-strip-types --no-warnings checks/waterway.check.ts && node --experimental-strip-types --no-warnings checks/hydest.check.ts && node --experimental-strip-types --no-warnings checks/grid.check.ts && node --experimental-strip-types --no-warnings checks/measured.check.ts && node --experimental-strip-types --no-warnings checks/protected.check.ts && node --experimental-strip-types --no-warnings checks/sediment.check.ts && node --experimental-strip-types --no-warnings checks/flowchoice.check.ts",
+    "check": "node --experimental-strip-types --no-warnings checks/api.check.ts && node --experimental-strip-types --no-warnings checks/region.check.ts && node --experimental-strip-types --no-warnings checks/geology.check.ts && node --experimental-strip-types --no-warnings checks/faults.check.ts && node --experimental-strip-types --no-warnings checks/hazards.check.ts && node --experimental-strip-types --no-warnings checks/connectivity.check.ts && node --experimental-strip-types --no-warnings checks/cascade.check.ts && node --experimental-strip-types --no-warnings checks/context.check.ts && node --experimental-strip-types --no-warnings checks/hydro.check.ts && node --experimental-strip-types --no-warnings checks/units.check.ts && node --experimental-strip-types --no-warnings checks/plants.check.ts && node --experimental-strip-types --no-warnings checks/hydrogenerate.check.ts && node --experimental-strip-types --no-warnings checks/export.check.ts && node --experimental-strip-types --no-warnings checks/readiness.check.ts && node --experimental-strip-types --no-warnings checks/gauges.check.ts && node --experimental-strip-types --no-warnings checks/waterway.check.ts && node --experimental-strip-types --no-warnings checks/hydest.check.ts && node --experimental-strip-types --no-warnings checks/grid.check.ts && node --experimental-strip-types --no-warnings checks/measured.check.ts && node --experimental-strip-types --no-warnings checks/protected.check.ts && node --experimental-strip-types --no-warnings checks/sediment.check.ts && node --experimental-strip-types --no-warnings checks/flowchoice.check.ts && node --experimental-strip-types --no-warnings checks/seismic.check.ts && node --experimental-strip-types --no-warnings checks/collector.check.ts && node --experimental-strip-types --no-warnings checks/mhsp.check.ts && node --experimental-strip-types --no-warnings checks/fdcshape.check.ts && node --experimental-strip-types --no-warnings checks/overrides.check.mjs && node --experimental-strip-types --no-warnings checks/modified-hydest.check.ts && node --experimental-strip-types --no-warnings checks/corridor.check.ts && node --experimental-strip-types --no-warnings checks/pondage.check.ts && node --experimental-strip-types --no-warnings checks/landcover.check.ts && node --experimental-strip-types --no-warnings checks/designflow.check.ts && node --experimental-strip-types --no-warnings checks/geology-units.check.ts",
     "desktop": "npm run build && electron desktop/main.cjs",
     "desktop:dev": "electron desktop/main.cjs",
     "desktop:pack": "npm run build && electron-builder --dir",
@@ -28,9 +28,14 @@
     "build:doed": "node pipeline/build-doed-projects.mjs",
     "build:hazards": "node pipeline/build-bipad-incidents.mjs",
     "build:faults": "node pipeline/build-nepal-faults.mjs",
-    "build:geology": "node pipeline/build-dmg-geology.mjs",
+    "build:geology": "python pipeline/build-dmg-geology.py",
+    "build:geology-units": "python pipeline/build-nepal-geology-units.py",
     "build:glacial-lakes": "node --no-warnings pipeline/build-glacial-lakes.mjs",
-    "build:validation": "node pipeline/build-validation.mjs"
+    "build:validation": "node pipeline/build-validation.mjs",
+    "build:pondage": "node pipeline/build-pondage-validation.mjs",
+    "build:gedtm": "python pipeline/build-gedtm-nepal.py",
+    "build:landcover": "python pipeline/build-worldcover-nepal.py",
+    "build:fleet": "node pipeline/build-fleet-validation.mjs"
   },
   "dependencies": {
     "maplibre-gl": "^5.6.0",
@@ -39,8 +44,8 @@
   },
   "main": "desktop/main.cjs",
   "build": {
-    "appId": "org.ghatta.workbench",
-    "productName": "Ghatta",
+    "appId": "org.hydrorecon.workbench",
+    "productName": "HydroRecon",
     "files": [
       "dist/**/*",
       "desktop/main.cjs",

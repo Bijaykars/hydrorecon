@@ -17,7 +17,7 @@ import { writeFileSync } from 'node:fs';
 
 const BASE = 'https://doed.gov.np/pages';
 const OUT = 'src/data/doed-projects.json';
-const UA = 'Ghatta/0.2 (open-source hydropower screening; github.com/Bijaykars)';
+const UA = 'HydroRecon/0.2 (open-source hydropower screening; github.com/Bijaykars)';
 
 const PAGES = [
   ['hydromorethan1', 'Survey licence', 'licence', 200],

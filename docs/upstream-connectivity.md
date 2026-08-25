@@ -1,6 +1,6 @@
 # Upstream glacial-lake and incident connectivity
 
-Ghatta now asks a catchment question that a 15 km proximity buffer cannot answer:
+HydroRecon now asks a catchment question that a 15 km proximity buffer cannot answer:
 
 > Can a mapped glacial-lake centroid or a BIPAD report point be snapped close to a mapped channel whose directed HydroRIVERS topology reaches the selected intake?
 
@@ -18,7 +18,7 @@ The bundled `nepal-glacial-lakes.json` is built from the Sentinel-2 centroid lay
 
 The observations span 2017–2024 and use Sentinel-2. The upstream dataset reports validation F1 of 0.92 for 2020 and about 0.91 for 2017 and 2024. Centroids are EPSG:4326; lake polygon areas were calculated upstream in an equal-area CRS. The dataset is CC BY 4.0.
 
-Ghatta retains the source identifier, country, basin, glacier-fed classification, mean lake elevation, published expansion rate and uncertainty, expansion-significance flag, time-series-outlier flag, and centroid. It does not create a danger score. Significant positive lake expansion is an investigation trigger, not breach likelihood.
+HydroRecon retains the source identifier, country, basin, glacier-fed classification, mean lake elevation, published expansion rate and uncertainty, expansion-significance flag, time-series-outlier flag, and centroid. It does not create a danger score. Significant positive lake expansion is an investigation trigger, not breach likelihood.
 
 Rebuild with:
 
@@ -32,7 +32,7 @@ The builder checks Zenodo's open-access and CC BY 4.0 metadata, pins the exact s
 
 HydroRIVERS v1.0 is a 15 arc-second (about 500 m) global river network. Its topology supports upstream/downstream connectivity, but it includes only streams with at least 10 km² upstream area or 0.1 m³/s long-term mean discharge. The technical documentation explicitly warns that smaller streams become spatially unreliable at that scale.
 
-Ghatta uses the direction already encoded in the bundled Nepal HydroRIVERS geometry:
+HydroRecon uses the direction already encoded in the bundled Nepal HydroRIVERS geometry:
 
 1. Snap the intake to a stored river-network vertex. The intake must meet the same 0.8 km network-snap guard used by the study.
 2. Snap lake centroids within 1.0 km and BIPAD point reports within 1.5 km to a stored vertex. Distance uses a local metric frame; EPSG:3857 is not used for analysis.
@@ -57,7 +57,7 @@ For sites within its published extent, the UI also links ICIMOD's open [2026 Kos
 
 ## Source and licence boundary
 
-- Ghatta code remains MIT.
+- HydroRecon code remains MIT.
 - The GLO-derived compact data bundle remains CC BY 4.0 and retains its citation/licence in the file and exports.
 - The BIPAD public-API bundle has no explicit dataset licence identified; attribute BIPAD/NDRRMA and verify reuse terms.
 - HydroRIVERS is used under the HydroSHEDS licence; cite Lehner and Grill (2013) and follow its attribution requirements.

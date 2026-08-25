@@ -112,6 +112,8 @@ export function licencesAlong(
   radiusKm = 6
 ): Licence[] {
   if (path.length === 0) return [];
+  // Latitude pad. Longitude degrees are narrower, so they need a wider one —
+  // see lonPad below; a single pad rejected licences inside the radius.
   const pad = radiusKm / 100;
   let n = -90;
   let s = 90;
@@ -124,10 +126,12 @@ export function licencesAlong(
     w = Math.min(w, p.lon);
   }
 
+  const lonPad = pad / Math.max(0.2, Math.cos((((n + s) / 2) * Math.PI) / 180));
+
   const out: Licence[] = [];
   for (const project of all) {
     const [south, west, north, east] = project.bounds;
-    if (south > n + pad || north < s - pad || west > e + pad || east < w - pad) continue;
+    if (south > n + pad || north < s - pad || west > e + lonPad || east < w - lonPad) continue;
     let best = Infinity;
     for (const p of path) {
       const d = distanceToBounds(p, project.bounds);

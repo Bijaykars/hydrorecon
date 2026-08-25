@@ -18,6 +18,7 @@ import type { GridLink } from './grid.ts';
 import type { HazardScreen } from './hazards.ts';
 import type { FaultScreen } from './faults.ts';
 import type { GeologyScreen } from './geology.ts';
+import { BUILT_UP, TREE_COVER, type LandcoverScreen } from './landcover.ts';
 import {
   LAKE_MAX_ROUTE_KM,
   LAKE_MAX_SNAP_KM,
@@ -43,6 +44,20 @@ export type GateId =
   | 'grid'
   | 'legal-environment'
   | 'economics';
+
+/**
+ * A distance a reader believes.
+ *
+ * These strings are quoted verbatim into the desk study, and `toFixed(1)` on a
+ * short distance prints "0.0 km" — which reads as a broken field rather than as
+ * a fact. One real site has a 132 kV line 2.8 m from the powerhouse, and the
+ * grid gate reported "0.0 km straight-line to a mapped line". Below 100 m the
+ * honest unit is metres.
+ */
+function km(value: number): string {
+  if (!Number.isFinite(value)) return 'an unknown distance';
+  return value < 0.1 ? `${Math.round(value * 1000)} m` : `${value.toFixed(1)} km`;
+}
 
 export type ReadinessGate = {
   id: GateId;
@@ -98,6 +113,8 @@ export type ReadinessInput = {
   } | null;
   sediment: { source: SedimentSource | null } | null;
   bench: BenchFit | null;
+  /** What the alignment crosses. Null is not screened, not "no forest". */
+  landcover: LandcoverScreen | null;
 };
 
 const task = (
@@ -132,6 +149,7 @@ export function assessReadiness(input: ReadinessInput): EngineeringReadiness {
     conservation,
     sediment,
     bench,
+    landcover,
   } = input;
   if (!scheme) {
     return {
@@ -250,25 +268,37 @@ export function assessReadiness(input: ReadinessInput): EngineeringReadiness {
     );
   }
 
-  // Topography and layout.
-  const headLevel: EvidenceLevel = headAudit
-    ? headAudit.deltaM <= 10
-      ? 'corroborated'
-      : 'weak'
-    : 'screened';
+  /**
+   * Topography and layout.
+   *
+   * ABSOLUTE AND RELATIVE, both. A flat 10 m tolerance is right on a 400 m
+   * drop and meaningless on the 15 m minimum the engine will accept: two
+   * sources reporting 15 m and 6 m differ by 9 m, passed as "corroborated",
+   * and the summary said they agree — about a head one of them puts at 60%
+   * of the other's. A difference that large relative to the head being
+   * measured is not corroboration whatever its absolute size.
+   */
+  const headAgrees =
+    !!headAudit &&
+    headAudit.deltaM <= 10 &&
+    (!(scheme.grossHeadM > 0) || headAudit.deltaM / scheme.grossHeadM <= 0.15);
+  const headLevel: EvidenceLevel = headAudit ? (headAgrees ? 'corroborated' : 'weak') : 'screened';
   gates.push({
     id: 'head-layout',
     title: 'Head & layout',
     level: headLevel,
     summary: headAudit
-      ? headAudit.deltaM <= 10
+      ? headAgrees
         ? 'Two terrain products agree on the gross head, but neither is a ground survey.'
         : 'The two terrain products disagree materially at this layout.'
       : 'One global DEM and an unrouted waterway define the layout.',
     evidence: [
       `${scheme.grossHeadM.toFixed(0)} m gross head over ${scheme.waterwayKm.toFixed(2)} km.`,
       headAudit
-        ? `Independent terrain heads differ by ${headAudit.deltaM.toFixed(1)} m.`
+        ? `Independent terrain heads differ by ${headAudit.deltaM.toFixed(1)} m` +
+          (scheme.grossHeadM > 0
+            ? ` — ${((headAudit.deltaM / scheme.grossHeadM) * 100).toFixed(0)}% of the gross head.`
+            : '.')
         : 'No second-terrain site audit has been run.',
       'The displayed waterway follows the river reach; tunnel, canal and penstock alignments are not routed.',
     ],
@@ -353,7 +383,7 @@ export function assessReadiness(input: ReadinessInput): EngineeringReadiness {
         : regionalUnits.length
           ? 'Open small-scale regional units were sampled at the layout, but they cannot establish a contact, foundation or tunnel condition.'
           : nearestFault
-            ? `The nearest GEM regional active-fault trace is ${nearestFault.distanceKm.toFixed(1)} km from the reach; distance and non-intersection do not clear the site.`
+            ? `The nearest GEM regional active-fault trace is ${km(nearestFault.distanceKm)} from the reach; distance and non-intersection do not clear the site.`
             : region === 'nepal' && hazards
               ? `No approved, verified BIPAD incident record is mapped within ${hazards.radiusKm} km; absence of reports does not clear the site.`
               : 'No engineering geology, subsurface, seismic, landslide or GLOF investigation is in the desktop result.';
@@ -388,7 +418,7 @@ export function assessReadiness(input: ReadinessInput): EngineeringReadiness {
               ? `Nearby report breakdown: ${hazardCategories.map((category) => `${category.title} ${category.count}`).join(', ')}.`
               : 'No nearby reports were found in the screened categories; reporting and geocoding coverage vary by place, year and hazard.',
             nearestHazard
-              ? `Nearest mapped report: ${nearestHazard.title}, ${nearestHazard.date}, ${nearestHazard.distanceKm.toFixed(1)} km from the selected reach.`
+              ? `Nearest mapped report: ${nearestHazard.title}, ${nearestHazard.date}, ${km(nearestHazard.distanceKm)} from the selected reach.`
               : `BIPAD inventory screened from ${hazards.period.from} to ${hazards.period.to}; bundled ${hazards.retrieved}.`,
             'Point proximity does not test an upstream GLOF/flood path, slope connectivity, recurrence, magnitude or seismic design action.',
           ]
@@ -417,9 +447,9 @@ export function assessReadiness(input: ReadinessInput): EngineeringReadiness {
       ...(region === 'nepal' && faults
         ? [
             crossedFaults.length
-              ? `GEM trace intersection(s): ${crossedFaults.map((fault) => `${fault.name ?? fault.sourceId} near reach chainage ${fault.chainageKm.toFixed(1)} km`).join('; ')}.`
+              ? `GEM trace intersection(s): ${crossedFaults.map((fault) => `${fault.name ?? fault.sourceId} near reach chainage ${km(fault.chainageKm)}`).join('; ')}.`
               : nearestFault
-                ? `Nearest GEM regional active-fault trace: ${nearestFault.name ?? nearestFault.sourceId} (${nearestFault.type}), ${nearestFault.distanceKm.toFixed(1)} km from the selected reach.`
+                ? `Nearest GEM regional active-fault trace: ${nearestFault.name ?? nearestFault.sourceId} (${nearestFault.type}), ${km(nearestFault.distanceKm)} from the selected reach.`
                 : 'No regional GEM trace result is available for this reach.',
             'Regional HimaTibetMap-derived traces are not surveyed locations; distance or non-intersection is not clearance, and the river reach is not a routed project waterway.',
           ]
@@ -523,10 +553,10 @@ export function assessReadiness(input: ReadinessInput): EngineeringReadiness {
       summary:
         adequate === null
           ? `No mapped line at the screening ${grid?.requiredKv ?? 'required'} kV class was found.`
-          : `${adequate.toFixed(1)} km straight-line to a mapped line at the required voltage class.`,
+          : `${km(adequate)} straight-line to a mapped line at the required voltage class.`,
       evidence: [
         grid
-          ? `Screening requirement ${grid.requiredKv} kV; nearest line of any voltage ${grid.nearestKm.toFixed(1)} km.`
+          ? `Screening requirement ${grid.requiredKv} kV; nearest line of any voltage ${km(grid.nearestKm)}.`
           : 'Nepal grid mapping was unavailable.',
         'OpenStreetMap coverage and straight-line distance do not establish capacity, right-of-way or connection cost.',
       ],
@@ -539,7 +569,7 @@ export function assessReadiness(input: ReadinessInput): EngineeringReadiness {
         'Confirm the grid connection and evacuation route',
         adequate === null
           ? 'No adequate-voltage line is mapped within the screening search.'
-          : `The ${adequate.toFixed(1)} km figure is a straight-line floor and says nothing about available capacity.`,
+          : `The ${km(adequate)} figure is a straight-line floor and says nothing about available capacity.`,
         'NEA connection point and available capacity; load-flow, short-circuit and stability scope; surveyed line route, voltage, losses, land and cost.'
       )
     );
@@ -597,7 +627,22 @@ export function assessReadiness(input: ReadinessInput): EngineeringReadiness {
         conservation
           ? `${conservation.inside.length} protected-area intersection(s), ${conservation.near.length} near-boundary result(s).`
           : 'No protected-area intersection at the selected intake or powerhouse.',
-        'Land, forests, environmental flow, aquatic ecology, cultural heritage, communities and cumulative impacts are not cleared by this screen.',
+        ...(landcover
+          ? (() => {
+              // Forests moved from "not screened" to "screened, not cleared" when
+              // the land-cover store landed, and the evidence has to say which.
+              const of = (code: number) => landcover.along.find((a) => a.code === code);
+              const tree = of(TREE_COVER);
+              const built = of(BUILT_UP);
+              return [
+                tree
+                  ? `${km(tree.km)} of the ${km(landcover.waterwayKm)} alignment centreline runs on mapped tree cover (${(tree.share * 100).toFixed(0)}%); forest clearance and compensatory plantation are in play. Cover is not tenure, so national, community and private forest are not separated here.`
+                  : `No mapped tree cover on the alignment centreline over ${km(landcover.waterwayKm)}.`,
+                ...(built ? [`${km(built.km)} crosses mapped built-up ground; treat as a resettlement question, not an easement.`] : []),
+              ];
+            })()
+          : ['Land cover along the alignment has not been screened.']),
+        'Land tenure, environmental flow, aquatic ecology, cultural heritage, communities and cumulative impacts are not cleared by this screen.',
         `Nepal policy requires the higher of at least ${(NEPAL_EFLOW_POLICY.minimumFractionOfLowestMonthlyMean * 100).toFixed(0)}% of minimum monthly average discharge or the EIA-required minimum; the desktop release is not an approved EFlow.`,
         ...(cascade
           ? [
@@ -606,7 +651,7 @@ export function assessReadiness(input: ReadinessInput): EngineeringReadiness {
             ]
           : ['Upstream/downstream licensed-project topology and cascade interfaces are not established.']),
         ...(nearCountryBorder
-          ? [`The site is ${input.borderKm!.toFixed(1)} km from the generalized country outline; verify jurisdiction from authoritative survey/control points.`]
+          ? [`The site is ${km(input.borderKm!)} from the generalized country outline; verify jurisdiction from authoritative survey/control points.`]
           : []),
       ],
       next: 'Confirm legal status, actual components and exact footprints; then run alternatives, E&S baseline, e-flow, cascade-interface and cumulative-impact scoping.',
@@ -633,7 +678,7 @@ export function assessReadiness(input: ReadinessInput): EngineeringReadiness {
       evidence: [
         'Global mode supplies physical screening only where open inputs are available.',
         ...(input.borderKm !== null && input.borderKm <= 10
-          ? [`The site is ${input.borderKm.toFixed(1)} km from the generalized Nepal outline; authoritative jurisdiction must be checked.`]
+          ? [`The site is ${km(input.borderKm)} from the generalized Nepal outline; authoritative jurisdiction must be checked.`]
           : []),
       ],
       next: 'Run the host-country land, water right, protected-area, indigenous/community and environmental process.',

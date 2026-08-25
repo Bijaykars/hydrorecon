@@ -333,11 +333,21 @@ export function turbineCurve(designFlowCms: number, headM: number): TurbineCurve
     }
   };
 
+  /**
+   * No runner is more than this efficient. The ported polynomials are clamped
+   * at zero below but were unbounded above, and the Pelton form runs over 1.0
+   * on very small, very high-head duty points — `turbineCurve(0.0051, 2000)`
+   * returned 1.0009, and a grid scan reached 1.034. Those are extrapolations
+   * past the data the curves were fitted to, not machines.
+   */
+  const MAX_RUNNER_EFFICIENCY = 0.95;
+  const bounded = (q: number) => Math.min(MAX_RUNNER_EFFICIENCY, raw(q));
+
   const minFlowFrac = MIN_FLOW_FRAC[type];
   let peak = 0;
   let peakFlowCms = designFlowCms;
   for (let f = minFlowFrac; f <= 1.0001; f += 0.01) {
-    const e = raw(f * designFlowCms);
+    const e = bounded(f * designFlowCms);
     if (e > peak) {
       peak = e;
       peakFlowCms = f * designFlowCms;
@@ -348,7 +358,7 @@ export function turbineCurve(designFlowCms: number, headM: number): TurbineCurve
     type,
     at: (q: number) => {
       if (!(q > 0) || q < minFlowFrac * designFlowCms) return 0;
-      return raw(Math.min(q, designFlowCms));
+      return bounded(Math.min(q, designFlowCms));
     },
     peak,
     peakFlowCms,

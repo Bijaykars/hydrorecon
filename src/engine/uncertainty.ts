@@ -123,8 +123,22 @@ export function uncertaintyFor(
       ? FLOW_SPREAD_CORROBORATED
       : FLOW_SPREAD_ALONE;
 
+  /**
+   * A flow scenario scales the RIVER, and the environmental release is a
+   * fraction of that river's low-month flow — so it has to move with it. Held
+   * fixed, a 0.5× scenario kept the full baseline release and took usable flow
+   * to 0.8 m³/s where the policy-equivalent answer is 0.9.
+   */
   const withFlow = (mult: number) =>
-    evaluate({ ...input, series: input.series.map((v) => v * mult) }, scheme.i, scheme.j);
+    evaluate(
+      {
+        ...input,
+        series: input.series.map((v) => v * mult),
+        residualCms: input.residualCms * mult,
+      },
+      scheme.i,
+      scheme.j
+    );
 
   const withHead = (deltaM: number) =>
     evaluate(
@@ -144,8 +158,21 @@ export function uncertaintyFor(
   const headLow = withHead(-headErrM);
   const headHigh = withHead(+headErrM);
 
-  const swing = (a: Scheme | null, b: Scheme | null, key: 'capacityMW' | 'energyGwh') =>
-    a && b ? Math.abs(a[key] - b[key]) : 0;
+  /**
+   * An endpoint that does not evaluate is not an endpoint of zero width.
+   *
+   * `evaluate` returns null when a scenario is infeasible — usually because the
+   * low-flow case leaves no usable water after the residual release. Scoring
+   * that as a zero swing collapsed the whole band onto the best estimate and
+   * reported "±0% river flow" at exactly the feasibility boundary, which is
+   * where the uncertainty is largest. A dead endpoint means the scheme can
+   * reach zero, so the distance from best down to nothing IS the swing.
+   */
+  const swing = (a: Scheme | null, b: Scheme | null, key: 'capacityMW' | 'energyGwh') => {
+    if (a && b) return Math.abs(a[key] - b[key]);
+    const alive = a ?? b;
+    return alive ? Math.abs(alive[key] - best[key]) + best[key] : best[key];
+  };
 
   // Combine in quadrature: flow and terrain error are independent, so taking
   // the arithmetic sum would overstate the band.
@@ -153,7 +180,19 @@ export function uncertaintyFor(
     const f = swing(flowLow, flowHigh, key) / 2;
     const h = swing(headLow, headHigh, key) / 2;
     const half = Math.hypot(f, h);
-    return { low: Math.max(0, best[key] - half), best: best[key], high: best[key] + half };
+    /**
+     * The band must contain the scenarios that produced it. Recentring a
+     * symmetric half-width on `best` does not, because low and high are not
+     * symmetric around it — one randomized sweep put the evaluated low outside
+     * the reported low on every case tested. So widen to cover whatever
+     * actually evaluated.
+     */
+    const evaluated = [flowLow, flowHigh, headLow, headHigh]
+      .filter((s): s is Scheme => s !== null)
+      .map((s) => s[key]);
+    const low = Math.max(0, Math.min(best[key] - half, ...evaluated));
+    const high = Math.max(best[key] + half, ...evaluated);
+    return { low, best: best[key], high };
   };
 
   const capacityMW = combine('capacityMW');

@@ -68,7 +68,7 @@ export const NEA_ROR_PPA = {
   effectiveAd: '2017-04-27',
   reviewed: '2026-08-13',
   postedRateCapacityUpToMW: 100,
-  escalation: '3% simple escalation for eight years for capacity up to 100 MW; not applied by Ghatta',
+  escalation: '3% simple escalation for eight years for capacity up to 100 MW; not applied by HydroRecon',
   above100MW:
     'The NEA decision says the base rate may be lowered above 100 MW where return on equity exceeds 17%; project terms must be confirmed.',
   sourcePage: 'https://www.nea.org.np/en/pages/ppa-tarrif-rates',
@@ -460,10 +460,27 @@ export function annualEnergyByYear(
   minCoverage = 0.9
 ): AnnualEnergyYear[] {
   const acc = new Map<number, { sumW: number; days: number }>();
+  /**
+   * ONE ENTRY PER CALENDAR DAY, and only for days that have one.
+   *
+   * `Number('')` is 0, so an undated observation used to be filed under year 0
+   * — and a 365-value record with no dates at all produced a "year 0" with
+   * 99.73% coverage, an annual energy figure and a P50/P90 spread, from a
+   * record carrying no calendar evidence whatsoever. Duplicate timestamps were
+   * counted the same way, so 365 copies of one day also read as a complete
+   * year. Interannual reliability is the one statistic that cannot be faked
+   * from a record's length.
+   */
+  const seenDays = new Set<string>();
   for (let i = 0; i < Math.min(dates.length, valuesCms.length); i++) {
     const v = valuesCms[i];
-    const year = Number(dates[i]?.slice(0, 4));
-    if (!Number.isInteger(year) || !Number.isFinite(v) || v <= USGS_NO_DATA + 1) continue;
+    const date = dates[i];
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    if (seenDays.has(date)) continue;
+    seenDays.add(date);
+    const year = Number(date.slice(0, 4));
+    if (!Number.isInteger(year) || year < 1000 || !Number.isFinite(v) || v <= USGS_NO_DATA + 1)
+      continue;
     const qt = turbineFlow(v, p);
     const w = powerW(qt, netHeadAt(p, qt), p.efficiencyAt ? p.efficiencyAt(qt) : p.efficiency);
     const prior = acc.get(year) ?? { sumW: 0, days: 0 };

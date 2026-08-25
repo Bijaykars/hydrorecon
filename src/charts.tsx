@@ -53,7 +53,16 @@ export function Fdc({
   const hi = positive.length ? positive[0].q : 1;
   const lo = positive.length ? positive[positive.length - 1].q : 0.01;
   const yMax = 10 ** Math.ceil(Math.log10(hi));
-  const yMin = Math.max(10 ** Math.floor(Math.log10(Math.max(lo, hi / 1e4))), hi / 1e4);
+  /**
+   * At least one full decade of range.
+   *
+   * A record that is constant at exactly a power of ten — 1 m³/s every day, a
+   * legitimate import — puts hi and lo on the same decade boundary, so ceil and
+   * floor collapse to the same value and the log transform divides by zero.
+   * Every plotted coordinate then came out NaN and the chart rendered empty.
+   */
+  const yMinRaw = Math.max(10 ** Math.floor(Math.log10(Math.max(lo, hi / 1e4))), hi / 1e4);
+  const yMin = yMinRaw < yMax ? yMinRaw : yMax / 10;
 
   const x = (p: number) => m.l + (W - m.l - m.r) * p;
   const y = (q: number) => {

@@ -532,8 +532,22 @@ ok('evaluate reproduces P = rho*g*Q*H*eta by hand', () => {
   // The identity itself is still checked by hand, on the head the engine used.
   const c = turbineCurve(12, s.netHeadM)!;
   assert.ok(c, 'a 12 m3/s duty point must select a machine');
-  near(s.turbinePeak, c.peak, 1e-12);
-  near(s.capacityMW, (1000 * 9.81 * 12 * s.netHeadM * c.peak * 0.85) / 1e6, 1e-9);
+
+  /**
+   * RATED POWER IS ON THE CURVE AT DESIGN FLOW, not at the curve's best point.
+   *
+   * This assertion used to demand `c.peak`, and the engine obliged. But peak
+   * efficiency generally occurs below full gate — here 0.9300 against 0.9008
+   * at design flow — so nameplate was computed with one efficiency while every
+   * dispatched day used another, and capacity read about 3% high against the
+   * energy beside it. Both now use `at(designFlow)`.
+   */
+  assert.ok(
+    c.at(12) < c.peak,
+    'this fixture is only meaningful while design flow sits off the best point'
+  );
+  near(s.turbinePeak, c.at(12), 1e-12);
+  near(s.capacityMW, (1000 * 9.81 * 12 * s.netHeadM * c.at(12) * 0.85) / 1e6, 1e-9);
 });
 
 ok('scheme PPA and P90 figures use the exact same dispatch as headline energy', () => {

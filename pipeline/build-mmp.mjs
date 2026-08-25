@@ -43,6 +43,24 @@ const PROVENANCE = 'src/data/nepal-hydest-provenance.json';
 const HYPSO_TMP = `${HYPSO}.tmp`;
 const PROVENANCE_TMP = `${PROVENANCE}.tmp`;
 const MONTHS = ['06', '07', '08', '09'];
+/**
+ * All twelve months, for the ANNUAL total.
+ *
+ * The monsoon sum above is what WECS/DHM 1990 and MHSP 1997 ask for. The
+ * Modified HYDEST regression that Nepali offices actually run asks for an
+ * ANNUAL wetness index instead, and it takes that figure directly rather than
+ * deriving it, so the annual total has to be carried.
+ *
+ * A correction to what this comment first claimed. It asserted that no constant
+ * could bridge the two, because the monsoon share varied from about two thirds
+ * in the west to over ninety per cent in the east. Measured across 117 gauged
+ * catchments (checks/workbook-method.mjs) that is wrong: the share runs 0.70 to
+ * 0.85 between the 5th and 95th percentiles with a median of 0.79, and only six
+ * catchments sit more than 0.10 from it. The office workbook's flat 0.8 is a
+ * good constant. The annual figure is still needed — Modified HYDEST consumes
+ * it directly — but not for the reason given.
+ */
+const ALL_MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 const URL = (mm) => `https://data.chc.ucsb.edu/products/CHPclim/v2/monthly_9090/CHPclim2.90-90.${mm}.tif`;
 const sha256 = (buffer) => createHash('sha256').update(buffer).digest('hex');
 
@@ -168,13 +186,17 @@ async function loadMonth(mm) {
 console.log(`decoding CHPclim rows ${ROW0}–${ROW1} for ${MONTHS.length} months…`);
 const monthGrids = [];
 for (const mm of MONTHS) monthGrids.push(await loadMonth(mm));
+const annualGrids = [];
+for (const mm of ALL_MONTHS) {
+  annualGrids.push(MONTHS.includes(mm) ? monthGrids[MONTHS.indexOf(mm)] : await loadMonth(mm));
+}
 
 /** June–September total at a point, mm. NaN over nodata. */
-function mmpAt(lat, lon) {
+function sumAt(grids, lat, lon) {
   const col = Math.floor((lon + 180) / 0.05);
   const row = Math.floor((90 - lat) / 0.05);
   let sum = 0;
-  for (const g of monthGrids) {
+  for (const g of grids) {
     const line = g.rows.get(row);
     const v = line ? line[col] : NaN;
     if (!(v >= 0)) return NaN; // nodata is a large negative
@@ -182,6 +204,8 @@ function mmpAt(lat, lon) {
   }
   return sum;
 }
+const mmpAt = (lat, lon) => sumAt(monthGrids, lat, lon);
+const annualAt = (lat, lon) => sumAt(annualGrids, lat, lon);
 
 // A place with a famous answer each: Pokhara is one of the wettest towns in
 // Asia, Jomsom sits in the trans-Himalayan rain shadow two ridges away.
@@ -366,6 +390,7 @@ console.log('averaging monsoon precipitation over catchments…');
 const nBasins = basins.length;
 const areaSum = new Float64Array(nBasins);
 const precipSum = new Float64Array(nBasins);
+const annualSum = new Float64Array(nBasins);
 for (let row = 0; row < NY; row++) {
   const lat = COVER.south + (row + 0.5) * STEP;
   const w = Math.cos((lat * Math.PI) / 180);
@@ -375,22 +400,27 @@ for (let row = 0; row < NY; row++) {
     if (bi < 0) continue;
     const p = mmpAt(lat, COVER.west + (c + 0.5) * STEP);
     if (!Number.isFinite(p)) continue;
+    const a = annualAt(lat, COVER.west + (c + 0.5) * STEP);
     areaSum[bi] += w;
     precipSum[bi] += w * p;
+    if (Number.isFinite(a)) annualSum[bi] += w * a;
   }
 }
 
 const byId = new Map(basins.map((b, i) => [b.id, i]));
 const order = basins.map((_, i) => i).sort((a, b) => basins[b].sort - basins[a].sort);
 const accArea = Float64Array.from(areaSum);
+const accAnnual = Float64Array.from(annualSum);
 const accPrecip = Float64Array.from(precipSum);
 for (const i of order) {
   const d = byId.get(basins[i].next);
   if (d === undefined) continue;
   accArea[d] += accArea[i];
   accPrecip[d] += accPrecip[i];
+  accAnnual[d] += accAnnual[i];
 }
 const mmp = Float64Array.from(accArea, (a, i) => (a > 0 ? accPrecip[i] / a : NaN));
+const annual = Float64Array.from(accArea, (a, i) => (a > 0 ? accAnnual[i] / a : NaN));
 
 {
   const v = [...mmp].filter(Number.isFinite).sort((a, b) => a - b);
@@ -422,6 +452,7 @@ const stride = old.length === count * 4 ? 4 : 2;
 if (old.length !== count * stride) throw new Error(`hypso file is ${old.length} bytes for ${count} reaches`);
 
 const out = Buffer.alloc(count * 4);
+const annualByReach = new Float64Array(count).fill(NaN);
 let attached = 0;
 for (let i = 0; i < count; i++) {
   let x = 0;
@@ -448,7 +479,10 @@ for (let i = 0; i < count; i++) {
   let m = NaN;
   if (col >= 0 && col < NX && row >= 0 && row < NY) {
     const bi = cellBasin[row * NX + col];
-    if (bi >= 0) m = mmp[bi];
+    if (bi >= 0) {
+      m = mmp[bi];
+      annualByReach[i] = annual[bi];
+    }
   }
   const enc = Number.isFinite(m) ? Math.min(65534, Math.round(m)) : 0xffff;
   out.writeUInt16LE(enc, i * 4 + 2);
@@ -516,6 +550,26 @@ const provenance = {
 // validation failure before this point therefore leaves the previous outputs
 // untouched; the sidecar checksum lets a later check detect any partial pair.
 try {
+  /**
+   * Annual precipitation ships as its own file, like nepal-elev.dat, rather
+   * than as more bytes in the hypsometry record — two pipelines already
+   * negotiate that record's stride and a third claimant is how stride bugs are
+   * born. Absent, the Modified HYDEST method is simply unavailable.
+   */
+  const ab = Buffer.alloc(8 + count * 2);
+  ab.writeUInt32LE(0x4e415031, 0); // 'NAP1'
+  ab.writeUInt32LE(count, 4);
+  let annualAttached = 0;
+  for (let i = 0; i < count; i++) {
+    const v = annualByReach[i];
+    const q = Number.isFinite(v) ? Math.max(1, Math.min(65535, Math.round(v))) : 0;
+    if (q > 0) annualAttached++;
+    ab.writeUInt16LE(q, 8 + i * 2);
+  }
+  writeFileSync('public/nepal-annual-precip.dat', ab);
+  console.log(
+    `wrote public/nepal-annual-precip.dat: ${annualAttached}/${count} reaches with an annual total`
+  );
   writeFileSync(HYPSO_TMP, out);
   writeFileSync(PROVENANCE_TMP, `${JSON.stringify(provenance, null, 2)}\n`);
   renameSync(HYPSO_TMP, HYPSO);

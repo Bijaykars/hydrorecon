@@ -1,6 +1,6 @@
 # Nepal regional hydrology screen
 
-Ghatta uses the legacy WECS/DHM 1990 regional regressions as an independent Nepal-specific
+HydroRecon uses the legacy WECS/DHM 1990 regional regressions as an independent Nepal-specific
 screening comparator at ungauged reaches. The method is valuable because it was fitted to Nepali
 gauges. It is not a substitute for a project flow series, gauge-frequency analysis or selection of
 a design flood.
@@ -32,7 +32,7 @@ Q100 = 14.63  × (Abelow3000 + 1)^0.7342
 QT   = exp(ln(Q2) + S(T) × ln(Q100/Q2) / 2.326)
 ```
 
-Ghatta evaluates the published return-period set Q2, Q10, Q20, Q50, Q100, Q200 and Q500. The UI
+HydroRecon evaluates the published return-period set Q2, Q10, Q20, Q50, Q100, Q200 and Q500. The UI
 and exports call these **regional flood estimates**. They are not a selected construction,
 diversion, design, spillway check flood or PMF/PMP case.
 
@@ -48,7 +48,7 @@ The bundled river-reach input contains:
 
 CHPclim substitutes a gridded modern climatology for the original WECS/DHM monsoon-isohyet input.
 Mountain precipitation and gauge-undercatch bias remain possible. The product is publicly
-downloadable, but its page does not state a standalone reuse licence. Ghatta therefore preserves
+downloadable, but its page does not state a standalone reuse licence. HydroRecon therefore preserves
 attribution and explicitly says that the repository's MIT licence does not cover this derivative
 input.
 

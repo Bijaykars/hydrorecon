@@ -65,9 +65,25 @@ export type HeadAudit = {
 export async function auditHead(
   path: { lat: number; lon: number; km: number; elevationM: number }[],
   i: number,
-  j: number
+  j: number,
+  /**
+   * Which product produced the head already on screen.
+   *
+   * The audit always fetches AWS Terrain Tiles as its "second" opinion, and the
+   * primary profile tries Re:Earth first but FALLS BACK to AWS. When it had
+   * already fallen back, this compared AWS against AWS — same provider, same
+   * coordinates, same sampling — and the near-zero difference then tightened
+   * the uncertainty band to its 10 m floor while the page described the head as
+   * independently measured twice. Knowing the primary's source is the only way
+   * to tell corroboration from an echo.
+   */
+  primarySource?: string
 ): Promise<HeadAudit | null> {
   const second = await fetchPathProfile(path, 'AWS Terrain Tiles');
+  if (primarySource && second.source === primarySource) {
+    // Not a second opinion. Better no evidence than false corroboration.
+    return null;
+  }
   const zi = second.points[i]?.elevationM;
   const zj = second.points[j]?.elevationM;
   if (!Number.isFinite(zi) || !Number.isFinite(zj)) return null;
@@ -120,6 +136,25 @@ export function shapeScore(
 /** A neighbour must beat the incumbent by this much before the study moves. */
 const DECISIVE_MARGIN = 0.12;
 
+/**
+ * How far a neighbour's MAGNITUDE may sit from the incumbent's and still be a
+ * candidate to replace it.
+ *
+ * Shape scoring deliberately normalises magnitude away, which is right for
+ * judging seasonal timing and catastrophic on its own: every Nepali river
+ * shares one monsoon, so the scores cluster and the winner is close to noise.
+ * Swept over 131 gauge anchors the rule switched cell at 45 of them, and in 43
+ * of those the chosen cell's raw mean differed by more than 2× — Rapti Jalkundi
+ * moved from 159 m³/s to 0.28, Kali Gandaki from 486 to 1.33. Those are not the
+ * same river.
+ *
+ * A neighbouring 0.05° cell on the same channel carries a similar mean; one
+ * that is 3× away is a different watercourse, and no shape score should be
+ * allowed to adopt it. This bounds the rule to what it was meant to fix — a
+ * cell offset onto the far bank — rather than letting it re-pick the river.
+ */
+const MAX_MAGNITUDE_RATIO = 3;
+
 export type ShapeAudit = {
   /** Cells scored, best first. The one in use is flagged. */
   ranked: { lat: number; lon: number; score: number; inUse: boolean }[];
@@ -147,7 +182,12 @@ export async function auditShape(
     for (let dx = -1; dx <= 1; dx++) {
       if (dx === 0 && dy === 0) continue;
       try {
-        const s = await fetchDischarge(current.cell.lat + dy * CELL_DEG, current.cell.lon + dx * CELL_DEG);
+        const s = await fetchDischarge(
+          current.cell.lat + dy * CELL_DEG,
+          current.cell.lon + dx * CELL_DEG,
+          undefined,
+          true // a probe, not a study: must not evict the engineer's own sites
+        );
         // The API snaps to its own grid; two probes can land on one cell.
         if (cells.some((c) => c.s.cell.lat === s.cell.lat && c.s.cell.lon === s.cell.lon)) continue;
         const score = shapeScore(hydestMonths, monthly(s));
@@ -170,7 +210,18 @@ export async function auditShape(
     inUse: inUse(c.s),
   }));
 
-  if (!inUse(best.s) && own - best.score > DECISIVE_MARGIN) {
+  const meanOfSeries = (s: DischargeSeries) =>
+    s.values.length ? s.values.reduce((a, b) => a + b, 0) / s.values.length : NaN;
+  const ownMean = meanOfSeries(current);
+  const bestMean = meanOfSeries(best.s);
+  const magnitudeRatio =
+    ownMean > 0 && bestMean > 0 ? Math.max(ownMean / bestMean, bestMean / ownMean) : Infinity;
+
+  if (
+    !inUse(best.s) &&
+    own - best.score > DECISIVE_MARGIN &&
+    magnitudeRatio <= MAX_MAGNITUDE_RATIO
+  ) {
     return {
       ranked,
       better: best.s,
@@ -186,6 +237,12 @@ export async function auditShape(
     note:
       ranked[0]?.inUse === true
         ? `the cell in use matches Nepal's seasonal regime best of all ${ranked.length} cells here`
-        : `no neighbouring cell beats the one in use decisively — kept it`,
+        : !inUse(best.s) &&
+            own - best.score > DECISIVE_MARGIN &&
+            magnitudeRatio > MAX_MAGNITUDE_RATIO
+          ? `a neighbouring cell matches the seasonal regime better, but carries ` +
+            `${magnitudeRatio.toFixed(0)}× the flow — that is a different watercourse, ` +
+            `not a better reading of this one, so the cell in use was kept`
+          : `no neighbouring cell beats the one in use decisively — kept it`,
   };
 }

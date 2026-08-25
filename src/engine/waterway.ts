@@ -129,6 +129,8 @@ export type Waterway = {
   totalLossM: number;
   /** That loss as a fraction of gross head — what the engine consumes. */
   lossFrac: number;
+  /** True when the uncapped loss met or exceeded gross head: not buildable. */
+  lossExceedsHead: boolean;
 };
 
 /**
@@ -238,11 +240,23 @@ export function sizeWaterway(opts: {
   ];
 
   const totalLossM = lossHead + lossPen;
+  const rawFrac = totalLossM / h;
   return {
     segments,
     totalLossM,
-    // Cap below 1: a scheme whose losses exceed its gross head is not a scheme,
-    // and the engine downstream must never see a negative net head.
-    lossFrac: Math.min(0.9, totalLossM / h),
+    // Cap below 1 so the engine downstream never sees a negative net head.
+    lossFrac: Math.min(0.9, rawFrac),
+    /**
+     * Whether that cap actually bit.
+     *
+     * A scheme whose losses meet or exceed its gross head is not a scheme, but
+     * capping quietly handed it back 10% of its head and a positive capacity —
+     * a 15.5 m drop over a 14 km waterway returned 0.102 MW. Worse, only the
+     * DESIGN point was capped: daily dispatch recomputes loss as Q², so at part
+     * flow it recovered nearly the full gross head and out-generated its own
+     * nameplate, giving a plant factor of 2.13. The caller has to be able to
+     * reject these rather than infer it from a suspiciously round 0.9.
+     */
+    lossExceedsHead: rawFrac >= 1,
   };
 }

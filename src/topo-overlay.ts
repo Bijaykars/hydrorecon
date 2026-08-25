@@ -141,7 +141,16 @@ export async function syncTopoOverlay(
     active.add(id);
     // Keep every vector layer above the scan — the whole point is to read the
     // river and the scheme against surveyed contours, not to bury them.
-    const firstOverlay = ['reaches', 'scheme-glow', 'scheme-line'].find((l) => map.getLayer(l));
+    // report-ends-* are added to the style BEFORE the three scheme layers, so a
+    // list naming only those still slid the scan above the INTAKE and
+    // POWERHOUSE markers and the exported figure lost them. Lowest first.
+    const firstOverlay = [
+      'report-ends-dot',
+      'report-ends-label',
+      'reaches',
+      'scheme-glow',
+      'scheme-line',
+    ].find((l) => map.getLayer(l));
     if (firstOverlay) map.moveLayer(id, firstOverlay);
   }
 }

@@ -1,6 +1,8 @@
 {
- "_what": "Ghatta run at ten built Nepali plants with its shipped defaults — same engine and data sources as the app, coordinates from public records, no per-plant tuning.",
- "_generated": "2026-08-16",
+ "_what": "HydroRecon run at ten built Nepali plants with its shipped defaults — same engine and data sources as the app, coordinates from public records, no per-plant tuning.",
+ "_generated": "2026-08-24",
+ "_engine": "28b4b3f033a8",
+ "_headCaveat": "Underground powerhouses publish surface markers, not tailrace outlets. Head errors here compare the chosen scheme against the built one; they are not a measurement of DEM error.",
  "_appDefaults": {
   "exceedance": "Q40",
   "efficiency": 0.96,
@@ -36,33 +38,38 @@
    "result": {
     "name": "Upper Tamakoshi",
     "ok": true,
+    "usedMeasured": false,
+    "intakeMeanCms": 29.740827441210424,
+    "seriesMeanCms": 48.45096380736809,
     "predicted": {
-     "capacityMW": 101.87875201668756,
-     "energyGwh": 598.2778409917984,
+     "capacityMW": 90.91505047330845,
+     "energyGwh": 544.8258768086981,
      "grossHeadM": 669.1302145282878,
-     "netHeadM": 657.0649513689152,
-     "designFlowCms": 19.39803569757494,
-     "meanFlowCms": 54.46300000000001,
-     "waterwayKm": 7.920000000000006,
+     "netHeadM": 656.3654108108851,
+     "designFlowCms": 17.522942537308296,
+     "meanFlowCms": 29.740827441210424,
+     "waterwayKm": 7.943696216605301,
      "turbine": "Pelton",
-     "plantFactor": 0.6703709639047964
+     "plantFactor": 0.6840972366151091
     },
     "snapKm": {
-     "intake": 1.102833831293673,
+     "intake": 0.34261705070643994,
      "powerhouse": 0.4804627986221266
     },
-    "reachKm2": 1754,
+    "reachKm2": 1745,
+    "ambiguous": null,
     "flow": {
      "authority": "network",
-     "disagreement": 1.5197518817208335,
-     "judgeCms": null,
-     "judgeKind": null,
-     "networkCms": null,
-     "modelCms": null,
-     "note": "the two flow sources agree to within rescaling range"
+     "disagreement": 1.113414383550328,
+     "judgeCms": 12.489044425920897,
+     "judgeKind": "annual",
+     "networkCms": 53.946,
+     "modelCms": 48.45096380736809,
+     "magnitudeFactor": 0.5513073710972162,
+     "note": "the two flow sources agree to within rescaling range; magnitude is their geometric mean with the Modified HYDEST regional estimate (53.95 and 12.49 m³/s blended to 29.74)"
     },
     "snappedIntake": [
-     27.914583333333333,
+     27.924,
      86.21041666666666
     ],
     "demSource": "Re:Earth Mapterhorn"
@@ -88,7 +95,7 @@
     "headBasis": "net",
     "energyGwh": 842
    },
-   "note": "44 m high dam raises the intake level well above the riverbed; Ghatta models a low weir, so it should under-read the head here by roughly the dam height.",
+   "note": "44 m high dam raises the intake level well above the riverbed; HydroRecon models a low weir, so it should under-read the head here by roughly the dam height.",
    "sources": [
     "https://en.wikipedia.org/wiki/Kaligandaki_A_Hydroelectric_Power_Station",
     "https://www.adb.org/features/kali-gandaki-hydroelectric-project-report-card"
@@ -96,34 +103,39 @@
    "result": {
     "name": "Kali Gandaki A",
     "ok": true,
+    "usedMeasured": true,
+    "intakeMeanCms": 300.4421861899306,
+    "seriesMeanCms": 300.44218618993057,
     "predicted": {
-     "capacityMW": 162.92711693453853,
-     "energyGwh": 684.8649675914616,
-     "grossHeadM": 125.02614044367232,
-     "netHeadM": 116.0626584267818,
-     "designFlowCms": 157.78933300826958,
-     "meanFlowCms": 290.481,
-     "waterwayKm": 40.439999999999905,
+     "capacityMW": 199.14102692730225,
+     "energyGwh": 1024.7378940842314,
+     "grossHeadM": 144.27820071094789,
+     "netHeadM": 135.50542878626007,
+     "designFlowCms": 171.11964109740808,
+     "meanFlowCms": 300.4421861899306,
+     "waterwayKm": 41.36056344940783,
      "turbine": "Francis",
-     "plantFactor": 0.47985218080588965
+     "plantFactor": 0.58741894354173
     },
     "snapKm": {
-     "intake": 0.24814349562202434,
-     "powerhouse": 0.7382613224444748
+     "intake": 0.0987414265409796,
+     "powerhouse": 1.217296648300025
     },
-    "reachKm2": 7425.4,
+    "reachKm2": 7574.0786568461845,
+    "ambiguous": null,
     "flow": {
      "authority": "network",
-     "disagreement": 54.79187120253624,
-     "judgeCms": 285.09611318932446,
+     "disagreement": 1.0342920404086002,
+     "judgeCms": 285.40243748978526,
      "judgeKind": "annual",
      "networkCms": 290.481,
-     "modelCms": 5.301534582132578,
-     "note": "The WECS/DHM regional comparison is closer to the mapped network (290.5 vs its 285.1 m³/s annual-mean figure)"
+     "modelCms": 300.44218618993057,
+     "magnitudeFactor": 1.1357396593881128,
+     "note": "the two flow sources agree to within rescaling range; magnitude is their geometric mean with the Modified HYDEST regional estimate (290.48 and 285.40 m³/s blended to 329.91)"
     },
     "snappedIntake": [
-     27.98125,
-     83.58125
+     27.979717148020274,
+     83.57971714802028
     ],
     "demSource": "Re:Earth Mapterhorn"
    }
@@ -156,34 +168,39 @@
    "result": {
     "name": "Middle Marsyangdi",
     "ok": true,
+    "usedMeasured": false,
+    "intakeMeanCms": 120.08331097254792,
+    "seriesMeanCms": 194.8826027992171,
     "predicted": {
-     "capacityMW": 70.90094891069775,
-     "energyGwh": 362.3145232248542,
+     "capacityMW": 57.448576058825836,
+     "energyGwh": 273.451299731652,
      "grossHeadM": 99.59923974306139,
-     "netHeadM": 95.77990649324394,
-     "designFlowCms": 83.48915801499511,
-     "meanFlowCms": 132.569,
-     "waterwayKm": 6.960000000000005,
+     "netHeadM": 95.43721604468959,
+     "designFlowCms": 70.5889981775489,
+     "meanFlowCms": 120.08331097254792,
+     "waterwayKm": 7.270080715777729,
      "turbine": "Francis",
-     "plantFactor": 0.5833505196532646
+     "plantFactor": 0.5433712014704493
     },
     "snapKm": {
-     "intake": 0.1136004108703418,
+     "intake": 0.0649366666668449,
      "powerhouse": 0.08374120062820335
     },
-    "reachKm2": 3027.6,
+    "reachKm2": 3007.4230356204203,
+    "ambiguous": null,
     "flow": {
      "authority": "network",
-     "disagreement": 38.77325521610349,
-     "judgeCms": 97.99483105497586,
+     "disagreement": 1.4700465629160446,
+     "judgeCms": 82.85251416671976,
      "judgeKind": "annual",
      "networkCms": 132.569,
-     "modelCms": 3.419083573487036,
-     "note": "The WECS/DHM regional comparison is closer to the mapped network (132.6 vs its 98.0 m³/s annual-mean figure)"
+     "modelCms": 194.8826027992171,
+     "magnitudeFactor": 0.9058174307156872,
+     "note": "the two flow sources agree to within rescaling range; magnitude is their geometric mean with the Modified HYDEST regional estimate (132.57 and 82.85 m³/s blended to 120.08)"
     },
     "snappedIntake": [
      28.189583333333335,
-     84.41875
+     84.4197
     ],
     "demSource": "Re:Earth Mapterhorn"
    }
@@ -208,41 +225,46 @@
     "headBasis": "net",
     "energyGwh": 462.5
    },
-   "note": "Design flow is 3 turbines at 30.5 m³/s each. Peaking plant: its dam ponds the river well above the bed, and Ghatta models a low weir reading the riverbed — so an under-read head here is the model being honest about what it measures, not a terrain error.",
+   "note": "Design flow is 3 turbines at 30.5 m³/s each. Peaking plant: its dam ponds the river well above the bed, and HydroRecon models a low weir reading the riverbed — so an under-read head here is the model being honest about what it measures, not a terrain error.",
    "sources": [
     "https://en.wikipedia.org/wiki/Marsyangdi_Hydropower_Station"
    ],
    "result": {
     "name": "Marsyangdi",
     "ok": true,
+    "usedMeasured": true,
+    "intakeMeanCms": 211.94468281430213,
+    "seriesMeanCms": 211.9446828143021,
     "predicted": {
-     "capacityMW": 50.464247877257094,
-     "energyGwh": 253.18583360498545,
+     "capacityMW": 61.385520360237955,
+     "energyGwh": 356.75874868026136,
      "grossHeadM": 55.310156235880584,
-     "netHeadM": 51.51092471255083,
-     "designFlowCms": 111.80371052648398,
-     "meanFlowCms": 204.989,
-     "waterwayKm": 9.12,
+     "netHeadM": 51.71895734493471,
+     "designFlowCms": 135.94606321839083,
+     "meanFlowCms": 211.94468281430215,
+     "waterwayKm": 9.387275011441712,
      "turbine": "Kaplan",
-     "plantFactor": 0.5727320555922926
+     "plantFactor": 0.6634444786578881
     },
     "snapKm": {
-     "intake": 0.39515904624472775,
+     "intake": 0.16512466666661138,
      "powerhouse": 0.08335577019609088
     },
-    "reachKm2": 4130.4,
+    "reachKm2": 4110.937292998137,
+    "ambiguous": null,
     "flow": {
      "authority": "network",
-     "disagreement": 5.270128139111863,
-     "judgeCms": 157.31502702108017,
+     "disagreement": 1.0339319808102,
+     "judgeCms": 177.03916962282617,
      "judgeKind": "annual",
      "networkCms": 204.989,
-     "modelCms": 38.89639769452462,
-     "note": "The WECS/DHM regional comparison is closer to the mapped network (205.0 vs its 157.3 m³/s annual-mean figure)"
+     "modelCms": 211.9446828143021,
+     "magnitudeFactor": 1.0648249570856758,
+     "note": "the two flow sources agree to within rescaling range; magnitude is their geometric mean with the Modified HYDEST regional estimate (204.99 and 177.04 m³/s blended to 218.28)"
     },
     "snappedIntake": [
      27.927083333333332,
-     84.49375
+     84.4974
     ],
     "demSource": "Re:Earth Mapterhorn"
    }
@@ -275,33 +297,38 @@
    "result": {
     "name": "Khimti I",
     "ok": true,
+    "usedMeasured": true,
+    "intakeMeanCms": 31.853470633076626,
+    "seriesMeanCms": 31.853470633076626,
     "predicted": {
-     "capacityMW": 34.9887105204143,
-     "energyGwh": 186.07945929869183,
+     "capacityMW": 62.064135079761336,
+     "energyGwh": 359.01158297414,
      "grossHeadM": 500.0585127571246,
-     "netHeadM": 483.2524274273415,
-     "designFlowCms": 8.918399365365755,
-     "meanFlowCms": 15.121,
-     "waterwayKm": 8.040000000000006,
+     "netHeadM": 487.90210467529397,
+     "designFlowCms": 16.06461118476522,
+     "meanFlowCms": 31.853470633076626,
+     "waterwayKm": 8.112020165249609,
      "turbine": "Pelton",
-     "plantFactor": 0.6071086099652849
+     "plantFactor": 0.6603339813641188
     },
     "snapKm": {
-     "intake": 0.18171920457780366,
+     "intake": 0.07666890242725405,
      "powerhouse": 0.057328723996812776
     },
-    "reachKm2": 379.4,
+    "reachKm2": 377.3982004131845,
+    "ambiguous": null,
     "flow": {
      "authority": "network",
-     "disagreement": 1.8036516004327754,
-     "judgeCms": null,
-     "judgeKind": null,
-     "networkCms": null,
-     "modelCms": null,
-     "note": "the two flow sources agree to within rescaling range"
+     "disagreement": 2.10657169718118,
+     "judgeCms": 29.54473607782779,
+     "judgeKind": "annual",
+     "networkCms": 15.121,
+     "modelCms": 31.853470633076626,
+     "magnitudeFactor": 1.6016168109353806,
+     "note": "the two flow sources agree to within rescaling range; magnitude is their geometric mean with the Modified HYDEST regional estimate (15.12 and 29.54 m³/s blended to 24.22)"
     },
     "snappedIntake": [
-     27.53125,
+     27.52977,
      86.15208333333334
     ],
     "demSource": "Re:Earth Mapterhorn"
@@ -335,34 +362,38 @@
    "result": {
     "name": "Upper Marsyangdi A",
     "ok": true,
+    "usedMeasured": false,
+    "intakeMeanCms": 115.493,
+    "seriesMeanCms": 20.243731586452203,
     "predicted": {
-     "capacityMW": 53.681706950344804,
-     "energyGwh": 275.9339643519375,
+     "capacityMW": 51.52534403203115,
+     "energyGwh": 267.84478383717925,
      "grossHeadM": 86.27762096947833,
-     "netHeadM": 82.83177986877241,
-     "designFlowCms": 73.19549500419599,
-     "meanFlowCms": 115.965,
-     "waterwayKm": 5.160000000000004,
+     "netHeadM": 82.77427079430156,
+     "designFlowCms": 73.1169078940008,
+     "meanFlowCms": 115.49299999999998,
+     "waterwayKm": 5.353672370007662,
      "turbine": "Francis",
-     "plantFactor": 0.5867792361412104
+     "plantFactor": 0.5934145446341957
     },
     "snapKm": {
-     "intake": 0.29187275229431897,
+     "intake": 0.04413531480844396,
      "powerhouse": 0.2338120835375067
     },
-    "reachKm2": 2775.4,
+    "reachKm2": 2754.9100416739907,
+    "ambiguous": null,
     "flow": {
      "authority": "network",
-     "disagreement": 17.09821181973387,
-     "judgeCms": 83.70495872566742,
+     "disagreement": 5.705124053180583,
+     "judgeCms": 54.305142237546875,
      "judgeKind": "annual",
-     "networkCms": 115.965,
-     "modelCms": 6.782288184438048,
-     "note": "The WECS/DHM regional comparison is closer to the mapped network (116.0 vs its 83.7 m³/s annual-mean figure)"
+     "networkCms": 115.493,
+     "modelCms": 20.243731586452203,
+     "note": "The Modified HYDEST regional comparison is closer to the mapped network (115.5 vs its 54.3 m³/s annual-mean figure)"
     },
     "snappedIntake": [
-     28.310416666666665,
-     84.39791666666666
+     28.312361984025895,
+     84.39986198402589
     ],
     "demSource": "Re:Earth Mapterhorn"
    }
@@ -396,34 +427,39 @@
    "result": {
     "name": "Upper Bhote Koshi",
     "ok": true,
+    "usedMeasured": true,
+    "intakeMeanCms": 70.43479370636581,
+    "seriesMeanCms": 70.43479370636581,
     "predicted": {
-     "capacityMW": 41.7762087878747,
-     "energyGwh": 191.60633418796974,
+     "capacityMW": 57.013959920349244,
+     "energyGwh": 311.94839892505087,
      "grossHeadM": 148.19171656554477,
-     "netHeadM": 144.08044367344047,
-     "designFlowCms": 32.8676041301025,
-     "meanFlowCms": 78.86,
+     "netHeadM": 144.55876594320802,
+     "designFlowCms": 46.21436313509,
+     "meanFlowCms": 70.43479370636581,
      "waterwayKm": 3.360000000000002,
      "turbine": "Francis",
-     "plantFactor": 0.5235723832816633
+     "plantFactor": 0.6245934832845103
     },
     "snapKm": {
-     "intake": 0.5397946917804644,
+     "intake": 0.4569592115739366,
      "powerhouse": 0.3762382136933896
     },
-    "reachKm2": 2132.5,
+    "reachKm2": 2105.8,
+    "ambiguous": null,
     "flow": {
      "authority": "network",
-     "disagreement": 1.7879172260083815,
-     "judgeCms": null,
-     "judgeKind": null,
-     "networkCms": null,
-     "modelCms": null,
-     "note": "the two flow sources agree to within rescaling range"
+     "disagreement": 1.1029208138786528,
+     "judgeCms": 19.33445177978764,
+     "judgeKind": "annual",
+     "networkCms": 77.684,
+     "modelCms": 70.43479370636581,
+     "magnitudeFactor": 0.5716220318200298,
+     "note": "the two flow sources agree to within rescaling range; magnitude is their geometric mean with the Modified HYDEST regional estimate (77.68 and 19.33 m³/s blended to 44.41)"
     },
     "snappedIntake": [
-     27.939583333333335,
-     85.93958333333333
+     27.941517795580328,
+     85.94151779558032
     ],
     "demSource": "Re:Earth Mapterhorn"
    }
@@ -454,37 +490,8 @@
    ],
    "result": {
     "name": "Mistri Khola",
-    "ok": true,
-    "predicted": {
-     "capacityMW": 5.4278732215969825,
-     "energyGwh": 25.058231416362634,
-     "grossHeadM": 795.3778708274865,
-     "netHeadM": 736.5067903249892,
-     "designFlowCms": 0.8664328770409412,
-     "meanFlowCms": 1.509,
-     "waterwayKm": 6.840000000000005,
-     "turbine": "Pelton",
-     "plantFactor": 0.5270072795945658
-    },
-    "snapKm": {
-     "intake": 0.6493270023286954,
-     "powerhouse": 0.06034961296146727
-    },
-    "reachKm2": 27.9,
-    "flow": {
-     "authority": "network",
-     "disagreement": 2.6272308512040228,
-     "judgeCms": null,
-     "judgeKind": null,
-     "networkCms": null,
-     "modelCms": null,
-     "note": "the two flow sources agree to within rescaling range"
-    },
-    "snappedIntake": [
-     28.51875,
-     83.68958333333333
-    ],
-    "demSource": "Re:Earth Mapterhorn"
+    "ok": false,
+    "error": "The flood model returned no complete calendar year at this point."
    }
   },
   {
@@ -507,41 +514,46 @@
     "headBasis": "gross",
     "energyGwh": 184.2
    },
-   "note": "Far-western Nepal — the test that the data holds outside the famous central basins. Six-hour peaking: the dam ponds the river above the bed Ghatta reads, and pondage lets the design flow exceed what a pure run-of-river Q40 would be.",
+   "note": "Far-western Nepal — the test that the data holds outside the famous central basins. Six-hour peaking: the dam ponds the river above the bed HydroRecon reads, and pondage lets the design flow exceed what a pure run-of-river Q40 would be.",
    "sources": [
     "https://en.wikipedia.org/wiki/Chameliya_Khola_Hydropower_Station"
    ],
    "result": {
     "name": "Chameliya",
     "ok": true,
+    "usedMeasured": true,
+    "intakeMeanCms": 37.4802437507446,
+    "seriesMeanCms": 37.4802437507446,
     "predicted": {
-     "capacityMW": 10.44299861581626,
-     "energyGwh": 68.11096312973501,
+     "capacityMW": 11.160611077959487,
+     "energyGwh": 77.80176283879419,
      "grossHeadM": 59.63743525421171,
-     "netHeadM": 54.18785347847815,
-     "designFlowCms": 22.208522992300978,
-     "meanFlowCms": 33.089,
-     "waterwayKm": 5.280000000000004,
+     "netHeadM": 54.189603727455065,
+     "designFlowCms": 23.878153210384255,
+     "meanFlowCms": 37.4802437507446,
+     "waterwayKm": 5.565101677075079,
      "turbine": "Kaplan",
-     "plantFactor": 0.744539417039862
+     "plantFactor": 0.79578794692144
     },
     "snapKm": {
-     "intake": 0.5657922111355809,
+     "intake": 0.014599395635922026,
      "powerhouse": 0.10892897152850524
     },
-    "reachKm2": 829.6,
+    "reachKm2": 830.0331308764969,
+    "ambiguous": null,
     "flow": {
      "authority": "network",
-     "disagreement": 1.451502820706285,
-     "judgeCms": null,
-     "judgeKind": null,
-     "networkCms": null,
-     "modelCms": null,
-     "note": "the two flow sources agree to within rescaling range"
+     "disagreement": 1.1327100773896037,
+     "judgeCms": 51.04082228939705,
+     "judgeKind": "annual",
+     "networkCms": 33.089,
+     "modelCms": 37.4802437507446,
+     "magnitudeFactor": 1.423068573528594,
+     "note": "the two flow sources agree to within rescaling range; magnitude is their geometric mean with the Modified HYDEST regional estimate (33.09 and 51.04 m³/s blended to 47.09)"
     },
     "snappedIntake": [
-     29.70625,
-     80.68125
+     29.710085998992774,
+     80.68508599899278
     ],
     "demSource": "Re:Earth Mapterhorn"
    }
@@ -574,34 +586,38 @@
    "result": {
     "name": "Chilime",
     "ok": true,
+    "usedMeasured": false,
+    "intakeMeanCms": 9.44,
+    "seriesMeanCms": 117.32995699164756,
     "predicted": {
-     "capacityMW": 20.0708576101143,
-     "energyGwh": 97.38363415759964,
+     "capacityMW": 18.584324558216426,
+     "energyGwh": 92.83964693187495,
      "grossHeadM": 442.855158619697,
-     "netHeadM": 428.2501972957566,
-     "designFlowCms": 5.721983148801903,
+     "netHeadM": 427.7250845646502,
+     "designFlowCms": 5.36813371890049,
      "meanFlowCms": 9.44,
      "waterwayKm": 4.080000000000003,
      "turbine": "Pelton",
-     "plantFactor": 0.5538803288971443
+     "plantFactor": 0.5702727144159591
     },
     "snapKm": {
-     "intake": 0.24335388253149248,
+     "intake": 0.19478404023166696,
      "powerhouse": 0.08171263472363632
     },
-    "reachKm2": 209,
+    "reachKm2": 208.3220825712597,
+    "ambiguous": null,
     "flow": {
      "authority": "network",
-     "disagreement": 8.05164973379569,
-     "judgeCms": 7.977895718146055,
+     "disagreement": 12.429020867759277,
+     "judgeCms": 8.303201567915977,
      "judgeKind": "annual",
      "networkCms": 9.44,
-     "modelCms": 76.00757348703131,
-     "note": "The WECS/DHM regional comparison is closer to the mapped network (9.4 vs its 8.0 m³/s annual-mean figure)"
+     "modelCms": 117.32995699164756,
+     "note": "The Modified HYDEST regional comparison is closer to the mapped network (9.4 vs its 8.3 m³/s annual-mean figure)"
     },
     "snappedIntake": [
-     28.21875,
-     85.28541666666666
+     28.217766807502315,
+     85.28639985916435
     ],
     "demSource": "Re:Earth Mapterhorn"
    }

@@ -1,5 +1,5 @@
 /**
- * The validation page: Ghatta against plants that exist.
+ * The validation page: HydroRecon against plants that exist.
  *
  * For an engineering tool, credibility IS the product, and credibility is not
  * claimed, it is shown — misses included, each with its reason, each row
@@ -15,6 +15,10 @@ import './app.css';
 import validation from './data/validation.json' with { type: 'json' };
 import spec from '../pipeline/plants.json' with { type: 'json' };
 import type { FlowChoice } from './engine/flowchoice.ts';
+
+/** Injected by vite.config.ts from the calculation modules on disk. */
+declare const __ENGINE_SIGNATURE__: string;
+const ENGINE_SIGNATURE = __ENGINE_SIGNATURE__;
 
 type Row = {
   name: string;
@@ -55,6 +59,8 @@ type Row = {
 
 const DATA = validation as unknown as {
   _generated: string;
+  /** Engine fingerprint at generation time. Absent in files built before it. */
+  _engine?: string;
   plants: Row[];
 };
 
@@ -206,7 +212,7 @@ function PlantCard({ r }: { r: Row }) {
           href={appLink(r)}
           className="ml-auto rounded text-[11px] text-river underline-offset-2 hover:underline"
         >
-          re-run it in Ghatta →
+          re-run it in HydroRecon →
         </a>
       </div>
 
@@ -219,7 +225,7 @@ function PlantCard({ r }: { r: Row }) {
           <b>Placement failed, and the numbers below are not a prediction.</b> The intake snapped
           to a {n(r.result.reachKm2!, 0)} km² reach, but the plant&apos;s published{' '}
           {n(r.actual.designQ!, 1)} m³/s cannot come from {n(r.result.reachKm2!, 0)} km² — the
-          mapped river network does not resolve this stream. Ghatta on this khola needs a hand-placed
+          mapped river network does not resolve this stream. HydroRecon on this khola needs a hand-placed
           intake and a gauge record.
         </p>
       ) : null}
@@ -232,7 +238,7 @@ function PlantCard({ r }: { r: Row }) {
             pred={r.actual.headBasis === 'net' ? p.grossHeadM : r.actual.head !== null ? p.grossHeadM : null}
             act={r.actual.head}
             unit="m"
-            basis={r.actual.headBasis === 'net' ? 'Ghatta gross vs plant net' : r.actual.headBasis}
+            basis={r.actual.headBasis === 'net' ? 'HydroRecon gross vs plant net' : r.actual.headBasis}
           />
           <Cell label="design flow" pred={p.designFlowCms} act={r.actual.designQ} unit="m³/s" />
           <Cell label="energy" pred={p.energyGwh} act={r.actual.energyGwh} unit="GWh/yr" />
@@ -274,7 +280,7 @@ function PlantCard({ r }: { r: Row }) {
             {p?.turbine ? (
               <>
                 {' '}
-                · Ghatta picked a <b className="text-muted">{p.turbine}</b>
+                · HydroRecon picked a <b className="text-muted">{p.turbine}</b>
               </>
             ) : null}
           </div>
@@ -314,7 +320,7 @@ function Page() {
       <div className="mx-auto max-w-[880px] px-5 pb-16 pt-8">
         <header className="flex items-center gap-2.5">
           <Mark />
-          <span className="text-[15px] font-semibold tracking-tight">Ghatta</span>
+          <span className="text-[15px] font-semibold tracking-tight">HydroRecon</span>
           <span className="text-[12px] text-muted">validation</span>
           <a href="./" className="ml-auto rounded text-[12px] text-river underline-offset-2 hover:underline">
             ← open the app
@@ -325,7 +331,7 @@ function Page() {
           Ten plants that exist, and what this tool would have said about them.
         </h1>
         <p className="mt-3 max-w-[62ch] text-[13.5px] leading-relaxed text-muted">
-          Each plant below was run through Ghatta&apos;s own engine — same code, same public data,
+          Each plant below was run through HydroRecon&apos;s own engine — same code, same public data,
           shipped defaults, no per-plant tuning — by clicking where its builders actually put the
           intake and powerhouse. Coordinates come from OpenStreetMap, GeoNames and published
           records, each named per plant. The misses are shown with the same prominence as the
@@ -399,13 +405,13 @@ function Page() {
           </p>
           <p>
             <b className="text-ink">Pondage is outside the model, visibly.</b> Marsyangdi,
-            Chameliya and Kali Gandaki A pond their rivers behind real dams; Ghatta models a low
+            Chameliya and Kali Gandaki A pond their rivers behind real dams; HydroRecon models a low
             weir and reads the riverbed, so it under-reads exactly there — by roughly the dam
-            height. The waterway lengths differ too: Ghatta follows the river; tunnels cut
+            height. The waterway lengths differ too: HydroRecon follows the river; tunnels cut
             corners.
           </p>
           <p>
-            <b className="text-ink">It does not prove Ghatta replaces a feasibility study.</b>{' '}
+            <b className="text-ink">It does not prove HydroRecon replaces a feasibility study.</b>{' '}
             Every one of these plants was built on years of site gauging. The claim is narrower
             and more useful: at the screening stage, on an ungauged mid-hills river, the number on
             screen is the right order and the band around it is honest — and where it cannot be,
@@ -413,12 +419,25 @@ function Page() {
           </p>
         </div>
 
+        {/* The claim above is only true while the stamp still matches the engine
+            that is loaded. Without this the page asserted current-code validity
+            from a JSON file four days behind the modules beside it. */}
+        {DATA._engine !== ENGINE_SIGNATURE && (
+          <div className="mt-8 rounded-lg border border-amber/50 bg-amber/10 px-4 py-3 text-[11.5px] leading-relaxed text-amber">
+            <b>These results are older than the engine.</b> They were produced on{' '}
+            {DATA._generated} by engine <code>{DATA._engine ?? 'unstamped'}</code>, and the
+            calculation modules loaded here are <code>{ENGINE_SIGNATURE}</code>. Read them as a
+            record of that run, not as validation of the code you are using now — re-run{' '}
+            <code>npm run build:validation</code> to refresh.
+          </div>
+        )}
+
         <footer className="mt-10 border-t border-line pt-4 text-[10.5px] leading-relaxed text-faint">
           Generated {DATA._generated} by <code>npm run build:validation</code> — a headless browser
           driving the same modules the app runs, from{' '}
           <code>pipeline/plants.json</code> (every coordinate and figure sourced there). Plant data:
           OpenStreetMap © contributors (ODbL), GeoNames (CC BY), operators&apos; and public
-          records as linked per plant. Ghatta is open source under MIT.
+          records as linked per plant. HydroRecon is open source under MIT.
         </footer>
       </div>
     </div>
