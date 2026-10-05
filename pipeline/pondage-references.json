@@ -1,14 +1,22 @@
 {
   "_what": "Surveyed reservoirs with published stage/area/storage figures, for scoring the pondage screen against something real rather than against a synthetic fixture.",
-  "_why": "Every other headline number in HydroRecon is measured against reality — flow against 69 DHM gauges, capacity against 104 commissioned plants, head against two terrain products. Pondage was measured against an 18-cell bowl whose answer was true by construction. This is the reference set that changes that.",
+  "_why": "Every other headline number in HydroRecon is measured against reality \u2014 flow against 69 DHM gauges, capacity against 104 commissioned plants, head against two terrain products. Pondage was measured against an 18-cell bowl whose answer was true by construction. This is the reference set that changes that.",
   "_caution": "A modern DEM over an EXISTING reservoir samples the water surface, not the drowned valley. So these sites test the fill, the barrier and the shoreline integration against a real, complex shoreline at a known level; they cannot test the stage-storage relation below that level, because no bathymetry is present in the raster. Read `test` on each entry for what it is actually claiming.",
   "reservoirs": [
     {
       "name": "Kulekhani (Indrasarobar)",
       "river": "Kulekhani Khola",
       "country": "Nepal",
-      "dam": { "lat": 27.590278, "lon": 85.155833 },
-      "damCoordinateNote": "27°35′25″N 85°9′21″E as published, converted to decimal degrees.",
+      "dam": {
+        "lat": 27.590278,
+        "lon": 85.155833
+      },
+      "damCoordinateNote": "27\u00b035\u203225\u2033N 85\u00b09\u203221\u2033E as published, converted to decimal degrees.",
+      "downstream": {
+        "lat": 27.580278,
+        "lon": 85.151833
+      },
+      "downstreamNote": "A point ~1.1 km downstream of the dam, hand-measured off the published coordinate. It lived in the harness as a literal until the GSW reference set needed two hundred of them; it is data now, and it is kept explicit here so this site's shipped numbers cannot move when the derived outlet rule changes. Every reference without this field gets the outlet derived from the DEM instead - the lowest cell on the plateau's own margin.",
       "commissioned": 1982,
       "fullSupplyLevelM": 1530,
       "surfaceAreaKm2": 2.2,

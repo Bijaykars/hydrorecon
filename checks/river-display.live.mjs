@@ -1,0 +1,37 @@
+import { chromium } from 'playwright-core';
+import assert from 'node:assert/strict';
+import { mkdirSync } from 'node:fs';
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+try {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('http://127.0.0.1:5173/#at=28.226,85.073&map=15/28.2215/85.0715');
+  await page.waitForFunction(() => window.__exportCtx?.selected && window.__map?.getSource('display-channel')?.serialize().data.features.length > 0, null, { timeout: 90000 });
+  await page.waitForTimeout(1500);
+  const result = await page.evaluate(() => ({ selected: window.__exportCtx.selected, path: window.__exportCtx.path, geometry: window.__map.getSource('scheme').serialize().data, network: window.__map.getLayoutProperty('reaches', 'visibility') }));
+  assert.equal(result.network, 'none');
+  assert.ok(result.geometry.features.length > 1);
+  const start = result.geometry.features[0].geometry.coordinates[0];
+  assert.ok(start.every(Number.isFinite));
+  assert.equal(result.selected.i, 0, 'Default intake stays at the selected model position');
+  assert.ok(result.selected.waterwayKm <= 6 + 1e-9);
+  const pin = await page.locator('.marker').filter({ hasText: /^intake$/ }).boundingBox();
+  const xy = await page.evaluate((p) => window.__map.project(p), start);
+  assert.ok(pin && Math.hypot(pin.x + pin.width / 2 - xy.x, pin.y + pin.height / 2 - xy.y) < 3, 'Intake pin and orange line share one position');
+  await page.getByLabel('Show model reference geometry', { exact: true }).check();
+  assert.equal(await page.evaluate(() => window.__map.getLayoutProperty('reaches', 'visibility')), 'visible');
+  assert.equal(await page.evaluate(() => window.__map.getSource('model-reference').serialize().data.features.length), 1);
+  await page.getByLabel('Show model reference geometry', { exact: true }).uncheck();
+  const afterComparison = await page.evaluate(() => ({ selected: window.__exportCtx.selected, path: window.__exportCtx.path }));
+  assert.deepEqual(afterComparison.selected, result.selected, 'Changing display comparison preserves engineering outputs');
+  assert.deepEqual(afterComparison.path, result.path, 'Changing display comparison preserves every model sample');
+  await page.getByRole('button', { name: 'satellite', exact: true }).click();
+  await page.waitForTimeout(1800);
+  mkdirSync('.codex-dev.alignment', { recursive: true });
+  await page.screenshot({ path: '.codex-dev.alignment/after.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  assert.deepEqual(errors, []);
+  console.log(JSON.stringify({ start, modelIntake: result.selected.intake, capacityMW: result.selected.capacityMW, segments: result.geometry.features.length, checks: 'pin alignment, model comparison, numeric parity, mobile and runtime passed' }, null, 2));
+} finally { await browser.close(); }

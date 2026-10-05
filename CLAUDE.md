@@ -22,22 +22,42 @@ Read the comment block above it first.
 
 ## Accuracy, as measured
 
-**The two halves of this table are stamped to different engines.** The fleet was
-re-run whole on 2026-08-24 under `949cb685322e`; the gauge and head rows are
-still the `28b4b3f033a8` measurement and have NOT been re-scored under it. Signed
-code changed between the two, so the flow rows are a claim about slightly older
-code than the plant rows. Re-running the gauge harness is the outstanding job.
+**Every row below is one engine, `acdb34241895`, re-measured 2026-08-25.** The
+table used to be stamped to two — the fleet at `949cb685322e`, the gauge and head
+rows at `28b4b3f033a8` — and closing that was the outstanding job. It is closed:
+the whole fleet, both gauge harnesses, the dry-share harness and the three-way
+DEM probe were re-run under one signature.
 
-Against **69 DHM gauges** with 10+ complete years (engine `28b4b3f033a8`) and
-**193 commissioned Nepali plants** — the whole eligible register, not a sample
-(engine `949cb685322e`):
+**Nothing moved.** Not "nothing much" — nothing. The fleet paired 193 plants
+against the old file on capacity, energy, design flow, head, waterway and licence
+ratio, and the largest relative move was **zero**. Both gauge tables reproduce
+digit for digit; so does the dry-share confusion matrix; so does the
+three-cornered hat.
+
+**So a signature change is not a behaviour change, and only a paired re-run can
+tell them apart.** `engine-signature.mjs` hashes sixteen files with comments
+stripped, and something in them moved between the fleet run and the commit that
+followed it — an intermediate state that is not in git, so what moved cannot now
+be recovered. That is the signature doing its job: it is deliberately
+over-sensitive, because CLAUDE.md's own rule is that covering too much costs one
+re-run while covering too little silently invalidates every comparison. The cost
+here was one re-run and the answer was worth having.
+
+One thing the re-run exposed about the table itself: **the head row was never
+the engine's to stamp.** `checks/dem-vs-survey.probe.mjs` compares three terrain
+products through `src/api.ts`, and not one of the sixteen signed modules can move
+its answer. It is dated, not signed.
+
+Against **69 DHM gauges** with 10+ complete years and **193 commissioned Nepali
+plants** — the whole eligible register, not a sample — all under
+`acdb34241895`:
 
 | Quantity | Result |
 |---|---|
 | Flow, typical error | **1.37×** (blend), weighted to where projects sit: **1.64×** |
 | Flow, bias | **1.00×** — unbiased, after the correction below |
 | Flow, within a factor of two | **90%** of gauges |
-| Head | no systematic bias, **σ 6.6 m**, 3.4% relative. Re-run three-way 2026-08-24: Mapterhorn is the best of three, see below |
+| Head | no systematic bias, **σ 6.6 m**, 3.4% relative. Three-way, re-run 2026-08-25: Mapterhorn is the best of three, see below. Terrain, so unsigned |
 | Plants reaching their licence at a buildable waterway | **147/180 = 82%** |
 | Impossible coordinates (excluded, not scored) | **8/180 = 4.4%** |
 | Plants under-predicted by more than 2× | **9/172 = 5.2%** |
@@ -226,6 +246,267 @@ bankable.
 
 ---
 
+## Rain in, runoff out — and the ceiling the gauges had to set
+
+`waterBalance()` in `src/report.ts`, measured by
+`checks/waterbalance-vs-fleet.mjs`.
+
+A catchment cannot deliver much more water than falls on it. Mean flow,
+catchment area and rainfall were all being printed, in three different sections,
+and nobody had ever divided one by the other two.
+
+Doing it caught a live site on the first run. At **27.65 N, 85.90 E** the report
+shipped a modelled mean of **1.70 m³/s** on a mapped **5.5 km²** catchment with
+**1,589 mm** of rain — a runoff coefficient of **6.2**. The other three estimates
+of the same river sat far below it:
+
+| source | mean | runoff coefficient |
+|---|---|---|
+| mapped network | 0.20 m³/s | 0.73 |
+| WECS/DHM 1990 | 0.33 m³/s | 1.20 |
+| Modified HYDEST | 0.67 m³/s | 2.43 |
+| **flood model — shipped** | **1.70 m³/s** | **6.17** |
+
+`flowchoice.ts` arbitrated and chose the worst one, because it only ever compares
+the candidates against *each other*. The two disagreed 8.4×, so the referee
+measured each against Modified HYDEST in log space: the model sat 2.53× off the
+judge, the network 3.32×. The model was closer, so the model won — and the
+`BOTH_LOST` guard that would have handed magnitude to the regression is set at
+e¹ ≈ 2.72× and the winner cleared it by 0.07.
+
+### The ceiling is 2.0, and 1.0 was wrong — including in the first version of this
+
+The obvious bound is a runoff coefficient of 1. **It is wrong for Nepal, and it
+shipped that way for one turn before being measured.**
+
+`checks/waterbalance-vs-fleet.mjs` scores the coefficient of the **measured**
+mean at 69 DHM gauges with ten or more complete years. A fire there is the screen
+calling a river impossible when a gauge recorded the water going past:
+
+| ceiling | fires on MEASURED gauges | fires on the fleet as shipped |
+|---|---|---|
+| **1.00** | **22/69 = 31.9%** | 100/168 = 59.5% |
+| 1.25 | 9/69 = 13.0% | 46/168 = 27.4% |
+| 1.50 | 5/69 = 7.2% | 22/168 = 13.1% |
+| 1.75 | 2/69 = 2.9% | 15/168 = 8.9% |
+| **2.00** | **0/69 = 0.0%** | **5/168 = 3.0%** |
+| 2.50 | 0/69 = 0.0% | 1/168 = 0.6% |
+
+Measured distribution at those gauges: **median 0.87, p90 1.31, p95 1.52, max
+1.89.**
+
+**Nepal really does run near 1.** Roughly 225 km³/yr off 147,181 km² is about
+1,530 mm of runoff against about 1,600 mm of rain, a national coefficient near
+**0.95**: steep ground, thin soils, monsoon intensity. So 1.0 sits in the middle
+of the distribution rather than above it.
+
+#### Snow and ice was the obvious explanation, and it is not the whole one
+
+This was first asserted here without measurement, then tested against the only
+proxy the app had — the share of catchment above 5,000 m — and rejected at
+rho 0.26. **That rejection was too strong, because the proxy was bad.**
+
+**The app now has the ice itself.** `pipeline/build-nepal-glaciers.py` cuts RGI
+7.0 region 15 to the three transboundary basins — **6,816 glaciers, 8,016 km²**,
+CC-BY-4.0, via UNESCO's IHP-WINS mirror because NSIDC wants an Earthdata login.
+`src/glaciers.ts` routes each centroid to a site down the same directed network
+the lake screen uses, so a glacier counts only where the channel connects. That
+matters: the bundle's extent is a bounding box, and Rongbuk sits inside it while
+draining north into Tibet.
+
+`checks/glaciers-vs-waterbalance.mjs`, 69 gauges, glacierised fraction measured
+rather than inferred:
+
+| glacierised share | n | median | max | over 1.0 |
+|---|---|---|---|---|
+| no connected ice | 32 | 0.81 | 1.61 | 8 |
+| under 2% | 11 | 0.85 | 1.52 | 1 |
+| 2–10% | 19 | 0.95 | 1.89 | 7 |
+| **over 10%** | 7 | **1.07** | 1.19 | **6 of 7** |
+
+**Real ice beats the proxy and the banding is now monotone**, which it never was
+against the contour: rho **0.36** with measured glacierised fraction against
+**0.26** with the share above 5,000 m. And the proxy correlates with the real
+thing at only **rho 0.66** — so "above 5,000 m" really was measuring a mountain.
+Six of the seven catchments over 10% glacierised exceed a coefficient of 1.0.
+**Melt is real, measurable, and shows up exactly where it should.**
+
+**It still does not explain the tail.** The two largest exceedances are Melamchi
+at 1.89 with 6.9% ice and Solu at 1.82 with 3.5%, and **8 of the 22 exceedances
+have no connected ice at all** — Sabhaya 1.61, Andhi 1.50, Hinwa 1.31, Surnagad
+1.31 and 1.08, Mardi 1.25, Chepe 1.04, Mai 1.01. A two-tier ceiling would still
+need 1.61 for the barely-glacierised and 1.89 for the glacierised, which is not
+a separation worth a rule. One constant stands, and the residual spread is in
+the inputs: a ~5 km climatology cannot resolve orographic gradients, its rain
+gauges sit in valleys, and MERIT's area carries its own error.
+
+
+### Making the engine refuse an impossible flow is REFUSED
+
+The screen does not discriminate. At the same 69 gauges, with a 1.0 ceiling:
+
+| coefficient of | fires |
+|---|---|
+| measured mean — ground truth | 22/69 = 31.9% |
+| mapped network | 11/69 = 15.9% |
+| Modified HYDEST | 16/69 = 23.2% |
+| **blend as shipped** | **22/69 = 31.9%** |
+
+**The shipped blend trips it at exactly the rate the measured record does.** A
+screen that fires on truth as often as on the estimate carries no information
+about which is wrong.
+
+The fleet says the same. On 180 scored plants the screen fires on 59.5% of
+shipped flows at a 1.0 ceiling, and the plants it picks out are not the ones the
+engine gets wrong — licence ratio median 2.59 where it fires against 2.06 where
+it passes, and the passing group has the **worse** tail at both ends (p10 0.42
+against 0.85, p90 10.21 against 6.97). And 36 of the 100 fires are on rows using
+a **transferred DHM record**, where flow choice is bypassed by design and there
+is nothing to arbitrate — harness rule 4 in its usual place.
+
+At the ceiling that is actually defensible, 2.0, it fires on **5 of 168** plants.
+Five rows cannot support a change to arbitration, and arbitration is not where
+the defect is anyway: the network candidate at the failing site was right and
+available, and the referee had no absolute anchor to prefer it with.
+
+**So `flowchoice.ts` is untouched and no measured number moves.** What ships is
+disclosure only — the coefficient printed beside every mean flow, in three tiers,
+with the wording escalating past 2.0. Do not fix this by moving `BOTH_LOST`;
+that is the trap this file names four times over.
+
+**What would settle it** is an absolute anchor in the arbitration rather than a
+relative one — scoring each candidate against the water balance and preferring
+the one that clears it. That is a real change to a signed module, so it needs the
+fleet and the 69 gauges re-run behind it, and it is not written.
+
+---
+
+## What dropping MERIT would cost, priced for the first time
+
+`checks/merit-vs-reach-area.mjs`
+
+MERIT Hydro is the one **CC-BY-NC** licence in this stack, and this file has said
+from the day it was written that going commercial "would require contacting the
+developer or dropping it". Nobody had ever measured what dropping it costs, which
+left an unpriced decision sitting under every flow figure the app produces.
+
+It is cheap to price, because the alternative is already in hand: `rivers.ts`
+carries both `uplandKm2` (MERIT's 92 m accumulation, per vertex) and
+`reachUplandKm2` (HydroRIVERS' own attribute), and the app already falls back to
+the second wherever MERIT is absent. Catchment area drives the REGRESSIONS —
+Modified HYDEST and its below-3000/below-5000 terms — which are half the shipped
+blend. The flood model reads a GloFAS cell and the network's discharge is a
+HydroRIVERS attribute, so neither moves.
+
+At 73 DHM gauges with 10+ complete years, blend against the measured mean:
+
+| | median | bias | typ.err | within 2× |
+|---|---|---|---|---|
+| with MERIT (as shipped) | 1.03× | 0.89× | **1.21×** | 85% |
+| HydroRIVERS area only | 1.02× | 0.82× | **1.21×** | **88%** |
+
+**Typical error identical to two decimals. Within-2× three points better without
+it. Bias three points worse.** Paired on the same 73 gauges, dropping MERIT is
+closer on 41 and further on 32 — a coin flip.
+
+### And that is exactly the evidence this project has been fooled by before
+
+The gauge population is not the use population, and here the gap is measurable
+rather than assumed:
+
+| | n | areas differ >1% | p90 divergence | median catchment |
+|---|---|---|---|---|
+| the 69-gauge population | 73 | 51% | 1.08 | **1,957 km²** |
+| commissioned plant intakes | 180 | **81%** | **1.15** | **163 km²** |
+
+The two areas disagree at four intakes in five where projects actually sit,
+against one gauge in two — and the gauges sit on catchments **twelve times
+larger**. That is the recurring trap in its usual clothes, and it means the
+gauge A/B above cannot close this decision however comfortable it looks.
+
+**So: the licence is far less expensive than feared, and it is not yet free.**
+What would settle it is a fleet re-run against a MERIT-free build, which is an
+engine change that moves the signature and re-stales the whole accuracy table.
+That is a deliberate piece of work, not a side effect, and it is not done.
+
+Two things this does establish. The flow would not obviously get worse, which is
+the part that decides whether the app still works at all. And MERIT's own
+documented bleed is visible in the same numbers — 5% of gauges read more than
+twice the reach's own area, with the Seti reading 7,358 km² against a reach of 7.
+
+---
+
+## Collector intakes, finally in the report
+
+A panel-against-report audit found three things the app knew and the document
+did not say. Two were closed at the time — the wrong-river warning and the
+flow-duration shape check. This was the third, left open for two sessions while
+being the only one of the three that changes the **design flow**.
+
+A collector intake diverts a neighbouring stream into the same headrace, and the
+app models the gain. A reader of the PDF got the raised capacity with no way to
+know a second stream had been assumed — a scheme they never agreed to, and a
+consent they were not told about. It now prints beside the flow, with each
+stream, its position and its share, and the note that every capacity and energy
+figure in the document includes them.
+
+It only fires when the user ctrl-clicks an extra intake, so no render harness
+reaches it. It was verified by injecting a two-collector context into the real
+`deskStudyHtml` and checking both that the section appears with both streams and
+that it stays silent when `collectors` is null.
+
+---
+
+## Three things that were broken and did not announce it
+
+**The GLOF screen could not fire.** `report.ts` filtered upstream lakes on
+`areaHa ?? areaKm2 * 100 ?? 0`, through an `as unknown as` cast, and
+`ConnectedGlacialLake` has neither field — `build-glacial-lakes.mjs` keeps
+centroids and deliberately drops the polygons. So the area was 0 on every lake,
+the risky set was empty on every site, and the report printed *"none is both
+large and close"* whatever was upstream. **A hazard screen failing open**, and
+the cast is what hid it from the compiler. It now screens on what the inventory
+carries — ICIMOD's 2020 list of 47 potentially dangerous glacial lakes, and
+glacier-fed lakes with a significant published expansion trend — which is better
+evidence than an area threshold anyway. The appendix table was printing
+`unnamed — –` for every row for the same reason.
+
+**It survived because the safe branch is the one that renders.** Almost every
+site has no dangerous lake upstream, so a screen that always answers "safe"
+looks exactly like a site that is. `checks/glof.check.ts` now exercises the
+dangerous branch on every run — ten cases including the regression itself, the
+route cut, a non-glacier-fed lake, a shrinking lake, and a trend the source
+flags as an outlier.
+
+**The app burned a core doing nothing, forever.** `setPick({ i, j })` built a
+fresh object on every run of the auto-select effect, and React bails out of a
+state update only on `Object.is`, so an identical-but-new object still counted as
+a change. The effect depends on `found`, which is derived from `pick`:
+
+    pick -> intakeReach -> flowChoice -> input -> found -> effect -> pick
+
+Every turn re-ran `discover()` over 139 candidate layouts, `evaluate()`, and
+`sweepDesignFlow()`'s seventeen further evaluations. Measured in the browser on
+a loaded site: **2.4-second blocking tasks back to back, 4,885 ms blocked in a
+3-second idle window, and `requestAnimationFrame` fired ZERO times in 4.7
+seconds.** React was printing "Maximum update depth exceeded" the whole time.
+Returning the previous reference when `i` and `j` are unchanged fixes it:
+**0 long tasks, 0 ms blocked, 165 fps**, idle and while zooming.
+
+**And it was not only slow — it made the output nondeterministic.** The ring
+never converged, so the scheme oscillated, and `render-report.mjs` captured
+whichever state it happened to catch. Two renders of one coordinate disagreed
+about whether 43 upstream lakes existed or none did. The renderer now waits for
+the context to stop changing — screens present AND the scheme's own i, j,
+capacity and waterway — and says so when it is still moving.
+
+A fourth, self-inflicted and caught the same day: the glacier bundle went into
+`src/data/` as a static import, which Vite inlines into the JS bundle and parses
+before first paint. **2.4 MB, more than every other statically imported layer
+combined.** It lives in `public/` and is fetched on demand, like the OSM rivers.
+
+---
+
 ## Pondage, as measured
 
 `node pipeline/build-pondage-validation.mjs` — Kulekhani (Indrasarobar), Nepal's
@@ -251,6 +532,133 @@ the app uses is decades younger, so the raster holds the LAKE SURFACE, not the
 drowned valley. That is what makes the area test possible at all — the water
 plateau is a real shoreline at a known level — and what makes the storage test
 impossible. A predicted volume here is a lower bound by construction.
+
+### And now against a population, not one reservoir
+
+`npm run build:pondage-refs` then `npm run build:pondage-gsw`
+
+The section above rested on **one** site, and said so. It does not any more.
+JRC's Global Surface Water maps every waterbody on Earth from 38 years of
+Landsat, and the surface area of a lake is exactly what `delineatePondage` is
+asked to reproduce — so the published figure is replaced by a MEASURED one, at
+**206 Nepali waterbodies**. Two instruments, two physics, one shoreline: the app
+fills a Copernicus radar/photogrammetric DEM, GSW thresholds Landsat optical
+reflectance, so agreement is evidence rather than bookkeeping.
+
+**The reference is a BAND, and assuming it was a number would have poisoned the
+whole comparison.** Kulekhani reads **0.73 km²** of always-wet water against a
+published 2.2: a reservoir is *drawn down*, so its outer 60% is not wet nine
+years in ten. Rara reads 10.22 against about 10.4, because a natural lake is not
+operated. Every row therefore carries a core (≥90% occurrence) and a typical
+(≥50%) extent, and the screen is scored against the interval — the DEM caught
+each lake at one unknown level inside it.
+
+#### The seed was wrong for one round of runs, and Kulekhani caught it
+
+The reference point started as the MEAN of each component's wet cells, which for
+a 7 km reservoir winding between ridges lands **on the hillside between its
+arms**. The harness read 1553 m there against a water surface at 1533, found
+three connected cells instead of a plateau, and reported the country's only large
+reservoir as unscoreable — **on both terrain products**, which is exactly what
+made it look like a terrain limit rather than arithmetic. **82 of 206 seeds were
+more than 100 m off; Kulekhani's was 665 m off.**
+
+The seed is now the point furthest from the shore, which is inside the waterbody
+by construction and maximally far from a noisy bank. The first attempt at that
+was also wrong and never ran: an unpadded distance transform has no background to
+measure to, so `argmax` landed in a CORNER — 1,094 m out, claiming 2.3 km of
+clearance inside a 1.6 km box. `--self-check` caught it, which is the first time
+that check paid for itself; it now carries a C-shaped fixture whose centroid is
+dry and asserts the seed is in water against the raster rather than against a
+coordinate.
+
+**Every number below is post-fix.** The pre-fix run is not recorded here, because
+a set that could miss its own lake 40% of the time was measuring the seed.
+
+178 of 206 scored, under Mapterhorn as shipped:
+
+| subset | n | in band | median | p10 | p90 | moves >3× |
+|---|---|---|---|---|---|---|
+| **all scored** | **178** | **36%** | **0.82×** | 0.49× | 14.44× | **31%** |
+| tight band only | 108 | 29% | 0.79× | 0.52× | 1.54× | — |
+| not glacial | 28 | 36% | 1.53× | 0.18× | 63.48× | 25% |
+| tight, not glacial | 4 | 50% | 1.03× | 0.83× | 1.53× | — |
+
+The huge p90s are **window-edge rows** and nothing else: 19 of the 178, mostly
+Terai floodplains, where a level pool on flat ground runs to the edge of any
+window you give it. On the rows that stayed inside their window the p90 is 1.12×.
+The screen there is meaningless rather than wrong, and it says `edgeLimited`.
+
+**The finding worth the whole exercise: the saddle escape is a third of the
+population.** "A result that moves 20× for a metre is an order of magnitude, not
+an estimate" was written about Kulekhani at n=1, and the obvious reading was that
+it was a quirk of one drowned valley. It is not. **56 of 178 waterbodies move
+more than 3× across the three metres above their own water plateau**, and the
+rate barely differs between the glacial subset (31%) and outside it (25%). Close
+to one pondage screen in three is an order of magnitude. `screenPondage` already
+reports its ±3 m sensitivity for exactly this reason — that disclosure is now
+load-bearing rather than precautionary.
+
+**28 produced no result at all, and every one failed the same way**: no flat
+surface at the seed, even at ±3 m, at 3,800–5,400 m. Mapterhorn does not resolve
+a small high glacial lake as a plateau. A terrain limit, reported rather than
+filled in.
+
+**Do not read an accuracy figure off the 0.79× median.** Three reasons, all
+structural. The band's upper edge is the ≥50% extent and the DEM is one
+snapshot, so scoring against it is conservative by construction. 157 of the 183
+are glacial lakes, which test the fill geometry and are absurd places for a
+forebay. And **the subset closest to an actual pondage site — a tight band,
+not glacial — is THREE ROWS.** That is the trap this file names on every other
+page, arriving on schedule: the measurable population is not the use population,
+because at 28 m Landsat only resolves large open water and run-of-river pondage
+is built on rivers narrower than a pixel.
+
+What this does establish, which nothing did before: the screen reproduces a real
+complex shoreline when the DEM holds one — **Rara 10.33 km² against a measured
+10.22–10.38, 1.00×**, Begnas 0.99× — and it is unstable on a third of the places
+you might point it. Both halves are new.
+
+### GEDTM30 for pondage, paired at last — and REFUSED
+
+`node checks/pondage-dem-ab.mjs`
+
+CLAUDE.md carried the GEDTM30-for-pondage swap as decided on Kulekhani: area
+0.57× → 0.77×, and a stability that went from **20× per three metres to 1.10×**.
+That was one site, and this file said n=1 could not close it. Now it is paired
+over the population, on identical seeds, same day, same code.
+
+Both arms fail on their own subset, so every figure is on the **166 rows scored
+by both** — comparing 178 rows against 170 different ones would be harness rule
+2 for the third time in this project:
+
+| | in band | median | p10 | p90 | moves >3× | edge-limited | scored |
+|---|---|---|---|---|---|---|---|
+| **Mapterhorn (shipped)** | 21% | 0.83× | **0.51×** | **14.4×** | 30% | **18** | **178** |
+| GEDTM30 bare earth | **27%** | 0.84× | 0.43× | 29.3× | **25%** | 22 | 170 |
+
+On the 135 rows where neither arm ran off its window: in band 25% against **31%**,
+**median 0.78× either way**, p10 0.49× against 0.40×, p90 1.12× against 1.31×,
+saddle escape 32% against **27%**.
+
+**Refused, and it is a genuine split rather than a rout.** GEDTM30 wins the
+in-band rate by six points and the saddle escape by five. Mapterhorn wins both
+tails, scores **eight more sites** (28 failures against 36), runs off the window
+four times less, and — the measure that answers the question actually being asked
+— **is closer to the measured band on 82 sites against 68, with 16 tied.** A
+primary is changed when a candidate is better, not when it is differently wrong.
+
+Two things the pairing kills outright. The Kulekhani stability result **does not
+generalise**: 20× → 1.10× at one site becomes 32% → 27% across 135, and site by
+site GEDTM30 fixes 32 saddle escapes while creating 24. And at Kulekhani itself,
+seeded from the satellite rather than from its published dam coordinate,
+Mapterhorn reads **1.380 km²** against GEDTM30's 1.527 on a measured band of
+0.730–1.314 — the shipped source is the closer of the two on the very site that
+launched the argument.
+
+**And the low read is the method, not the terrain.** Both arms sit at a median
+0.78× of the ≥50% shoreline on clean rows. Whatever makes the screen read small,
+swapping the DEM does not touch it.
 
 ### What this test caught on its first run
 
@@ -296,8 +704,12 @@ site after the swap it went from **0% area / 0% storage** against AWS to **0% /
 15%** against GEDTM30 — the spread went UP, and that is the improvement. A
 second opinion that always answers "we agree exactly" is not a check.
 
-GEDTM30 is still not the primary: one reservoir is not a population, and the
-head measurement below says Mapterhorn is the better surface.
+**GEDTM30 is still not the primary, and that is now measured rather than
+deferred.** The head probe below already said Mapterhorn is the better surface;
+the paired run over 166 waterbodies says it is also the better one for pondage,
+narrowly and on the measures that matter for a screen — see "GEDTM30 for pondage,
+paired at last" above. The Kulekhani result in this table stands as reported and
+does not generalise.
 
 ### Bare earth does not help head. It was measured, and it lost.
 
@@ -509,6 +921,8 @@ shaft or a support change. The 1:350,000 province sheets are better and the
 | Terrain | Copernicus GLO-30 (Mapterhorn) | primary; best of three on head |
 | Bare-earth terrain | **GEDTM30** (CC-BY-4.0) | local ~0.97 GB Nepal cut; the cross-check source, AWS where absent |
 | Land cover | **ESA WorldCover 2021** (CC-BY-4.0) | local ~598 MB Nepal cut at 30 m; what the alignment crosses |
+| Surface water | **JRC Global Surface Water v1.4** (free, unrestricted) | Pekel et al. 2016, 1984–2021, ~28 m. Two 130 MB tiles cover Nepal; the pondage reference set only, never read by the app. Sees large open water and **not** the gorge rivers projects sit on — 4% of commissioned plants have any GSW water within 150 m |
+| Glaciers | **RGI 7.0** region 15 (CC-BY-4.0) | 6,816 outlines, 8,016 km² of ice, cut to the three transboundary basins; 2.5 MB in `public/`, fetched on demand. Areas are RGI's own — the rings are simplified to 60 m for drawing and read 1.3% low. |
 | Geological units | **ICIMOD RDS "Geology of Nepal"** (CC-BY-4.0) | Amatya & Jnawali 1994 at 1:1,000,000, 856 polygons, 57 units; bundled 0.45 MB. The only NEPALI geology the app can query, and the only geology it can query offline. |
 | Hypsometry, altitude, rainfall | HydroBASINS + CHPclim | built per catchment |
 | Gauges | DHM Nepal | 136 records, daily |
@@ -586,6 +1000,69 @@ Both light figures share `lightGroundInk()` in the capture, because every scheme
 layer is styled for the dark basemap and on white relief or a printed sheet the
 alignment goes faint and the labels turn to grey smudges — the figure ends up
 showing its background clearly and the project poorly, which is backwards.
+
+---
+
+## The report was apologising, and it had a lot to be proud of
+
+Counted on one real site, the sixteen body pages carried **29 finding badges**,
+and **not one of them read as a result**. Thirteen said REQUIRED FIELD
+VERIFICATION and fourteen said LIMITATION, because `finding('note', …)` — the
+tone this file reaches for whenever it has an ordinary fact to state — rendered
+as "Limitation". So "no mapped active fault intersects the corridor", "the scheme
+lies outside every protected area" and "both structures are on the road network"
+were all stamped as shortcomings. **The report was reporting its good news as
+failure.**
+
+Page 2 was the worst of it. In order: *does not establish a design*; four key
+figures reading **low confidence**; *hold spend*; *no site discharge measurement
+is available*; hold points; then a badge repeating the recommendation printed
+three lines above it. Seven negative statements and one duplicate before the
+document said what it had found. Page 3 then opened a table headed **"Evidence
+not obtained at desktop stage"** — eight rows of *Not undertaken*.
+
+None of that was dishonest. All of it was uninformative, which is worse for a
+tool whose whole argument is that it measures itself.
+
+**What changed, and what did not.** Not one caveat was deleted. The scope
+boundary is still stated in the lede, still stated in section 02, and every
+field task still appears. What changed is:
+
+- **`note` renders as "Screening result"**, and a fourth tone, `limit` →
+  "Scope limitation", carries the five findings whose content really is the
+  boundary of the method. Badges now read 3 key findings / 9 screening results /
+  6 scope limitations / 11 field-verification items.
+- **Adjectives became measurements.** Eight "low confidence" labels are gone.
+  The flow tile says *~1.6× typical error*, the head tile *±3.4% measured*, and
+  the uncertainty section quotes the gauge and DEM harnesses by their numbers —
+  1.4× typical, unbiased, 90% within a factor of two; σ 6.6 m on head; dry share
+  under-read by 3.7 pt ±5.1. **The measurement is this tool's one advantage over
+  a consultant's desktop study, and the report was hiding it behind the word
+  "low".**
+- **"Evidence not obtained" became "What each discipline rests on"** — the same
+  eight rows, naming the evidence first and the gap at the end of the same line.
+  It also tells the reader more: "Site reconnaissance — Not undertaken" concealed
+  that a 30 m terrain model and a 10 m land-cover raster were read over the whole
+  alignment.
+- **Two duplicated findings removed.** The gauge verdict was printed in section
+  05 and again in section 06, one page apart, in the same words. The geology
+  section fired four consecutive warnings, of which "Engineering geology remains
+  unresolved" came from the global layer the section itself dismisses and
+  restated what section 02 already said.
+- **The contact count became the key finding it is.** Counting formation
+  contacts along a headrace is the thing nothing else in this stack can do, and
+  it was stamped REQUIRED FIELD VERIFICATION with a sentence about its own
+  tolerance. The tolerance now sits in the appendix beside the chainages it
+  qualifies.
+
+**And one number was simply wrong.** The assumptions table printed *"Overall
+plant efficiency 96.0 %"*. It is not that: `assumptions.efficiency` is the
+generator and transformer train, which `discover.ts` multiplies by the selected
+runner's efficiency at design flow. `src/export.ts` had labelled it correctly
+all along. The report now prints all three — 96.0% generator and transformer,
+89.4% Pelton at the reference flow, **85.8% overall** — because no plant reaches
+96% and a reader who knows that would have stopped trusting the document on page
+three, over arithmetic that was right the whole time.
 
 ---
 
@@ -707,7 +1184,11 @@ Mapterhorn applies.
 
 ## Harnesses
 
-`npm run check` — unit checks, ~29 of them, all fast and offline.
+`npm run check` — 361 unit assertions across 37 files, all fast and offline.
+`node --experimental-strip-types checks/merit-vs-reach-area.mjs` — prices the
+CC-BY-NC licence against the gauges and the fleet; offline, under a minute.
+`node --experimental-strip-types checks/glaciers-vs-waterbalance.mjs` — routes RGI
+ice to all 69 gauges; about a minute, offline.
 `npm run build:fleet 1000 1` — run the whole eligible register through the
 app's own engine in a real browser, about thirteen minutes. The `20 <seed>`
 form still works and still accumulates, but seeded sampling existed only to
@@ -715,6 +1196,19 @@ survive a rate limit the local GloFAS store removed; prefer the full run, which
 cannot drift into a mixture of engines.
 `npm run build:validation` — the curated ten plants.
 `npm run probe:dem` — terrain error, measured rather than assumed.
+`npm run build:pondage-refs` — cuts 206 Nepali waterbodies out of JRC Global
+Surface Water as a pondage reference set; offline after the two tiles land,
+about a minute. `npm run check:pondage-refs` drives the same code with a
+synthetic raster whose answer is known by construction.
+`node checks/pondage-dem-ab.mjs` — reads two pondage runs against each other,
+paired on the rows both scored, with the unpaired rows counted rather than
+averaged in; instant, offline.
+`npm run build:pondage-gsw` — scores the pondage screen against all 206 in a
+real browser, about 25 minutes. It runs in chunks of ten and reloads between
+them: a single `page.evaluate` over two hundred terrain windows killed the
+renderer twice, and the second time it took a hundred already-scored sites with
+it. A lost chunk is now recorded as a harness failure rather than quietly
+shortening the scored set.
 
 `checks/*.mjs` are analysis harnesses (not in `npm run check`) that answer one
 question each and print the answer.
@@ -782,6 +1276,29 @@ Do not re-try these without reading the comment blocks:
   5 → 12 out of 74. Removing conservative errors by manufacturing optimistic
   ones is not an improvement on a screening tool that quotes a tariff.
   `checks/dryshare-vs-gauges.mjs` re-runs the whole comparison.
+- **Swapping pondage's primary terrain to GEDTM30.** Kulekhani argued for it
+  loudly — surface area 0.57× → 0.77×, and a level table that stopped moving 20×
+  per three metres and moved 1.10× instead. Paired over 166 satellite-measured
+  shorelines it does not hold up: GEDTM30 takes the in-band rate 21% → 27% and
+  the saddle escape 30% → 25%, and gives back both tails (p10 0.51× → 0.43×, p90
+  14.4× → 29.3×), eight scored sites (28 failures → 36), four more window-edge
+  runaways, and the head-to-head — **Mapterhorn is closer to the measured band on
+  82 sites, GEDTM30 on 68, 16 tied.** Site by site GEDTM30 fixes 32 saddle
+  escapes and creates 24, which is a coin flip wearing a 5-point aggregate. At
+  Kulekhani itself, seeded from the satellite instead of its published dam
+  coordinate, Mapterhorn reads 1.380 km² against GEDTM30's 1.527 on a band of
+  0.730–1.314. Both arms read a median 0.78× of the ≥50% shoreline, so the
+  screen's low bias is the method and not the surface. `checks/pondage-dem-ab.mjs`
+  re-runs the whole comparison, paired, with the unpaired rows counted separately.
+- **Seeding the GSW reference set on each waterbody's centroid.** Never shipped a
+  number, and worth the entry because of how it failed: the mean position of a
+  non-convex lake is not in the lake, Kulekhani's sat 665 m away on the ridge
+  between two arms, and the harness reported the country's only large reservoir
+  as unscoreable on BOTH terrain products — which reads exactly like a terrain
+  limit. 82 of 206 seeds were more than 100 m out. The replacement, the point
+  furthest from the shore, was itself wrong on the first attempt (an unpadded
+  distance transform has no background, so `argmax` lands in a corner) and was
+  caught by `--self-check` before it ran.
 - **Four of the six ICIMOD RDS layers downloaded on 2026-08-25.** All CC-BY-4.0
   and all rejected after looking inside, not before. *Fault lines*: 16 lines for
   the whole of Nepal, some with five vertices, and the only attribute is
@@ -796,6 +1313,31 @@ Do not re-try these without reading the comment blocks:
   hydropower. Two more were unreachable rather than rejected: the GLOF record
   has no file attached, and the DWIDM flood-hazard layers need permission from
   DWIDM.
+
+- **Letting the water balance refuse a flow inside `flowchoice.ts`.** A
+  catchment cannot deliver more water than falls on it, the app holds all three
+  numbers, and the arbitration had chosen a candidate implying a runoff
+  coefficient of 6.2 at a real site. It is still refused, twice over.
+  **It does not discriminate**: at 69 gauges with a coefficient ceiling of 1.0
+  it fires on the MEASURED mean 22/69 times and on the shipped blend 22/69 times
+  — identical, so it carries no information about which of the two is wrong. And
+  **the ceiling that is defensible is too quiet to fit a rule to**: the measured
+  records run to 1.89 and the country averages 0.95, so anything at or below 1.89
+  refuses a river a gauge recorded, and at 2.0 the screen fires on 5 of 168
+  plants. On the fleet it also fails to pick out the plants the engine gets
+  wrong — licence ratio median 2.59 where it fires against 2.06 where it passes,
+  with the passing group holding the worse tail at both ends — and 36 of its 100
+  fires land on rows running a transferred DHM record, where flow choice is
+  bypassed by design. What ships is the report disclosure only.
+  `checks/waterbalance-vs-fleet.mjs` re-runs the whole comparison.
+
+- **A runoff-coefficient ceiling of 1.0**, which is the physically obvious one
+  and shipped for exactly one turn before it was measured. It fires on **31.9% of
+  measured Nepali gauge records** and 59.5% of the fleet. Nepal genuinely runs
+  near 1 — about 1,530 mm of runoff against about 1,600 mm of rain nationally —
+  so 1.0 sits in the middle of the distribution rather than above it. The
+  ceiling is fitted to the gauges at 2.0 and `checks/waterbalance.check.ts`
+  fails if anyone lowers it back under the measured maximum.
 
 - **Widening the transfer bar, re-tested on the repaired records.** The DHM
   parser bug corrupted seasonal structure, so the leave-one-out that first

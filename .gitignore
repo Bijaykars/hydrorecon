@@ -86,3 +86,39 @@ checks/.osm-snapped.json
 # tracked because CLAUDE.md's accuracy table rests on it; its backups are a
 # local undo, not history.
 src/data/*.backup-*.json
+
+# RGI 7.0 region file — 23 MB zip, 65 MB unpacked. CC-BY-4.0 and public:
+# rebuild with `npm run build:glaciers` after unzipping it here.
+sources/rgi/
+
+# GSW pondage reference tiles: rebuild with one command, 130 MB
+sources/gsw/
+
+# Scratch from the US-sources exploration — raw probe responses dumped to the
+# repo root while checking what a non-Nepal build could read (CUAHSI WaterML,
+# the NID error body, NWM zarr chunks). ~20 MB of nothing reproducible.
+# docs/US-SOURCES.md is the keepable half; these are the exhaust.
+/a.json
+/b.json
+/c.json
+/f.json
+/g.json
+/p.json
+/r.json
+/s.json
+/ss.json
+/ut.json
+/zm.json
+/dm.json
+/dv.json
+/nid.json
+/pos.json
+/basin.json
+/gage_id.bin
+/order.bin
+/chunk.bin
+
+# Agent routing bookkeeping. About how work got delegated in this workspace,
+# not about the app.
+.claude/agent-memory/
+.claude/autoroute/

@@ -68,6 +68,8 @@ export type SchemeInput = {
    * whole corridor instead.
    */
   intakeWindowKm: number;
+  /** Maximum along-river intake-to-powerhouse distance, including manual layouts. */
+  maxWaterwayKm?: number;
 };
 
 export type Scheme = {
@@ -78,7 +80,7 @@ export type Scheme = {
   power: { lat: number; lon: number };
   grossHeadM: number;
   netHeadM: number;
-  /** Distance along the river between the two — what a canal or tunnel must span. */
+  /** Along-river distance; a screening proxy, not a surveyed tunnel alignment. */
   waterwayKm: number;
   /** Multiplier applied to the source record to obtain flow at this intake. */
   flowScale: number;
@@ -207,6 +209,9 @@ export function evaluate(
 ): Scheme | null {
   const { path, series, seriesMeanCms, residualCms, exceedance, efficiency } = input;
   if (i < 0 || j >= path.length || j <= i) return null;
+  if (input.maxWaterwayKm != null &&
+      (!Number.isFinite(input.maxWaterwayKm) || input.maxWaterwayKm <= 0 ||
+       path[j].km - path[i].km > input.maxWaterwayKm + 1e-9)) return null;
   const zi = path[i].elevationM;
   const zj = path[j].elevationM;
   if (!Number.isFinite(zi) || !Number.isFinite(zj)) return null;
@@ -403,7 +408,7 @@ export function discover(input: SchemeInput): DiscoverResult {
   // 0.12 km spacing, rounding to nearest made the 0.4 km floor three steps —
   // 0.36 km — and the search then offered it as the shortest waterway.
   const minSteps = Math.max(2, Math.ceil(MIN_LEN_KM / spacingKm));
-  const maxSteps = Math.max(minSteps + 1, Math.floor(MAX_LEN_KM / spacingKm) + 1);
+  const maxSteps = Math.max(minSteps + 1, Math.floor((input.maxWaterwayKm ?? MAX_LEN_KM) / spacingKm) + 1);
   // Coarse stride keeps this interactive: ~every 500 m rather than every sample.
   const stride = Math.max(1, Math.round(0.5 / spacingKm));
 

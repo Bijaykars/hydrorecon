@@ -19,7 +19,12 @@
  */
 import { closeSync, existsSync, openSync, readSync } from 'node:fs';
 
-const PATH = 'pipeline/.cache/glofas-nepal.bin';
+/**
+ * Repo-relative by default, because every harness here runs from the repo
+ * root. HYDRORECON_GLOFAS_STORE points it elsewhere, which is how the packaged
+ * desktop shell reads a store sitting beside the executable instead.
+ */
+const storePath = () => process.env.HYDRORECON_GLOFAS_STORE || 'pipeline/.cache/glofas-nepal.bin';
 const MAGIC = 0x474e5031;
 const HEADER = 40; // 9 x 4 bytes, then the step
 
@@ -28,6 +33,7 @@ let store = null;
 /** Open the store once, or return null if it has not been built. */
 function open() {
   if (store !== null) return store;
+  const PATH = storePath();
   if (!existsSync(PATH)) return (store = false);
   const fd = openSync(PATH, 'r');
   const head = Buffer.alloc(HEADER);

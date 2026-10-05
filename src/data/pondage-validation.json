@@ -2,11 +2,13 @@
   "_what": "HydroRecon pondage screen against reservoirs with published figures.",
   "_terrainSource": "app default",
   "_caution": "A modern DEM over an EXISTING reservoir samples the water surface, not the drowned valley. So these sites test the fill, the barrier and the shoreline integration against a real, complex shoreline at a known level; they cannot test the stage-storage relation below that level, because no bathymetry is present in the raster. Read `test` on each entry for what it is actually claiming.",
-  "_generated": "2026-08-24",
+  "_generated": "2026-09-01",
   "reservoirs": [
     {
       "name": "Kulekhani (Indrasarobar)",
       "ok": true,
+      "outlet": "from the reference",
+      "windowKm": 8,
       "rasterWaterLevelM": 1533,
       "rasterPlateauCells": 1419,
       "publishedFullSupplyLevelM": 1530,
@@ -36,10 +38,13 @@
         "upstreamLengthM": 3305.9944914955754,
         "seedMovedM": 108.16653826391969
       },
-      "published": {
+      "reference": {
         "areaKm2": 2.2,
+        "areaBandKm2": null,
         "grossStorageMm3": 85.3,
-        "damCrestLengthM": 397
+        "damCrestLengthM": 397,
+        "measured": false,
+        "glacialLake": null
       },
       "source": "https://en.wikipedia.org/wiki/Kulekhani_Reservoir",
       "terrainSource": "Re:Earth Mapterhorn",

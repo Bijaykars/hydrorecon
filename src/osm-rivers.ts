@@ -163,6 +163,11 @@ function closestOnLine(
 
 export type OsmSnap = {
   path: { lat: number; lon: number; km: number }[];
+  /**
+   * Which traced line and segment each point matched, parallel to `path`;
+   * null where the point kept its modelled position.
+   */
+  matches: ({ line: number; seg: number } | null)[];
   /** Mean distance each point moved, metres. */
   movedM: number;
   /** Share of points that found a traced channel within tolerance. */
@@ -214,6 +219,16 @@ export async function snapPathToOsm(
   const onRiver = seed >= 0 && data.lines[seed].r === 1;
 
   const out: { lat: number; lon: number; km: number }[] = [];
+  /**
+   * Where each point landed on the traced network, parallel to `path`.
+   *
+   * `null` means the point kept its modelled position. Carried so a caller can
+   * substitute OSM's OWN vertices between two consecutive matches instead of
+   * the straight chord that currently joins them — snapping the corners while
+   * keeping ~500 m chords is what makes the drawn river cut across meanders it
+   * has already been corrected onto.
+   */
+  const matches: ({ line: number; seg: number } | null)[] = [];
   let moved = 0;
   let matched = 0;
   /**
@@ -232,9 +247,9 @@ export async function snapPathToOsm(
    */
   let currentLine = seed;
   for (const point of path) {
-    let best: { lat: number; lon: number; km: number; line: number } | null = null;
-    let bestRiver: { lat: number; lon: number; km: number; line: number } | null = null;
-    let onCurrent: { lat: number; lon: number; km: number; line: number } | null = null;
+    let best: { lat: number; lon: number; km: number; line: number; seg: number } | null = null;
+    let bestRiver: { lat: number; lon: number; km: number; line: number; seg: number } | null = null;
+    let onCurrent: { lat: number; lon: number; km: number; line: number; seg: number } | null = null;
     const seen = new Set<number>();
     for (let dLat = -1; dLat <= 1; dLat++) {
       for (let dLon = -1; dLon <= 1; dLon++) {
@@ -246,7 +261,7 @@ export async function snapPathToOsm(
           const p = data.lines[index].p;
           for (let i = 0; i + 3 < p.length; i += 2) {
             const hit = nearestOnSegment(point.lat, point.lon, p[i], p[i + 1], p[i + 2], p[i + 3]);
-            const withLine = { ...hit, line: index };
+            const withLine = { ...hit, line: index, seg: i >> 1 };
             if (hit.km < (best?.km ?? Infinity)) best = withLine;
             if (data.lines[index].r === 1 && hit.km < (bestRiver?.km ?? Infinity))
               bestRiver = withLine;
@@ -274,8 +289,10 @@ export async function snapPathToOsm(
       moved += chosen.km * 1000;
       currentLine = chosen.line;
       out.push({ lat: chosen.lat, lon: chosen.lon, km: 0 });
+      matches.push({ line: chosen.line, seg: chosen.seg });
     } else {
       out.push({ lat: point.lat, lon: point.lon, km: 0 });
+      matches.push(null);
     }
   }
 
@@ -286,6 +303,7 @@ export async function snapPathToOsm(
   }
   return {
     path: out,
+    matches,
     movedM: moved / Math.max(1, matched),
     matched: matched / path.length,
     lengthBeforeKm: path[path.length - 1].km,
@@ -339,4 +357,92 @@ export async function osmLengthFactor(
 /** Restate a path's along-course distances at their traced length. */
 export function stretchPath<T extends { km: number }>(path: T[], factor: number): T[] {
   return factor === 1 ? path : path.map((p) => ({ ...p, km: p.km * factor }));
+}
+
+/**
+ * The traced course between two snapped points, not the chord across it.
+ *
+ * WHY THIS EXISTS. `snapPathToOsm` moves each modelled vertex onto the traced
+ * channel and stops there, and `snap-vertices-to-osm.mjs` writes those
+ * positions "parallel to the vertex block" — one output vertex per input
+ * vertex. HydroRIVERS vertices sit about 500 m apart, so the drawn river is a
+ * chain of corners that ARE on the water joined by straight lines that are not.
+ * On a meandering Himalayan reach that reads, correctly, as a line cutting
+ * across the valley the imagery plainly shows the river going round.
+ *
+ * OSM already holds the answer at 124 m per vertex over 92,000 km. This walks
+ * the matched line between consecutive points and emits its intermediate
+ * vertices, so the drawn course follows the channel instead of approximating
+ * it.
+ *
+ * THREE THINGS IT REFUSES TO DO, each of which would trade a cosmetic win for a
+ * wrong river:
+ *
+ *   It will not splice across a LINE CHANGE. Two consecutive points matched to
+ *   different OSM ways may be a legitimate confluence or the map-matcher
+ *   hopping onto a tributary; inserting one way's geometry between them would
+ *   draw a river that does not exist. Those pairs keep their chord.
+ *
+ *   It will not splice BACKWARDS. OSM ways carry their own direction, which is
+ *   not always downstream. A pair whose segment indices run the wrong way is
+ *   left as a chord rather than reversed on the assumption the way is drawn
+ *   upstream.
+ *
+ *   It will not splice a DETOUR. If the traced course between two points is
+ *   more than MAX_DETOUR times their straight-line separation, the match has
+ *   wandered up a side channel and come back. The chord is the safer drawing.
+ *
+ * Geometry only, and for DRAWING only. Nothing here feeds an elevation sample:
+ * `rivers.ts` keeps the engine on the modelled vertices deliberately, and
+ * `osm-rivers.ts` records that swapping the course under the engine was
+ * measured and lost on capacity.
+ */
+const MAX_DETOUR = 3;
+
+export function densifyAlongTrace(
+  snap: OsmSnap,
+  lines: readonly { p: readonly number[] }[]
+): { coordinates: [number, number][]; tracedSegments: number; totalSegments: number } {
+  const coordinates: [number, number][] = [];
+  let tracedSegments = 0;
+  let totalSegments = 0;
+  for (let i = 0; i < snap.path.length; i++) {
+    const a = snap.path[i];
+    coordinates.push([a.lon, a.lat]);
+    if (i === snap.path.length - 1) break;
+    totalSegments++;
+    const b = snap.path[i + 1];
+    const ma = snap.matches[i];
+    const mb = snap.matches[i + 1];
+    if (!ma || !mb || ma.line !== mb.line || mb.seg < ma.seg) continue;
+
+    const p = lines[ma.line]?.p;
+    if (!p) continue;
+    const between: [number, number][] = [];
+    let traced = 0;
+    let prev: [number, number] = [a.lon, a.lat];
+    // Vertices strictly between the two projections: segment `seg` runs from
+    // vertex seg to seg+1, so the interior starts at ma.seg + 1.
+    for (let v = ma.seg + 1; v <= mb.seg; v++) {
+      const lat = p[v * 2];
+      const lon = p[v * 2 + 1];
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+      traced += haversineKm([prev[1], prev[0]], [lat, lon]);
+      prev = [lon, lat];
+      between.push([lon, lat]);
+    }
+    if (!between.length) continue;
+    traced += haversineKm([prev[1], prev[0]], [b.lat, b.lon]);
+    const chord = haversineKm([a.lat, a.lon], [b.lat, b.lon]);
+    if (chord > 0 && traced > chord * MAX_DETOUR) continue;
+    coordinates.push(...between);
+    tracedSegments++;
+  }
+  return { coordinates, tracedSegments, totalSegments };
+}
+
+/** The traced lines themselves, for a caller doing its own densification. */
+export async function osmLines(): Promise<readonly { p: readonly number[]; r: number }[] | null> {
+  const data = await load();
+  return data ? data.lines : null;
 }

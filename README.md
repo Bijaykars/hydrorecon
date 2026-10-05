@@ -372,3 +372,12 @@ under CC BY 4.0 with their original references.
 The CHPclim-derived monsoon input is publicly downloadable but no standalone reuse licence was
 identified on its product page; it remains outside the repository MIT licence, with Climate
 Hazards Center attribution, source hashes and that rights warning embedded in the provenance sidecar.
+
+A per-file audit of every bundled dataset — upstream source, licence, whether redistribution
+and commercial use are permitted, and the attribution each one requires — is in
+[LICENSES.md](LICENSES.md). Read it before redistributing any of the data or using it
+commercially; several files are more restrictive than the MIT code licence above.
+
+## Author
+
+Built by [Bijay Karki](https://www.linkedin.com/in/bijay-karki-/) — bijay.karki.work@gmail.com

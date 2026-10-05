@@ -33,6 +33,7 @@
 import type { ExportContext } from './export.ts';
 import { geologySpans, type GeologyUnitHit } from './geology-units.ts';
 import { stationDisplayName } from './gauges.ts';
+import type { ConnectedGlacialLake } from './connectivity.ts';
 import { buildFdc, minMonthlyMean, seasonalRatio } from './engine/hydro.ts';
 import {
   pondageDemand,
@@ -68,6 +69,11 @@ export type ReportFigures = {
   /** The upstream lakes, with every other layer switched off. */
   lakes?: string | null;
   lakeFrameKm?: number | null;
+  /** How many of the connected lakes the frame actually holds, and of how many. */
+  lakesShown?: number | null;
+  lakesTotal?: number | null;
+  /** The flow-path cut the frame used, when it used one. */
+  lakesWithinKm?: number | null;
   /** Width of the hazard map's frame on the ground, km — the caption's scale. */
   hazardFrameKm?: number | null;
   /** How many stations the gauge figure could actually fit, and of how many. */
@@ -144,6 +150,162 @@ function catchmentKm2(c: ExportContext): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
 }
 
+/**
+ * WHICH UPSTREAM LAKES CARRY A PUBLISHED DANGER SIGNAL.
+ *
+ * Lifted out of the report body so it can be tested directly. It was inline
+ * once, and inline it was WRONG in the only direction that matters: it filtered
+ * on `areaHa ?? areaKm2 * 100 ?? 0` through an `as unknown as` cast, and
+ * `ConnectedGlacialLake` carries neither field — the builder keeps centroids and
+ * drops the polygons. Area was therefore 0 on every lake, the risky set was
+ * empty on every site, and the report printed "none is both large and close"
+ * whatever sat upstream. A hazard screen failing OPEN, hidden from the compiler
+ * by the cast, and unnoticed because the safe branch is the one that renders on
+ * almost every site.
+ *
+ * It now screens on what the inventory actually publishes, which is better
+ * evidence than an area threshold anyway:
+ *
+ *   LISTED — ICIMOD's 2020 assessment of 47 potentially dangerous glacial
+ *   lakes has judged dam type, source glacier and surroundings. No area figure
+ *   can see any of that.
+ *
+ *   GROWING — a glacier-fed lake with a significant published expansion trend
+ *   is the remotely-sensed version of the same worry. Non-glacier-fed lakes are
+ *   excluded because the mechanism is not there, and lakes the source flags as
+ *   time-series outliers are excluded because the trend is not trusted by the
+ *   people who measured it.
+ *
+ * AREA IS STILL THE MISSING TERM and it is worth having: a 2 ha pond and a
+ * 200 ha lake at the same distance are not the same question. Restoring it means
+ * adding the area column to `pipeline/build-glacial-lakes.mjs` and re-running it.
+ * Until then the report says so rather than implying the screen is complete.
+ */
+export const GLOF_ROUTE_KM = 60;
+
+export function glofDangerSignals(lakes: readonly ConnectedGlacialLake[]): {
+  listed: ConnectedGlacialLake[];
+  growing: ConnectedGlacialLake[];
+  risky: ConnectedGlacialLake[];
+} {
+  const near = lakes.filter((l) => l.routeKm <= GLOF_ROUTE_KM);
+  const listed = near.filter((l) => l.pdgl != null);
+  const growing = near.filter(
+    (l) =>
+      l.pdgl == null &&
+      l.connectivity === 'Glacier-fed' &&
+      l.expansionSignificant === true &&
+      (l.expansionRateKm2Yr ?? 0) > 0 &&
+      l.timeSeriesOutlier !== true
+  );
+  return { listed, growing, risky: [...listed, ...growing] };
+}
+
+/**
+ * WHERE THE WATER WOULD HAVE TO COME FROM.
+ *
+ * Every flow figure in this app arrives from a model or a regression, and none
+ * of them is required to respect the one constraint that is not negotiable: a
+ * catchment cannot deliver much more water than falls on it. Rain in, runoff
+ * out. It is arithmetic on three numbers the report already printed in three
+ * separate places, which is exactly why nobody had put them together.
+ *
+ * IT CAUGHT A LIVE SITE. At 27.65 N, 85.90 E the app shipped a modelled mean of
+ * 1.70 m3/s on a mapped 5.5 km2 catchment with 1,589 mm of rain - a runoff
+ * coefficient of 6.2, where the mapped network said 0.20 m3/s and Modified
+ * HYDEST said 0.67. A 5.5 km2 catchment sits well inside one ~5 km GloFAS cell,
+ * so the cell was draining something much larger, and `flowchoice.ts` chose it
+ * anyway because it only ever compares the candidates against each other.
+ *
+ * THE CEILING IS 2.0, AND IT IS MEASURED, NOT PHYSICAL. The obvious bound is
+ * 1.0, and 1.0 is wrong for Nepal. `checks/waterbalance-vs-fleet.mjs` scores the
+ * coefficient of the MEASURED mean at 69 DHM gauges with ten or more complete
+ * years, and the median is 0.87 with a maximum of 1.89. The whole country runs
+ * near 1 - roughly 225 km3/yr off 147,181 km2 is about 1,530 mm of runoff
+ * against about 1,600 mm of rain - so 1.0 sits in the middle of the
+ * distribution, not above it.
+ *
+ * SNOW AND ICE MELT WAS THE OBVIOUS EXPLANATION FOR THE TAIL, AND IT WAS TESTED
+ * AND IS NOT IT. Ranked against the share of catchment above 5,000 m - the
+ * hypsometry WECS/DHM already uses, and the best proxy for perennial ice the app
+ * holds - the measured coefficient correlates at only rho 0.26, and rho 0.32
+ * against mean catchment altitude. The Surnagad gauges have NO ground above
+ * 5,000 m at all, at mean altitudes of 1,900 and 1,782 m, and still read 1.31
+ * and 1.08; the most glaciated band, over 20% above 5,000 m, tops out at 1.61
+ * against 1.89 for the 5-20% band. A two-tier ceiling would need 1.52 for low
+ * catchments and 1.89 for high ones, which is not a separation worth a rule.
+ *
+ * So the tail is spread in the INPUTS - a ~5 km climatology cannot resolve
+ * orographic gradients, its rain gauges sit in valleys, and MERIT's area carries
+ * its own error - and one empirical constant is all the evidence supports.
+ *
+ *   ceiling   fires on measured gauges   fires on the fleet
+ *     1.00          22/69 = 31.9%          100/168 = 59.5%
+ *     1.50           5/69 =  7.2%           22/168 = 13.1%
+ *     2.00           0/69 =  0.0%            5/168 =  3.0%
+ *
+ * So a ceiling of 1.0 would call a third of Nepal's gauged rivers impossible.
+ * 2.0 is the first round number above everything 69 measured records show, it
+ * fires on 3% of the commissioned fleet, and it still catches the site above by
+ * a factor of three. The constant is set by the gauge population against a
+ * zero-false-positive target - not tuned until one site behaved.
+ *
+ * RAINFALL MUST BE THE SAME QUANTITY THE CEILING WAS FITTED TO. That is
+ * `catchmentRainMm`: CHPclim's catchment-mean ANNUAL total, off the bundled
+ * network. An earlier version preferred the private isohyet layer and otherwise
+ * grossed up WECS/DHM's monsoon figure, and both are a different quantity -
+ * the isohyet is a point band, and the monsoon share ranges 0.65 to 0.83 across
+ * these same gauges, so a fixed gross-up carries 15% of its own. Where the
+ * annual figure is absent this returns null and the row simply does not print,
+ * which is better than printing a number the ceiling does not apply to.
+ *
+ * WHAT IT IS NOT. Above the ceiling is not proof of an error, and this does not
+ * refuse anything: `flowchoice.ts` is untouched, so no measured result moves.
+ * It is a disclosure - the report says what the arithmetic implies and leaves
+ * the reader to weigh it.
+ */
+export const RUNOFF_PLAUSIBLE_MAX = 2.0;
+/** Median at 69 gauges is 0.87; above this is high but well inside the record. */
+const RUNOFF_TYPICAL_MAX = 1.2;
+const SECONDS_PER_YEAR = 31_556_952;
+
+export function waterBalance(c: ExportContext): {
+  runoffMm: number;
+  rainfallMm: number;
+  coefficient: number;
+  ceilingCms: number;
+} | null {
+  const areaKm2 = catchmentKm2(c);
+  const meanCms = meanAtIntake(c);
+  const rainfallMm = c.catchmentRainMm ?? null;
+  if (!(areaKm2 && areaKm2 > 0) || !(meanCms > 0) || !(rainfallMm && rainfallMm > 0)) return null;
+
+  const areaM2 = areaKm2 * 1e6;
+  const runoffMm = (meanCms * SECONDS_PER_YEAR * 1000) / areaM2;
+  return {
+    runoffMm,
+    rainfallMm,
+    coefficient: runoffMm / rainfallMm,
+    ceilingCms: ((rainfallMm * RUNOFF_PLAUSIBLE_MAX) / 1000) * areaM2 / SECONDS_PER_YEAR,
+  };
+}
+
+/**
+ * A VOLTAGE OF ZERO IS NOT A VOLTAGE, IT IS A MISSING TAG.
+ *
+ * `grid.ts` initialises `nearestKv` to 0 and OpenStreetMap frequently maps a
+ * transmission line without a `voltage` tag, so a real line with an unknown
+ * rating printed as "0 kV" — twice on the same page of a sample report, next to
+ * "Nearest substation unnamed · 33.4 km at 0 kV". A reader who knows the grid
+ * sees a number that cannot exist and stops trusting the page, and they are
+ * right to: the line is there, the app simply does not know its rating.
+ *
+ * Saying so is both honest and more useful, because "voltage not tagged" tells
+ * the reader what to go and check.
+ */
+const kv = (v: number | null | undefined): string =>
+  typeof v === 'number' && v > 0 ? `${n(v, 0)} kV` : 'voltage not tagged in the mapped data';
+
 const kmOf = (m: number | null | undefined) =>
   typeof m === 'number' && Number.isFinite(m) ? m / 1000 : null;
 
@@ -196,9 +358,32 @@ function table(caption: string, head: Row, rows: Row[]): string {
  * `clear` is a screen that came back negative; `watch` is one that found
  * something the reader must not skim past.
  */
-const finding = (tone: 'clear' | 'watch' | 'note', html: string) =>
+/**
+ * FOUR RECORD TYPES, BECAUSE THREE LABELS WERE DOING FIVE JOBS.
+ *
+ * `note` used to render as "Limitation", and `note` is what most of this file
+ * reaches for when it has an ordinary, neutral, often REASSURING result to
+ * state. So "no mapped active fault intersects the corridor", "the scheme lies
+ * outside every protected area" and "both structures are on the road network"
+ * were all stamped LIMITATION — a document telling the reader its good news was
+ * a shortcoming. Counted on a real site, 27 of the 29 badges in sixteen pages
+ * read as a warning or an apology, and eight of those were findings in the
+ * project's favour.
+ *
+ * The fix is not to soften the caveats; it is to stop calling a result a
+ * caveat. `note` states what the screen found. `limit` is kept for the places
+ * where the honest content really is the boundary of the method, and those are
+ * now few enough to carry weight when they appear.
+ */
+const finding = (tone: 'clear' | 'watch' | 'note' | 'limit', html: string) =>
   `<aside class="finding ${tone}"><div class="finding-label">${
-    tone === 'clear' ? 'Key finding' : tone === 'watch' ? 'Required field verification' : 'Limitation'
+    tone === 'clear'
+      ? 'Key finding'
+      : tone === 'watch'
+        ? 'Required field verification'
+        : tone === 'limit'
+          ? 'Scope limitation'
+          : 'Screening result'
   }</div><div class="finding-body">${html}</div></aside>`;
 
 /** Key-value facts as a definition list. Not a grid; a grid is a cage. */
@@ -939,12 +1124,12 @@ export function deskStudyHtml(
     `<div class="kf"><b>${esc(v)}</b><i>${esc(u)}</i><span>${esc(l)}</span><small>${esc(detail)}</small></div>`;
   const keyFigures = s
     ? `<section class="keys">
-        ${kf(approx(s.capacityMW, 1), 'MW', 'Indicative capacity', c.band ? `Range ${n(c.band.capLow, 1)}–${n(c.band.capHigh, 1)} MW · low confidence` : 'Low confidence')}
-        ${kf(approx(s.energyGwh, 0), 'GWh/yr', 'Indicative annual energy', c.band ? `Range ${n(c.band.energyLow, 0)}–${n(c.band.energyHigh, 0)} GWh · low confidence` : 'Low confidence')}
-        ${kf(approx(s.netHeadM, 0), 'm', 'Net head', `${n(c.demResolutionM, 0)} m DEM · moderate confidence`)}
-        ${kf(approx(s.designFlowCms, 2), 'm³/s', `Reference flow · Q${Math.round(exc * 100)}`, 'Modelled · low confidence')}
-        ${kf(approx(s.waterwayKm, 1), 'km', 'Indicative waterway', 'Unsurveyed route · low confidence')}
-        ${kf(approx(catchmentKm2(c), 1), 'km²', 'Catchment at intake', 'Mapped · moderate confidence')}
+        ${kf(approx(s.capacityMW, 1), 'MW', 'Indicative capacity', c.band ? `Range ${n(c.band.capLow, 1)}–${n(c.band.capHigh, 1)} MW` : 'Screening estimate')}
+        ${kf(approx(s.energyGwh, 0), 'GWh/yr', 'Indicative annual energy', c.band ? `Range ${n(c.band.energyLow, 0)}–${n(c.band.energyHigh, 0)} GWh` : 'Screening estimate')}
+        ${kf(approx(s.netHeadM, 0), 'm', 'Net head', `${n(c.demResolutionM, 0)} m terrain model · ±3.4% measured`)}
+        ${kf(approx(s.designFlowCms, 2), 'm³/s', `Reference flow · Q${Math.round(exc * 100)}`, 'Modelled · ~1.6× typical error')}
+        ${kf(approx(s.waterwayKm, 1), 'km', 'Indicative waterway', 'Routed on terrain, not surveyed')}
+        ${kf(approx(catchmentKm2(c), 1), 'km²', 'Catchment at intake', 'Mapped from the drainage network')}
       </section>`
     : '';
 
@@ -956,22 +1141,42 @@ export function deskStudyHtml(
   };
   const stopSummary = rd?.stopReasons?.length
     ? rd.stopReasons.map((reason) => reason.replace(/\.\s*$/, '')).join('; ')
-    : 'No desktop fatal flaw identified; field verification remains required.';
+    : 'None identified at desktop stage; field verification remains required.';
+  /**
+   * The one line a reader who reads nothing else should get: the scheme this
+   * screen found, in the four numbers that define it. It replaces a row that
+   * said only what was missing.
+   */
+  const headline = s
+    ? `A ${approx(s.capacityMW, 1)} MW run-of-river scheme is physically available here: ` +
+      `${approx(s.grossHeadM, 0)} m of gross head over ${approx(s.waterwayKm, 1)} km of waterway, ` +
+      `${approx(s.energyGwh, 0)} GWh/year at Q${Math.round(exc * 100)}.`
+    : 'No scheme could be laid out at this point.';
   sec.push(
     H('EXECUTIVE DESKTOP-SCREENING SUMMARY') +
-      `<p class="lede">This report screens whether the site warrants field investigation. It does not
-      establish a design, surveyed quantity, cost, consent position or construction basis.</p>` +
+      /**
+       * WHAT THIS PAGE SAID BEFORE, IN ORDER: it does not establish a design;
+       * low confidence, low confidence, low confidence, low confidence; hold
+       * spend; no site discharge measurement; hold points; and then a badge
+       * repeating the recommendation printed three lines above it. Seven
+       * negative statements and one duplicate before a single result.
+       *
+       * A screening report exists to say what was found. The scope boundary is
+       * real and it is stated - once, in the sentence below, and again in
+       * section 02, which is the section named for it. It does not need to be
+       * the first, second and fourth thing on the page.
+       */
+      `<p class="lede">This report establishes whether the site warrants field investigation, and what
+      that investigation should target. It is a desktop screen: it fixes no structure, quantity, cost or
+      consent position.</p>` +
       keyFigures +
       facts([
         ['Screening recommendation', rd ? decisionLabel[rd.decision] ?? decisionLabel.screening : decisionLabel.screening],
-        ['Dominant uncertainty', 'River flow; no site discharge measurement is available.'],
+        ['What the screen establishes', headline],
+        ['Largest remaining uncertainty', 'River flow, which carries roughly 1.6× at this catchment scale, against 3.4% on head.'],
         ['Principal hold points', stopSummary],
         ['Appropriate next decision', 'Whether to fund reconnaissance, gauging, survey and constraint verification.'],
-      ]) +
-      finding(
-        rd?.decision === 'hold' ? 'watch' : 'note',
-        `<b>Screening recommendation:</b> ${esc(rd ? decisionLabel[rd.decision] ?? decisionLabel.screening : decisionLabel.screening)}`
-      )
+      ])
   );
 
   // ---- 02 basis, scope and limitations -------------------------------------
@@ -980,36 +1185,95 @@ export function deskStudyHtml(
       `<p>The assessment uses global and national datasets only. Results are suitable for comparing
       options and planning fieldwork; they are not suitable for fixing structure locations, dimensions,
       quantities, tender requirements or investment returns.</p>` +
-      '<h2>Evidence not obtained at desktop stage</h2>' +
+      /**
+       * THE SAME EIGHT ROWS, TURNED THE RIGHT WAY ROUND.
+       *
+       * This table was headed "Evidence not obtained at desktop stage" and every
+       * cell in it read "Not undertaken", "No site measurement", "Not assessed".
+       * Eight rows of nothing, on page three, before the report had said what it
+       * DID find. It also told the reader less than it could: "Site
+       * reconnaissance - Not undertaken" hides the fact that a 30 m terrain
+       * model and a 10 m land-cover raster were read over the whole alignment.
+       *
+       * Every discipline here rests on something. Naming that something is what
+       * lets a reader judge the result, and the gap then states itself at the
+       * end of the same line without a heading having to shout it.
+       */
+      '<h2>What each discipline rests on</h2>' +
       facts([
-        ['Site reconnaissance', 'Not undertaken'],
-        ['River-flow gauging', 'No site measurement'],
-        ['Topographic survey', `Not undertaken; terrain model cell ${n(c.demResolutionM, 0)} m`],
-        ['Engineering-geology mapping', 'No mapped ground traverse, drilling or geotechnical testing'],
-        ['Sediment investigation', 'No suspended-load or bed-load samples'],
-        ['Grid connection', 'Mapped proximity only; capacity and connection point unconfirmed'],
-        ['Environmental and social baseline', 'Desktop register and land-cover screen only'],
-        ['Cost, schedule and bankability', 'Not assessed'],
+        ['Site conditions', `${n(c.demResolutionM, 0)} m terrain model and 10 m land cover over the whole alignment; no ground visit`],
+        ['River flow', `${c.flowYears} years of daily flood-model record, cross-checked against three published Nepali regressions; no site gauging`],
+        ['Topography', `${esc(c.demSource ?? 'terrain model')} at ${n(c.demResolutionM, 0)} m, cross-checked against a second elevation product; no survey`],
+        ['Engineering geology', 'Published national and provincial geological mapping; no ground traverse, drilling or testing'],
+        ['Sediment', 'Empirical desander sizing from the modelled flow; no suspended-load or bed-load samples'],
+        ['Grid connection', 'Mapped line geometry and substation ratings; connection point and available capacity unconfirmed'],
+        ['Environment and social', 'Protected-area, hazard and land-cover registers; no field baseline'],
+        ['Cost, schedule and bankability', 'Not assessed — this screen carries no cost model, and one built on a 1.6× flow would be false precision'],
       ]) +
       '<h2>Screening assumptions</h2>' +
       facts([
         ['Reference design-flow exceedance', `Q${Math.round(exc * 100)}`],
-        ['Overall plant efficiency', `${n((c.assumptions?.efficiency ?? 0) * 100, 1)} %`],
+        /**
+         * THIS ROW SAID "Overall plant efficiency 96.0 %", AND IT IS NOT THAT.
+         *
+         * `assumptions.efficiency` is the generator and transformer train only
+         * - `src/export.ts` has always labelled it correctly and this report did
+         * not. The turbine is separate: `discover.ts` multiplies this by the
+         * selected runner's efficiency AT DESIGN FLOW, so the overall figure is
+         * the product of the two and is nowhere near 96%.
+         *
+         * No hydro plant reaches 96% overall, so the row as printed was the kind
+         * of number that ends a reader's trust in a document on page 3 - and the
+         * arithmetic underneath it was right the whole time.
+         */
+        ['Generator and transformer', `${n((c.assumptions?.efficiency ?? 0) * 100, 1)} %`],
+        ...(s?.turbinePeak
+          ? ([
+              ['Turbine at the reference flow', `${n(s.turbinePeak * 100, 1)} % — ${esc(s.turbine ?? 'screening curve')}`],
+              [
+                'Overall plant efficiency',
+                `${n(s.turbinePeak * (c.assumptions?.efficiency ?? 0) * 100, 1)} % — the product of the two above`,
+              ],
+            ] as [string, string][])
+          : []),
         ['Head-loss allowance', `${n((c.assumptions?.headLossFrac ?? 0) * 100, 1)} %`],
         ['Environmental release', `${n((c.assumptions?.residualFrac ?? 0) * 100, 0)} % of the lowest monthly mean`],
         ['Hydrological record used', `${c.flowYears} model years`],
         ['Automated layouts evaluated', String(c.evaluated)],
       ]) +
       (c.localGis && (c.localGis.municipality || c.localGis.sheet || c.localGis.isohyetMm != null)
-        ? '<h2>Administrative and survey context</h2>' +
+        ? /**
+           * THE ONLY THREE NUMBERS IN THIS REPORT WITH NO SOURCE BESIDE THEM.
+           *
+           * Everything else here is traceable: the source table names every
+           * layer, its licence, its resolution and its vintage, and the whole
+           * argument of the document is that a screening figure is worth
+           * exactly what its provenance is worth. These three came from a
+           * privately supplied national GIS set and were printed bare, which
+           * left a reader unable to weigh them and — worse — unable to tell
+           * they were from a different class of source than everything above.
+           *
+           * The supplier is deliberately not named: that is their condition,
+           * and it is honoured. But "not named" and "not attributed" are not
+           * the same thing. Saying a value is supplied, unpublished, and not
+           * independently verifiable here tells the reader what they need in
+           * order to judge it, without naming anyone.
+           */
+          '<h2>Administrative and survey context</h2>' +
           facts([
             ['Local body', c.localGis.municipality ?? '–'],
             ['Survey sheet', c.localGis.sheet ?? '–'],
             ['Mean annual rainfall', c.localGis.isohyetMm == null ? '–' : `${n(c.localGis.isohyetMm, 0)} mm`],
+            [
+              'Source of the three rows above',
+              'A supplied national GIS set, used under its provider’s terms and not redistributed. ' +
+                'Unlike every other layer in this report it is not public, so it cannot be independently ' +
+                'checked from here — confirm against the published survey sheet and DHM isohyet map before use.',
+            ],
           ])
         : '') +
       finding(
-        'note',
+        'limit',
         '<b>Display precision follows evidence quality.</b> Rounded values in the main report are decision-level estimates; raw model values remain available in the technical appendices and machine-readable exports.'
       )
   );
@@ -1082,7 +1346,7 @@ export function deskStudyHtml(
   };
   const driest = monthly.driestMonth >= 0 ? MONTHS[monthly.driestMonth] : null;
 
-  const transferableGauge = c.gauges?.find((gauge) => gauge.measuresDischarge && gauge.trustworthy) ?? null;
+  const wb = waterBalance(c);
   let hyd =
     H('HYDROLOGY AND FLOW EVIDENCE') +
     `<p>The modelled long-term mean flow at the intake is ${approx(meanAtIntake(c), 2)} m³/s over
@@ -1093,7 +1357,33 @@ export function deskStudyHtml(
       ['Catchment at intake', `${approx(catchmentKm2(c), 1)} km²`],
       ['Modelled mean flow', `${approx(meanAtIntake(c), 2)} m³/s`],
       ['Reference flow after release', s ? `${approx(s.designFlowCms, 2)} m³/s at Q${Math.round(exc * 100)}` : '–'],
-      ['Hydrological confidence', transferableGauge ? 'Low to moderate; a transferable record may be obtainable' : 'Low; no transferable measured record identified'],
+      /**
+       * MEASURED, NOT ADJECTIVAL.
+       *
+       * This row said "Low; no transferable measured record identified", and
+       * five other rows across the report said "low confidence" too. An
+       * adjective is a shrug: it tells a reader to distrust the number without
+       * telling them by how much, so they cannot act on it.
+       *
+       * The figure below is not an estimate of this site. It is what this
+       * method scores against Nepal's own gauges — 69 DHM records with ten or
+       * more complete years, re-measured under the shipped engine — and it is
+       * the one thing this tool can say that a desk study cannot.
+       */
+      [
+        'Accuracy of this method',
+        'Typical error 1.4× at gauged sites, 1.6× weighted to catchments the size projects sit on; ' +
+          'unbiased; 90% of 69 DHM gauges within a factor of two',
+      ],
+      ...(wb
+        ? ([
+            [
+              'Implied runoff',
+              `${n(wb.runoffMm, 0)} mm/yr from ${n(wb.rainfallMm, 0)} mm of catchment rainfall — ` +
+                `runoff coefficient ${n(wb.coefficient, 2)}, against a median of 0.87 at 69 gauged Nepali rivers`,
+            ],
+          ] as [string, string][])
+        : []),
     ]);
 
   const chart = fdcSvg(c.flow.values.map((v) => v * scale), s?.designFlowCms ?? null, exc);
@@ -1111,15 +1401,61 @@ export function deskStudyHtml(
     'Monthly flow envelope — median and P10–P90 of annual monthly means; dry-season months lightly shaded'
   );
 
-  hyd += transferableGauge
-    ? finding(
-        'note',
-        `<b>A potentially transferable discharge record was identified at ${esc(stationDisplayName(transferableGauge.name).name)}.</b> Obtain and quality-check that series before fixing design flow.`
-      )
-    : finding(
-        'watch',
-        '<b>No nearby station combines a discharge record with a transferable catchment.</b> Flow, capacity and energy therefore remain low-confidence model results until site gauging or a defensible measured comparator is established.'
-      );
+  /**
+   * THE GAUGE VERDICT USED TO BE PRINTED HERE **AND** IN THE NEXT SECTION.
+   *
+   * Both carried the identical sentence — "No nearby station combines a
+   * discharge record with a transferable catchment" — one page apart, and the
+   * second one sits beside the station table that substantiates it. Saying it
+   * twice does not make it truer; it makes the report look as though it has
+   * nothing else to report. It is stated once, in the section that owns the
+   * evidence, and this section states its own finding instead.
+   */
+  if (wb) {
+    /**
+     * THREE TIERS, BECAUSE TWO WERE DISHONEST IN BOTH DIRECTIONS.
+     *
+     * The first version of this said "the modelled flow exceeds the rain that
+     * falls on this catchment" for anything above 1.0, and "consistent" below.
+     * Measured at 69 gauges, that binary would have called a third of Nepal's
+     * gauged rivers impossible - and it would have described a coefficient of
+     * 0.99, which is at the very top of what those rivers show, as consistent.
+     * The middle tier exists because the middle of the distribution is real.
+     */
+    hyd +=
+      wb.coefficient > RUNOFF_PLAUSIBLE_MAX
+        ? finding(
+            'watch',
+            `<b>This catchment cannot deliver the modelled flow.</b> A mean of ` +
+              `${approx(meanAtIntake(c), 2)} m³/s off ${approx(catchmentKm2(c), 1)} km² is a runoff depth of ` +
+              `${n(wb.runoffMm, 0)} mm/yr against ${n(wb.rainfallMm, 0)} mm of catchment rainfall — a runoff ` +
+              `coefficient of ${n(wb.coefficient, 2)}. No measured record at the 69 Nepali gauges this app is ` +
+              `scored against exceeds 1.89, and the whole country averages about 0.95, so this is beyond ` +
+              `anything the evidence supports. At the ceiling used here the catchment yields about ` +
+              `${n(wb.ceilingCms, 2)} m³/s. <b>Treat the capacity, energy and design flow as unresolved</b> ` +
+              `until a measured record replaces the model: a small catchment sits inside a single flood-model ` +
+              `grid cell, and a cell that drains a larger area is the usual cause. The ground-based screens — ` +
+              `terrain, geology, hazards, land cover and protected areas — are measured independently of the ` +
+              `flow, although a corrected flow could move the layout they describe.`
+          )
+        : wb.coefficient > RUNOFF_TYPICAL_MAX
+          ? finding(
+              'note',
+              `<b>The modelled flow is high for the rain on this catchment, but not beyond what Nepali rivers ` +
+                `show.</b> ${n(wb.runoffMm, 0)} mm/yr of runoff from ${n(wb.rainfallMm, 0)} mm of rainfall is a ` +
+                `coefficient of ${n(wb.coefficient, 2)}; the 69 gauged records this app is scored against run to ` +
+                `1.89, and the spread reflects how coarsely a 5 km climatology resolves mountain rainfall as ` +
+                `much as anything about the river. Worth re-testing against a measured record, but not on ` +
+                `its own a reason to doubt the figure.`
+            )
+          : finding(
+              'note',
+              `<b>The modelled flow is consistent with the rain that falls on this catchment.</b> ` +
+                `${n(wb.runoffMm, 0)} mm/yr of runoff from ${n(wb.rainfallMm, 0)} mm of rainfall is a coefficient of ` +
+                `${n(wb.coefficient, 2)}, against a median of 0.87 at 69 gauged Nepali rivers. This tests ` +
+                `magnitude only, not the seasonal shape.`
+            );
+  }
 
   sec.push(hyd);
 
@@ -1268,7 +1604,8 @@ export function deskStudyHtml(
           'watch',
           '<b>No nearby station combines a discharge record with a transferable catchment.</b> ' +
             `${c.gauges.some((gg) => gg.measuresDischarge) ? 'The stations that gauge discharge sit on catchments too different in size for area-ratio transfer to hold' : 'The nearby stations record water level only, which is not a flow series until its rating curve is obtained'}, ` +
-            'so the flow in this study remains modelled and low confidence.'
+            'so the flow here is modelled rather than measured. Commissioning a season of stage-discharge ' +
+            'measurement at the intake is the single change that most reduces the error in this report.'
         );
 
     sec.push(gs);
@@ -1287,6 +1624,51 @@ export function deskStudyHtml(
     app.push(A('HYDROLOGY METHOD AND DATA AVAILABILITY') + hydrologyAppendix);
   }
 
+  /**
+   * COLLECTOR INTAKES — THE LAST GAP FROM THE PANEL-VS-PDF AUDIT, AND THE ONE
+   * THAT MATTERED MOST OF THE THREE.
+   *
+   * A panel-against-report audit found three things the app knew and the
+   * document did not say. Two were closed at the time — the wrong-river warning
+   * and the flow-duration shape check. This was the third, and it was left open
+   * for two sessions while being the only one of the three that changes the
+   * DESIGN FLOW: a collector intake diverts a neighbouring stream into the same
+   * headrace, and the app models the gain. A reader of the PDF got the raised
+   * capacity with no way to know a second stream had been assumed, which is a
+   * scheme they never agreed to and a consent they were not told about.
+   *
+   * Reported where the flow is, not with the layout, because that is what it
+   * changes.
+   */
+  if (c.collectors && c.collectors.gainFrac > 0 && c.collectors.counted.length) {
+    const col = c.collectors;
+    sec.push(
+      H('COLLECTOR INTAKES') +
+        `<p>The design flow in this report is not drawn from the main intake alone.
+        ${col.counted.length} additional stream${col.counted.length === 1 ? ' is' : 's are'} assumed to be
+        collected into the same waterway, raising the design flow by
+        <b>${n(col.gainFrac * 100, 1)}%</b>.</p>` +
+        table(
+          'Streams assumed to be collected',
+          ['Stream', 'Position', 'Share of design flow'],
+          col.counted.map((x) => [
+            x.name ?? 'unnamed stream',
+            `${n(x.lat, 4)}, ${n(x.lon, 4)}`,
+            `${n(x.flowFrac * 100, 1)} %`,
+          ])
+        ) +
+        finding(
+          'watch',
+          `<b>Every capacity and energy figure in this report includes these collectors.</b> ` +
+            `Each one is a separate headworks with its own crossing, its own environmental release, its own ` +
+            `land take and its own consent, and none of that is costed or sited here. The flow gain is ` +
+            `modelled from the same network the main intake uses, so it carries the same ` +
+            `uncertainty — and it is applied on top of it, not independently of it. ` +
+            `Remove them to see the single-intake scheme.`
+        )
+    );
+  }
+
   // ---- 05 power and energy -------------------------------------------------
   const rel = s?.reliability ?? null;
   let pe =
@@ -1300,7 +1682,11 @@ export function deskStudyHtml(
       ['Modelled plant factor', s ? `${n(s.plantFactor * 100, 0)} %` : '–'],
       ['Indicative turbine family', s?.turbine ? `${String(s.turbine)} — screening only` : '–'],
       ['Unit number and rating', 'Not selected at desktop stage'],
-      ['Energy confidence', 'Low; inherited from the modelled flow record'],
+      [
+        'What sets the error here',
+        'The flow record, not the machine — energy inherits the flow error almost one for one, ' +
+          'so a 1.6× flow is a 1.6× energy',
+      ],
     ]);
 
   if (rel) {
@@ -1347,7 +1733,7 @@ export function deskStudyHtml(
   }
 
   pe += finding(
-    'note',
+    'limit',
     '<b>Equipment remains open.</b> Turbine family, unit arrangement, efficiencies and part-load behaviour are calculation assumptions until hydraulic transients, maintainability and supplier options are studied.'
   );
   sec.push(pe);
@@ -1668,7 +2054,7 @@ export function deskStudyHtml(
           ])
         ) +
         finding(
-          'note',
+          'limit',
           '<b>Alternative ranking excludes constructability and cost.</b> Survey control, geology, access, headworks siting, land requirements and power evacuation may change the preferred corridor.'
         )
     );
@@ -1753,9 +2139,9 @@ export function deskStudyHtml(
         (c.grid
           ? facts([
               ['Connection voltage required', `${n(c.grid.requiredKv, 0)} kV`],
-              ['Nearest mapped line', `${dist(c.grid.nearestKm)} at ${n(c.grid.nearestKv, 0)} kV`],
-              ['Nearest line of adequate voltage', c.grid.adequateKm == null ? '–' : `${dist(c.grid.adequateKm)} at ${n(c.grid.adequateKv, 0)} kV`],
-              ['Nearest substation', c.grid.nearestSub ? `${c.grid.nearestSub.name ?? 'unnamed'} · ${dist(c.grid.nearestSub.km)} at ${n(c.grid.nearestSub.kv, 0)} kV` : '–'],
+              ['Nearest mapped line', `${dist(c.grid.nearestKm)} at ${kv(c.grid.nearestKv)}`],
+              ['Nearest line of adequate voltage', c.grid.adequateKm == null ? '–' : `${dist(c.grid.adequateKm)} at ${kv(c.grid.adequateKv)}`],
+              ['Nearest substation', c.grid.nearestSub ? `${c.grid.nearestSub.name ?? 'unnamed'} · ${dist(c.grid.nearestSub.km)}, ${kv(c.grid.nearestSub.kv)}` : '–'],
             ])
           : '') +
         /**
@@ -1778,9 +2164,9 @@ export function deskStudyHtml(
                   ? finding('clear', `<b>A line of adequate voltage runs within ${dist(km)}.</b> Interconnection is a short spur rather than a transmission project, which for a scheme of this size is the favourable case.`)
                   : enough
                     ? finding('watch', `<b>${dist(km)} of ${n(c.grid.adequateKv, 0)} kV interconnection is implied.</b> That is a real transmission cost and it is not in any figure in this report — price it before the civil works, because on a scheme of this size it can decide the project.`)
-                    : finding('watch', `<b>No mapped line reaches the ${n(c.grid.requiredKv, 0)} kV this capacity would need.</b> The nearest line of any voltage is ${dist(c.grid.nearestKm)} away at ${n(c.grid.nearestKv, 0)} kV, so connection means either a new line at the required voltage or a smaller machine.`)) +
+                    : finding('watch', `<b>No mapped line reaches the ${n(c.grid.requiredKv, 0)} kV this capacity would need.</b> The nearest line of any voltage is ${dist(c.grid.nearestKm)} away, ${kv(c.grid.nearestKv)}, so connection means either a new line at the required voltage or a smaller machine.`)) +
                 (sub
-                  ? `<p>The nearest mapped connection point is <b>${esc(sub.name ?? 'an unnamed substation')}</b>, ${dist(sub.km)} away at ${n(sub.kv, 0)} kV${sub.inferredKv ? ', a voltage inferred from a connecting line rather than tagged on the substation itself' : ''}. Substation capacity and spare bay availability are not in any open dataset and must be confirmed with NEA.</p>`
+                  ? `<p>The nearest mapped connection point is <b>${esc(sub.name ?? 'an unnamed substation')}</b>, ${dist(sub.km)} away, ${kv(sub.kv)}${sub.inferredKv ? ', a voltage inferred from a connecting line rather than tagged on the substation itself' : ''}. Substation capacity and spare bay availability are not in any open dataset and must be confirmed with NEA.</p>`
                   : '') +
                 (figures.grid
                   ? figure(
@@ -1883,39 +2269,108 @@ export function deskStudyHtml(
   let lakeAppendix = '';
   if (c.upstreamConnectivity) {
     const u = c.upstreamConnectivity;
-    // A lake is worth naming when it is big enough to matter and close enough
-    // that a wave would still be a wave by the time it arrived.
-    const risky = u.lakes.filter((l) => {
-      const ll = l as unknown as { areaHa?: number; areaKm2?: number; routeKm?: number };
-      const ha = ll.areaHa ?? (ll.areaKm2 != null ? ll.areaKm2 * 100 : 0);
-      return ha >= 10 && (ll.routeKm ?? 1e9) <= 60;
-    });
+const { listed, growing, risky } = glofDangerSignals(u.lakes);
+    const nearest = u.lakes.reduce<(typeof u.lakes)[number] | null>(
+      (best, l) => (best == null || l.routeKm < best.routeKm ? l : best),
+      null
+    );
+        const glacierFed = u.lakes.filter((l) => l.connectivity === 'Glacier-fed').length;
     hazardSection +=
       hazardHeading() +
         '<h2>Glacial-lake outburst flood screen</h2>' +
         (u.lakes.length === 0
           ? finding('note', `<b>No mapped glacial-lake source in the screened inventory intersects the upstream flow path.</b> The connectivity test covered ${u.lakeInventory.total.toLocaleString()} mapped lakes. Verify inventory completeness and upstream routing during detailed hazard assessment; this screen does not eliminate GLOF risk.`)
           : risky.length
-            ? finding('watch', `<b>${risky.length} of the ${u.lakes.length} upstream lakes are large and close enough to matter</b> — at least 10 ha within 60 km of flow path. A GLOF study and an outburst design flood are required, and the intake and powerhouse levels should be set against it rather than against the flood frequency curve alone.`)
-            : finding('note', `${u.lakes.length} upstream lakes drain through the site, but none is both large (≥10 ha) and close (≤60 km of flow path). GLOF is a residual risk to note rather than a governing design case.`)) +
+            ? finding(
+                'watch',
+                `<b>${risky.length} upstream lake${risky.length === 1 ? '' : 's'} within ${GLOF_ROUTE_KM} km of flow path ` +
+                  `${risky.length === 1 ? 'carries' : 'carry'} a published danger signal.</b> ` +
+                  (listed.length
+                    ? `${listed.length} ${listed.length === 1 ? 'is' : 'are'} on ICIMOD's 2020 list of potentially ` +
+                      `dangerous glacial lakes${
+                        listed[0].pdgl ? ` — ${esc(listed[0].pdgl.name ?? listed[0].id)}, rank ${listed[0].pdgl.rank}, ${n(listed[0].routeKm, 0)} km upstream` : ''
+                      }. `
+                    : '') +
+                  (growing.length
+                    ? `${growing.length} ${growing.length === 1 ? 'is a glacier-fed lake' : 'are glacier-fed lakes'} with a ` +
+                      `significant measured expansion trend. `
+                    : '') +
+                  `A GLOF study and an outburst design flood are required, and the intake and powerhouse levels ` +
+                  `should be set against it rather than against the flood-frequency curve alone.`
+              )
+            : finding(
+                'note',
+                `<b>${u.lakes.length} upstream lake${u.lakes.length === 1 ? '' : 's'} drain${u.lakes.length === 1 ? 's' : ''} through this site${
+                  nearest ? `, the nearest ${n(nearest.routeKm, 0)} km up the flow path` : ''
+                }, and none carries a published danger signal.</b> ` +
+                  `${glacierFed} of them ${glacierFed === 1 ? 'is' : 'are'} glacier-fed; none within ${GLOF_ROUTE_KM} km of ` +
+                  `flow path appears on ICIMOD's list of 47 potentially dangerous glacial lakes, and none shows a ` +
+                  `significant expansion trend. <b>This screen has no lake-area term</b> — the bundled inventory is ` +
+                  `centroids only — so it cannot rank a pond against a large lake, and GLOF stays a residual risk to ` +
+                  `carry rather than a case this screen has closed.`
+              )) +
+        (c.glaciers && c.glaciers.connected.length
+          ? facts([
+              ['Ice draining to the intake', `${n(c.glaciers.iceKm2, 1)} km² across ${c.glaciers.connected.length} glacier${c.glaciers.connected.length === 1 ? '' : 's'}`],
+              ...(c.glaciers.glacierisedFraction != null
+                ? ([['Glacierised share of the catchment', `${n(c.glaciers.glacierisedFraction * 100, 1)} %`]] as [string, string][])
+                : []),
+              ...(c.glaciers.nearest
+                ? ([['Nearest ice by flow path', `${n(c.glaciers.nearest.routeKm, 1)} km`]] as [string, string][])
+                : []),
+              ...(c.glaciers.lowestFrontM != null
+                ? ([['Lowest ice front', `${n(c.glaciers.lowestFrontM, 0)} m`]] as [string, string][])
+                : []),
+              ...(c.glaciers.largest[0]
+                ? ([[
+                    'Largest connected glacier',
+                    `${esc(c.glaciers.largest[0].name ?? `RGI ${c.glaciers.largest[0].id}`)} — ${n(c.glaciers.largest[0].areaKm2, 1)} km²`,
+                  ]] as [string, string][])
+                : []),
+            ]) +
+            `<p>Glacier outlines are the Randolph Glacier Inventory 7.0, dated 2000–2010 by submission, so
+            the ice mapped here has retreated since. A glacierised catchment carries melt into the dry
+            season that a rain-fed one does not, and it is the term this screen previously had to infer
+            from the share of ground above 5,000 m.</p>`
+          : '') +
         `<p>${u.incidents.length} recorded upstream channel incidents lie on the same flow path.${
           u.lakes.length ? ' Each lake is listed in the appendices.' : ''
         }</p>` +
         figure(
-          `The lakes that drain through this site, with every other layer switched off — each one traced down its own flow path to the intake${
-            figures.lakeFrameKm ? `. Frame about ${n(figures.lakeFrameKm, 0)} km across` : ''
-          }`,
+          `The upstream lakes that decide this screen, with every other layer switched off — ice in pale blue, ` +
+            `each lake traced down its own flow path to the intake and labelled with the distance it would travel` +
+            `${
+              figures.lakesShown && figures.lakesTotal && figures.lakesShown < figures.lakesTotal
+                ? figures.lakesWithinKm
+                  ? `. ${figures.lakesShown} of the ${figures.lakesTotal} connected lakes lie within ${n(figures.lakesWithinKm, 0)} km of flow path and are shown; the other ${figures.lakesTotal - figures.lakesShown} are further upstream`
+                  : `. The ${figures.lakesShown} nearest of ${figures.lakesTotal} connected lakes are shown`
+                : ''
+            }${figures.lakeFrameKm ? `. Frame about ${n(figures.lakeFrameKm, 0)} km across` : ''}`,
           figures.lakes
         )
     ;
     if (u.lakes.length) {
+      /**
+       * The old table was three columns of nothing: `name` and `areaHa` do not
+       * exist on this record, so every row read "unnamed — –" beside a route
+       * distance. These are the fields the inventory actually publishes.
+       */
+      const shown = [...u.lakes].sort((a, b) => a.routeKm - b.routeKm).slice(0, 15);
       lakeAppendix = table(
-        'Upstream glacial lakes draining through the site',
-        ['Lake', 'Area ha', 'Route km'],
-        u.lakes.slice(0, 15).map((l) => {
-          const ll = l as unknown as { name?: string; areaHa?: number; areaKm2?: number; routeKm?: number };
-          return [ll.name ?? 'unnamed', n(ll.areaHa ?? (ll.areaKm2 != null ? ll.areaKm2 * 100 : null), 1), n(ll.routeKm ?? null, 1)];
-        })
+        `Upstream glacial lakes draining through the site${u.lakes.length > shown.length ? ` — the ${shown.length} nearest of ${u.lakes.length}` : ''}`,
+        ['Lake', 'Type', 'Elevation', 'Flow path', 'Expansion', 'ICIMOD danger list'],
+        shown.map((l) => [
+          l.pdgl?.name ?? l.id,
+          l.connectivity,
+          `${n(l.elevationM, 0)} m`,
+          `${n(l.routeKm, 1)} km`,
+          l.expansionRateKm2Yr == null
+            ? 'not published'
+            : `${l.expansionRateKm2Yr > 0 ? '+' : ''}${n(l.expansionRateKm2Yr * 100, 2)} ha/yr${
+                l.expansionSignificant === true ? ', significant' : ''
+              }`,
+          l.pdgl ? `rank ${l.pdgl.rank}` : 'not listed',
+        ])
       );
     }
   }
@@ -2025,7 +2480,7 @@ export function deskStudyHtml(
           figures.geology
         ) +
         finding(
-          'note',
+          'limit',
           `<b>The provincial sheet is regional context, not route-level engineering mapping.</b> ${km === null ? 'Its placement has not been independently measured.' : `Its measured placement tolerance is approximately ${n(km, 2)} km.`} Do not use it to fix a portal, foundation, support change or contact chainage.`
         );
     }
@@ -2088,7 +2543,7 @@ export function deskStudyHtml(
       */
       if (spans.some((sp) => sp.unit.named)) {
         geologyAppendix += '<h2>Regional nomenclature limitation</h2>' + finding(
-          'note',
+          'limit',
           `<b>Treat the unit name as a regional correlation rather than local mapping.</b> The 1994 ` +
             `compilation applies one national nomenclature: 17 of its 44 named units are drawn across ` +
             `more than 400 km of longitude. Lesser Himalayan stratigraphy in Nepal is not agreed ` +
@@ -2113,9 +2568,26 @@ export function deskStudyHtml(
         const rows = gu.contacts
           .filter((ct) => !ct.withinFormation)
           .map((ct) => [`${n(ct.atKm, 1)} km`, cell(ct.from), cell(ct.to)]);
+        /**
+         * THIS WAS A WARNING ABOUT ITSELF, AND IT IS THE SECTION'S RESULT.
+         *
+         * Counting formation contacts along a headrace is the thing nothing
+         * else in this stack can do: it is the difference between one
+         * excavation and three, it comes from Nepal's own DMG mapping, and it
+         * works offline. It was stamped REQUIRED FIELD VERIFICATION and its
+         * whole sentence was about its own tolerance.
+         *
+         * The tolerance is real and it is stated - in the appendix beside the
+         * chainages it qualifies, which is where a tolerance belongs. The
+         * finding states the finding.
+         */
         geo += finding(
-          'watch',
-          `<b>The regional mapping indicates ${gu.formationContacts} formation contact${gu.formationContacts === 1 ? '' : 's'} along the corridor.</b> Indicative chainages carry approximately ±${n(gu.contactErrorKm, 1)} km tolerance and require route-level mapping.`
+          'clear',
+          `<b>The waterway crosses ${gu.formationContacts} mapped formation contact${gu.formationContacts === 1 ? '' : 's'}.</b> ` +
+            `${esc(cell(gu.intake))} at the intake, ${esc(cell(gu.powerhouse))} at the powerhouse, from Nepal's own ` +
+            `${esc(gu.scale)} geological mapping. A contact is where the ground changes and where an excavation stops ` +
+            `behaving as it did, so the count is the number that matters at this stage; the chainages carry ` +
+            `±${n(gu.contactErrorKm, 1)} km and are tabulated in the appendix.`
         );
         geologyAppendix +=
           '<h2>Mapped contacts and unit lengths</h2>' +
@@ -2126,7 +2598,7 @@ export function deskStudyHtml(
           excavation stops behaving as it did — so the count matters more than the names.</p>` +
           table('Formation contacts along the waterway', ['Chainage', 'From', 'To'], rows) +
           finding(
-            'watch',
+            'limit',
             `<b>Every chainage above carries about ${n(gu.contactErrorKm, 1)} km of positional error.</b> ` +
               `At ${esc(gu.scale)} half a millimetre of ink is 500 m of ground, so these locate a contact to ` +
               `within a few hundred metres at best. They say a contact is crossed and roughly where; they ` +
@@ -2174,11 +2646,28 @@ export function deskStudyHtml(
       );
     }
 
-    if (distinct.size) {
+    /**
+     * DROPPED WHERE THE NATIONAL SHEET ALREADY NAMED THE GROUND.
+     *
+     * This fired on the global compilation - the same layer the section above
+     * calls "one polygon spanning the entire alignment, and not an engineering
+     * input" - and announced "Engineering geology remains unresolved" as a
+     * third consecutive warning, under a finding that had just named the
+     * formations and counted the contacts. Section 02 already says no ground
+     * traverse was made. Three statements of one absence, and the loudest of
+     * them came from the weakest source in the section.
+     *
+     * It still prints where the national units could not name the ground,
+     * because there the global layer really is all there is.
+     */
+    if (distinct.size && !gu?.runs?.length) {
       const only = [...distinct];
       geo += finding(
         'watch',
-        `<b>Engineering geology remains unresolved.</b> The open global layer resolves the corridor to ${only.length === 1 ? 'one regional polygon' : `${only.length} regional polygons`} and cannot establish rock mass, weathering, discontinuities, permeability or excavation behaviour. A mapped ground traverse is required.`
+        `<b>The ground along this corridor is not named by any mapping the app can read.</b> The open global ` +
+          `layer resolves it to ${only.length === 1 ? 'one regional polygon' : `${only.length} regional polygons`}, ` +
+          `which cannot establish rock mass, weathering, discontinuities, permeability or excavation behaviour. ` +
+          `A mapped ground traverse, or the published sheet where one exists, is the first geological task here.`
       );
     }
     sec.push(geo);
@@ -2296,7 +2785,11 @@ export function deskStudyHtml(
       facts([
         ['Sediment evidence', 'No site sampling or sediment rating curve'],
         ['Screening interpretation', 'Intake sediment exclusion and desanding provision likely required'],
-        ['Headworks confidence', 'Low; layout and footprint not established'],
+        [
+          'What this sizing is',
+          'A footprint and a settling check from the modelled flow — enough to ask whether the bank has room, ' +
+            'not enough to lay out a structure',
+        ],
       ]);
     if (basin) {
       sedimentAppendix +=
@@ -2367,14 +2860,42 @@ export function deskStudyHtml(
   if (unc) {
     let uc =
       H('UNCERTAINTY AND CONFIDENCE ASSESSMENT') +
-      `<p>All results remain screening estimates because no site measurement has been used. The
-      ranges below communicate the evidence quality; they are not statistical design bounds.</p>` +
+      /**
+       * THE THREE CONFIDENCE ROWS SAID "Low", "Moderate", "Low".
+       *
+       * This section is the one place in the report whose entire subject is how
+       * much to trust the numbers, and it answered with adjectives - while the
+       * project has measured every one of those quantities against Nepali
+       * evidence and re-measures them whenever the engine changes. Quoting the
+       * measurement is not less cautious than the adjective; it is the same
+       * caution with a magnitude attached, which is the difference between a
+       * reader distrusting the number and a reader knowing what to do about it.
+       *
+       * The figures come from the harnesses named beside them, so a reader who
+       * doubts one can re-derive it.
+       */
+      `<p>These ranges come from re-running the engine on perturbed inputs, not from a percentage attached
+      afterwards. They describe evidence quality and are not statistical design bounds.</p>` +
       facts([
         ['Indicative capacity range', `${n(unc.capacityMW.low, 1)}–${n(unc.capacityMW.high, 1)} MW`],
         ['Indicative annual-energy range', `${n(unc.energyGwh.low, 0)}–${n(unc.energyGwh.high, 0)} GWh`],
-        ['Hydrology confidence', 'Low — dominant uncertainty and no site discharge measurement'],
-        ['Head confidence', `Moderate — DEM-derived, with a screening spread of approximately ±${n(unc.headSpreadM, 0)} m`],
-        ['Layout confidence', 'Low — waterway and structures are not surveyed or field-routed'],
+        [
+          'Flow, measured against gauges',
+          'Typical error 1.4×, rising to about 1.6× at the catchment sizes projects sit on; unbiased; ' +
+            '90% of 69 DHM records within a factor of two',
+        ],
+        [
+          'Head, measured against a second terrain product',
+          `No systematic bias, σ 6.6 m, 3.4% of the drop; ±${n(unc.headSpreadM, 0)} m is carried here as a floor`,
+        ],
+        [
+          'Layout',
+          'Routed on the terrain model, not surveyed or walked; the waterway length is the quantity a survey moves most',
+        ],
+        [
+          'Dry-season energy share',
+          'Under-read by 3.7 percentage points on average, ±5.1, at 74 gauges — so a tariff verdict near its threshold is the one to re-test',
+        ],
       ]);
     if (unc.drivers.length) {
       uc += table(
@@ -2479,12 +3000,29 @@ export function deskStudyHtml(
       ['Bare-earth terrain', 'GEDTM30', 'CC-BY 4.0; 30 m, the cross-check source'],
       ['Land cover', 'ESA WorldCover 2021', 'CC-BY 4.0; 10 m, reduced to 30 m by dominant class'],
       ['Rainfall and hypsometry', 'CHPclim + HydroBASINS', 'Open; per catchment'],
+      ['Glaciers', 'Randolph Glacier Inventory 7.0', 'CC-BY 4.0; outlines dated 2000–2010 by submission'],
+      ['Glacial lakes', 'Sentinel-2 transboundary inventory + ICIMOD 2020 danger list', 'CC-BY 4.0; centroids only, no lake area'],
       ['Gauges', 'DHM Nepal', 'Supplied; 136 daily records'],
       ['Licensed projects', 'DoED register', 'Public register; ~1,048 located'],
       ['Geological mapping', 'DMG province sheets', 'Published 1:350,000, reproduced as issued'],
       ['Hazard records', 'BIPAD portal', 'Public; filed against settlements, not scars'],
       ['Seismic hazard', 'GEM global model', 'Peak ground acceleration, 475-year return'],
       ['Tariff', 'NEA published base rates', 'Board decision 2074/01/14 (27 April 2017)'],
+      /**
+       * NAMED AS A CLASS, NOT AS A PROVIDER.
+       *
+       * The municipality, survey sheet and isohyet band came from a privately
+       * supplied national GIS set and appeared nowhere in this table, so the
+       * three values printed in section 02 were the only figures in the report
+       * with no line of provenance anywhere. The provider is not named — that
+       * is their condition. What a reader needs is not the name but the CLASS:
+       * that these three came from somewhere they cannot check.
+       */
+      [
+        'Administrative and isohyet context',
+        'Supplied national GIS set',
+        'Not public and not redistributed; the only unverifiable layer here',
+      ],
     ];
 
     const acc: [string, string, string][] = [
@@ -2515,9 +3053,12 @@ export function deskStudyHtml(
             'capacity and energy. A quality-controlled measured record should therefore be established ' +
             'before refining the energy case.'
         ) +
-        `<p class="eqnote">MERIT Hydro is CC-BY-NC, so derived per-vertex values are used and the
-        original raster is not redistributed. The DMG sheet is reproduced as published, watermark
-        included. Private and supplied layers are named but not shipped.</p>`
+        `<p class="eqnote"><b>MERIT Hydro is CC-BY-NC.</b> Only derived per-vertex catchment values are
+        used and the original raster is not redistributed, which keeps this report inside the licence —
+        but the non-commercial condition attaches to the catchment areas behind every flow figure here,
+        so it travels with any commercial use of this document. The DMG sheet is reproduced as
+        published, watermark included. The supplied GIS set is used under its provider's terms and is
+        neither named nor shipped.</p>`
     );
   }
 
@@ -2685,7 +3226,7 @@ export function deskStudyHtml(
   th:last-child, td:last-child { padding-right: 0; }
   .num { text-align: right; }
 
-  /* ---- findings: three repeatable engineering record types ---- */
+  /* ---- findings: four repeatable engineering record types ---- */
   .finding {
     display: grid; grid-template-columns: 37mm 1fr; gap: 5mm;
     border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
@@ -2697,6 +3238,7 @@ export function deskStudyHtml(
   }
   .finding.watch .finding-label { color: var(--warm); }
   .finding.clear .finding-label { color: #2f6f56; }
+  .finding.limit .finding-label { color: var(--mid); }
   .finding-body { font-size: 10pt; line-height: 1.5; }
   .finding-body b { font-weight: 700; }
 
@@ -2764,6 +3306,9 @@ export function deskStudyHtml(
     margin-top: 9mm; padding-top: 3mm; border-top: 1px solid var(--rule);
     font: 8.5pt/1.5 Inter, Helvetica, Arial, sans-serif; color: var(--soft); text-align: left;
   }
+  /* The document carries no other links; a browser-default blue would be the
+     loudest thing on the page. */
+  .closing a { color: inherit; text-decoration: none; }
   @media screen { body { max-width: 210mm; margin: 0 auto; box-shadow: 0 0 0 1px #eee; } .cover { height: auto; } }
 </style></head><body>
 
@@ -2792,7 +3337,8 @@ ${sec.join('\n')}
 ${app.join('\n')}
 
 <p class="closing">Data sources, methodology, assumptions and limitations are set out in the accompanying
-Appendix, which forms part of this report.</p>
+Appendix, which forms part of this report.<br>
+HydroRecon built by <a href="https://www.linkedin.com/in/bijay-karki-/">Bijay Karki</a> &middot; <a href="mailto:bijay.karki.work@gmail.com">bijay.karki.work@gmail.com</a></p>
 
 </body></html>`;
 }

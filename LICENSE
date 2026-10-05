@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 RiverPower contributors
+Copyright (c) 2026 Bijay Karki
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,23 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+THE MIT LICENCE ABOVE COVERS THE CODE IN THIS REPOSITORY. IT DOES NOT COVER
+THE BUNDLED DATA.
+
+This repository ships derived data files — river networks, terrain-derived
+attributes, gauge records, project registers, geological units, glacier
+outlines and others — built from third-party sources. Each of those retains
+its own upstream licence, and some carry terms more restrictive than MIT,
+including at least one non-commercial clause.
+
+Those terms bind you regardless of anything written above. See LICENSES.md for
+the per-file audit: which upstream dataset each file derives from, its licence,
+whether redistribution and commercial use are permitted, and the attribution
+each source requires.
+
+If LICENSES.md is not yet present in your copy, treat every file under
+`public/` and `src/data/` as separately licensed and check the build script in
+`pipeline/` that produced it before redistributing or using it commercially.

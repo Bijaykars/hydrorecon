@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import { parseCoordinates, parseBounds, boundsBetween, boundsFeature, areaKm2, inBounds } from '../src/map-navigation.ts';
+import { GAUGE_ITEMS, itemsInBounds, searchInventory, type InventoryItem } from '../src/map-inventory.ts';
+
+assert.deepEqual(parseCoordinates('28.2096, 83.9856'), { lat: 28.2096, lon: 83.9856 });
+assert.deepEqual(parseCoordinates(' -27.2 ; +84.5 '), { lat: -27.2, lon: 84.5 });
+for (const input of ['', ',83', '28,', '28,83,1', 'Infinity,83', '0x1,83', '91,83', '28,181', '28N,83E']) assert.equal(parseCoordinates(input), null, input);
+assert.equal(parseBounds('28,84,27,85'), null);
+assert.equal(parseBounds('27,85,28,84'), null);
+assert.equal(parseBounds('27,84,27,85'), null);
+assert.equal(parseBounds('27,,28,85'), null);
+const b = parseBounds('27, 84, 28, 85')!;
+assert.deepEqual(boundsBetween({ lat: 28, lon: 84 }, { lat: 27, lon: 85 }), b);
+assert.equal(inBounds({ lat: 27, lon: 84 }, b), true);
+assert.equal(inBounds({ lat: 28.1, lon: 84 }, b), false);
+assert.deepEqual(boundsFeature(b).geometry.coordinates[0], [[84, 27], [85, 27], [85, 28], [84, 28], [84, 27]]);
+assert.ok(areaKm2(b) > 10_000 && areaKm2(b) < 12_000);
+assert.ok(GAUGE_ITEMS.length > 300);
+assert.ok(searchInventory(GAUGE_ITEMS, 'Trishuli').length > 0);
+assert.equal(searchInventory(GAUGE_ITEMS, 'missing-station-123').length, 0);
+const project: InventoryItem = { id: 'p', name: 'Range overlap', kind: 'project', lat: 29, lon: 85, detail: '', source: '', date: '', note: '', bounds: [27.5, 84.5, 30.5, 85.5] };
+assert.equal(itemsInBounds([project], b).length, 1, 'Count ranges intersecting the area even when their midpoint is outside');
+console.log('Map navigation: coordinate validation, rectangle geometry, area, inventory search and range intersections pass.');

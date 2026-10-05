@@ -4,8 +4,26 @@
     {
       "name": "riverpower",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 5173
+    },
+    {
+      "name": "riverpower-45173",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "45173",
+        "--strictPort"
+      ],
+      "port": 45173
     }
   ]
 }

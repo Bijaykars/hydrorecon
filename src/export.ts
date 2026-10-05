@@ -24,6 +24,7 @@ import type { UpstreamConnectivityScreen } from './connectivity.ts';
 import { isAdvancedDoedStage, type CascadeScreen } from './cascade.ts';
 import type { RegionMode } from './region.ts';
 import type { HydestScreen } from './engine/hydest.ts';
+import type { GlacierScreen } from './glaciers.ts';
 import type { MhspScreen } from './engine/mhsp.ts';
 import type { ShapeVerdict } from './engine/fdcshape.ts';
 import type { Uncertainty } from './engine/uncertainty.ts';
@@ -62,6 +63,8 @@ export type ExportContext = {
    */
   geologyUnits: GeologyTraverse | null;
   hydest: HydestScreen | null;
+  /** Ice routed to the intake down the mapped network. Null off the network. */
+  glaciers?: GlacierScreen | null;
   /** The second published Nepali regression, shown beside the first. */
   mhsp: MhspScreen | null;
   /** Whether the flow-duration shape is plausible against the national band. */
@@ -98,6 +101,12 @@ export type ExportContext = {
   designSweep?: DesignFlowSweep | null;
   schemes: Scheme[];
   selected: Scheme | null;
+  /**
+   * Set when the scheme search and the flow arbitration would not settle and
+   * the layout had to be frozen mid-cycle. `a` is the layout on screen, `b` the
+   * one it kept flipping to. Null on every site that converges.
+   */
+  pickUnstable?: { a: string; b: string } | null;
   /** `uplandKm2` is present at runtime (App passes StudyPoint) and the report reads it. */
   path: {
     km: number;
@@ -164,6 +173,13 @@ export type ExportContext = {
     ratio: number;
     notes: string[];
   } | null;
+  /**
+   * Catchment-mean ANNUAL precipitation at the studied reach, mm — CHPclim, via
+   * the bundled network. Named for what it is rather than for its source,
+   * because `waterBalance` in the report is calibrated against exactly this
+   * quantity and must not be fed a different one.
+   */
+  catchmentRainMm?: number | null;
   assumptions: {
     exceedance: number;
     efficiency: number;

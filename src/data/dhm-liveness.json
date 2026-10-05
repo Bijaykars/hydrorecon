@@ -1,0 +1,1511 @@
+{
+  "_what": "Which DHM gauges are still telemetering, from the public river-watch pages.",
+  "_source": "https://dhm.gov.np/hydrology/hms-Single/{pageId} and https://dhm.gov.np/site/getRiverWatchBySeriesId",
+  "_quantity": "WATER LEVEL in metres, never discharge. The portal has no discharge and publishes no rating curve, so nothing here can enter the hydrology. It answers only whether an instrument is reporting.",
+  "_history": "The endpoint holds about seven days. Every date older than that returns zero rows, so this cannot be backfilled and is not a record.",
+  "_bands": {
+    "liveWithinHours": 48,
+    "staleWithinHours": 720
+  },
+  "_checked": "2026-09-07T03:24:25.532Z",
+  "_scanned": {
+    "from": 1,
+    "to": 400,
+    "stationPages": 114
+  },
+  "_matched": "27 of 114 portal stations matched a bundled record, covering 25 distinct records of 136.",
+  "_duplicateRecordMatches": [
+    {
+      "recordId": "280",
+      "portalNames": [
+        "Karnali at Chisapani",
+        "Karnali at Chisapani Bridge"
+      ]
+    },
+    {
+      "recordId": "505",
+      "portalNames": [
+        "Bagmati River at Sundarijal",
+        "Bagmati River at Sundarijal Bridge"
+      ]
+    }
+  ],
+  "stations": [
+    {
+      "portalPageId": 168,
+      "portalSeriesId": "2436",
+      "portalName": "Sinja Khola at Diware",
+      "station": {
+        "id": "225",
+        "river": "Sinja Khola",
+        "location": "Diware"
+      },
+      "recordEndsYear": 2008,
+      "state": "live",
+      "lagHours": 0.3,
+      "lastReadingUtc": "2026-09-07T03:05:00.000Z",
+      "lastWaterLevelM": 2.23,
+      "error": null
+    },
+    {
+      "portalPageId": 163,
+      "portalSeriesId": "2312",
+      "portalName": "Thuli Gad at Khanayatal",
+      "station": {
+        "id": "262",
+        "river": "Thuli Gad",
+        "location": "Khanayatal"
+      },
+      "recordEndsYear": 2008,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 145,
+      "portalSeriesId": "2059",
+      "portalName": "Thulo Bheri at Rimna",
+      "station": {
+        "id": "265",
+        "river": "Thulo Bheri",
+        "location": "Rimna"
+      },
+      "recordEndsYear": 2008,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 4.82,
+      "error": null
+    },
+    {
+      "portalPageId": 35,
+      "portalSeriesId": "691",
+      "portalName": "Karnali at Chisapani",
+      "station": {
+        "id": "280",
+        "river": "Karnali",
+        "location": "Chisapani"
+      },
+      "recordEndsYear": 2008,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 8.46,
+      "error": null
+    },
+    {
+      "portalPageId": 258,
+      "portalSeriesId": "4136",
+      "portalName": "Karnali at Chisapani Bridge",
+      "station": {
+        "id": "280",
+        "river": "Karnali",
+        "location": "Chisapani"
+      },
+      "recordEndsYear": 2008,
+      "state": "live",
+      "lagHours": 0.4,
+      "lastReadingUtc": "2026-09-07T03:00:00.000Z",
+      "lastWaterLevelM": 8.13,
+      "error": null
+    },
+    {
+      "portalPageId": 246,
+      "portalSeriesId": "3778",
+      "portalName": "Mohana River at Malakheti",
+      "station": {
+        "id": "281",
+        "river": "Mohana River",
+        "location": "Malakheti"
+      },
+      "recordEndsYear": 2008,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 1.65,
+      "error": null
+    },
+    {
+      "portalPageId": 29,
+      "portalSeriesId": "649",
+      "portalName": "Babai at Chepang",
+      "station": {
+        "id": "289.95",
+        "river": "Babai",
+        "location": "Chepang"
+      },
+      "recordEndsYear": 2008,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 2.73,
+      "error": null
+    },
+    {
+      "portalPageId": 28,
+      "portalSeriesId": "642",
+      "portalName": "Babai at Bhada  Bridge",
+      "station": {
+        "id": "291",
+        "river": "Babai",
+        "location": "Bhada Bridge"
+      },
+      "recordEndsYear": 2007,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 4.35,
+      "error": null
+    },
+    {
+      "portalPageId": 54,
+      "portalSeriesId": "987",
+      "portalName": "Jalkundi",
+      "station": {
+        "id": "360",
+        "river": "Rapti River",
+        "location": "Jalkundi"
+      },
+      "recordEndsYear": 2008,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 55,
+      "portalSeriesId": "1000",
+      "portalName": "West Rapti at Kusum Rainfall",
+      "station": {
+        "id": "375",
+        "river": "Rapti",
+        "location": "Kusum"
+      },
+      "recordEndsYear": 2007,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 173,
+      "portalSeriesId": "3068",
+      "portalName": "Dumre Khola at Kalimati",
+      "station": {
+        "id": "387.4",
+        "river": "Dumre Khola",
+        "location": "Kalimati"
+      },
+      "recordEndsYear": 2008,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 1.26,
+      "error": null
+    },
+    {
+      "portalPageId": 176,
+      "portalSeriesId": "2575",
+      "portalName": "Kali Gandaki at Tatopani (Ratopani)",
+      "station": {
+        "id": "403.5",
+        "river": "Kali Gandaki",
+        "location": "Tatopani"
+      },
+      "recordEndsYear": 2008,
+      "state": "live",
+      "lagHours": 0.5,
+      "lastReadingUtc": "2026-09-07T02:55:00.000Z",
+      "lastWaterLevelM": 3.2,
+      "error": null
+    },
+    {
+      "portalPageId": 178,
+      "portalSeriesId": "2596",
+      "portalName": "Kali Gandaki at Modi Beni",
+      "station": {
+        "id": "406",
+        "river": "Kali Gandaki",
+        "location": "Modi Beni"
+      },
+      "recordEndsYear": 2009,
+      "state": "live",
+      "lagHours": 0,
+      "lastReadingUtc": "2026-09-07T03:25:00.000Z",
+      "lastWaterLevelM": 4.46,
+      "error": null
+    },
+    {
+      "portalPageId": 282,
+      "portalSeriesId": "4401",
+      "portalName": "Badigad at Rudrabeni",
+      "station": {
+        "id": "417",
+        "river": "Badigad Khola",
+        "location": "Rudrabeni Gulmi"
+      },
+      "recordEndsYear": 2009,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 0.79,
+      "error": null
+    },
+    {
+      "portalPageId": 52,
+      "portalSeriesId": "943",
+      "portalName": "Trishuli at Betrawati",
+      "station": {
+        "id": "447",
+        "river": "Trishuli",
+        "location": "Betrawati"
+      },
+      "recordEndsYear": 2007,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 235,
+      "portalSeriesId": "3733",
+      "portalName": "East Rapti at Rajaiya",
+      "station": {
+        "id": "460",
+        "river": "Rapti River",
+        "location": "Rajaiya"
+      },
+      "recordEndsYear": 2007,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 85,
+      "portalSeriesId": "1318",
+      "portalName": "Lothar Khola at Lothar",
+      "station": {
+        "id": "470",
+        "river": "Lothar Khola",
+        "location": "Lothar"
+      },
+      "recordEndsYear": 2005,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 1.57,
+      "error": null
+    },
+    {
+      "portalPageId": 192,
+      "portalSeriesId": "3400",
+      "portalName": "Bagmati River at Sundarijal",
+      "station": {
+        "id": "505",
+        "river": "Bagmati River",
+        "location": "Sundarijal"
+      },
+      "recordEndsYear": 2010,
+      "state": "live",
+      "lagHours": 0.3,
+      "lastReadingUtc": "2026-09-07T03:05:00.000Z",
+      "lastWaterLevelM": 0.99,
+      "error": null
+    },
+    {
+      "portalPageId": 259,
+      "portalSeriesId": "4190",
+      "portalName": "Bagmati River at Sundarijal Bridge",
+      "station": {
+        "id": "505",
+        "river": "Bagmati River",
+        "location": "Sundarijal"
+      },
+      "recordEndsYear": 2010,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 50,
+      "portalSeriesId": "927",
+      "portalName": "Bagmati River at Khokana",
+      "station": {
+        "id": "550.05",
+        "river": "Bagmati",
+        "location": "Khokana"
+      },
+      "recordEndsYear": 2008,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 2.02,
+      "error": null
+    },
+    {
+      "portalPageId": 236,
+      "portalSeriesId": "3593",
+      "portalName": "Bagmati River at Bhorleni",
+      "station": {
+        "id": "581",
+        "river": "Bagmati River",
+        "location": "Bhorleni"
+      },
+      "recordEndsYear": 2008,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 3.71,
+      "error": null
+    },
+    {
+      "portalPageId": 196,
+      "portalSeriesId": "2895",
+      "portalName": "Sabhaya Khola at Tumlingtar",
+      "station": {
+        "id": "602",
+        "river": "Sabhaya Khola",
+        "location": "Tumlingtar"
+      },
+      "recordEndsYear": 2008,
+      "state": "live",
+      "lagHours": 0.3,
+      "lastReadingUtc": "2026-09-07T03:05:00.000Z",
+      "lastWaterLevelM": 1.78,
+      "error": null
+    },
+    {
+      "portalPageId": 197,
+      "portalSeriesId": "2916",
+      "portalName": "Hinwa Khola at Pipletar",
+      "station": {
+        "id": "602.5",
+        "river": "Hinwa Khola",
+        "location": "Pipletar"
+      },
+      "recordEndsYear": 2008,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 2.23,
+      "error": null
+    },
+    {
+      "portalPageId": 107,
+      "portalSeriesId": "1481",
+      "portalName": "Arun at Turkeghat",
+      "station": {
+        "id": "604.5",
+        "river": "Arun River",
+        "location": "Turkeghat"
+      },
+      "recordEndsYear": 2008,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 4.28,
+      "error": null
+    },
+    {
+      "portalPageId": 203,
+      "portalSeriesId": "3144",
+      "portalName": "Solu Khola at Salme",
+      "station": {
+        "id": "668.5",
+        "river": "Solu Khola",
+        "location": "Salme"
+      },
+      "recordEndsYear": 2008,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 245,
+      "portalSeriesId": "3761",
+      "portalName": "Sapta Koshi at Chatara (new)",
+      "station": {
+        "id": "695",
+        "river": "Sapta Koshi",
+        "location": "Chatara-Kothu"
+      },
+      "recordEndsYear": 2008,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 53,
+      "portalSeriesId": "948",
+      "portalName": "Mainachuli (old - doesn't exist)",
+      "station": {
+        "id": "795",
+        "river": "Kankai Mai River",
+        "location": "Mainachuli"
+      },
+      "recordEndsYear": 2008,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 6,
+      "portalSeriesId": "5385",
+      "portalName": "HS at Imja Lake",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.3,
+      "lastReadingUtc": "2026-09-07T03:05:00.000Z",
+      "lastWaterLevelM": 0.87,
+      "error": null
+    },
+    {
+      "portalPageId": 7,
+      "portalSeriesId": "5378",
+      "portalName": "HS at Imja Lake Downstream",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 9,
+      "portalSeriesId": "445",
+      "portalName": "Melamchi at Nakote",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 11,
+      "portalSeriesId": "32",
+      "portalName": "Balefi at Jalbire",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 40,
+      "portalSeriesId": "801",
+      "portalName": "West Seti at Dipayal",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 6.93,
+      "error": null
+    },
+    {
+      "portalPageId": 41,
+      "portalSeriesId": "814",
+      "portalName": "Aadhi Khola at Borlangpul (Rainfall)",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 66,
+      "portalSeriesId": "1082",
+      "portalName": "Tadi at Belkot",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 69,
+      "portalSeriesId": "1120",
+      "portalName": "Roshi Khola at Panauti",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 3.64,
+      "error": null
+    },
+    {
+      "portalPageId": 72,
+      "portalSeriesId": "1198",
+      "portalName": "Kamala River at Titriya",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 77,
+      "portalSeriesId": "1220",
+      "portalName": "Mahakali at Darchula (Dattu)",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 4.03,
+      "error": null
+    },
+    {
+      "portalPageId": 78,
+      "portalSeriesId": "1234",
+      "portalName": "Mahakali at Parigaon",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.5,
+      "lastReadingUtc": "2026-09-07T02:55:00.000Z",
+      "lastWaterLevelM": 6.11,
+      "error": null
+    },
+    {
+      "portalPageId": 81,
+      "portalSeriesId": "1278",
+      "portalName": "Riew khola (Bankatta)",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 1.51,
+      "error": null
+    },
+    {
+      "portalPageId": 86,
+      "portalSeriesId": "1331",
+      "portalName": "Karnali at Asaraghat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 87,
+      "portalSeriesId": "1345",
+      "portalName": "Lohare Khola at Tallo Dungeshwor",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 2.85,
+      "error": null
+    },
+    {
+      "portalPageId": 101,
+      "portalSeriesId": "1468",
+      "portalName": "Kaligandaki at Kumalgaon",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 104,
+      "portalSeriesId": "1453",
+      "portalName": "Sunkoshi at Pachuwarghat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 106,
+      "portalSeriesId": "1601",
+      "portalName": "Tamakoshi at Busti",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 110,
+      "portalSeriesId": "1500",
+      "portalName": "Dudh Koshi at Rabuwabazar",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 111,
+      "portalSeriesId": "1508",
+      "portalName": "Saptakoshi at Chatara (old)",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.3,
+      "lastReadingUtc": "2026-09-07T03:05:00.000Z",
+      "lastWaterLevelM": 4.87,
+      "error": null
+    },
+    {
+      "portalPageId": 113,
+      "portalSeriesId": "1640",
+      "portalName": "Bhote Koshi at Bahrabise",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 120,
+      "portalSeriesId": "1580",
+      "portalName": "Tamakoshi at Gongar/Jagat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 126,
+      "portalSeriesId": "1652",
+      "portalName": "Indrawati at Melamchi",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 129,
+      "portalSeriesId": "1695",
+      "portalName": "Seti at Jyamirebari",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 132,
+      "portalSeriesId": "1867",
+      "portalName": "Tsho Rolpa Lake at Outlet",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 133,
+      "portalSeriesId": "1877",
+      "portalName": "Rolwaling River at Bedding",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 1.02,
+      "error": null
+    },
+    {
+      "portalPageId": 137,
+      "portalSeriesId": "1969",
+      "portalName": "Intake at Kalaiya Taal (Nulsing Gad)",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 147,
+      "portalSeriesId": "2090",
+      "portalName": "Bagmati River at Padheradovan",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 156,
+      "portalSeriesId": "2244",
+      "portalName": "Sarada Khola at Daredhunga",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 1.66,
+      "error": null
+    },
+    {
+      "portalPageId": 158,
+      "portalSeriesId": "2178",
+      "portalName": "Humla Karnali at Jaur (Sarkegad)",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 3.18,
+      "error": null
+    },
+    {
+      "portalPageId": 159,
+      "portalSeriesId": "2199",
+      "portalName": "Humla Karnali at Bihichhada",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.3,
+      "lastReadingUtc": "2026-09-07T03:05:00.000Z",
+      "lastWaterLevelM": 3.82,
+      "error": null
+    },
+    {
+      "portalPageId": 160,
+      "portalSeriesId": "2222",
+      "portalName": "Mugu Karnali  at Dhain",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 6.35,
+      "error": null
+    },
+    {
+      "portalPageId": 162,
+      "portalSeriesId": "2267",
+      "portalName": "Sano Bheri at Simlighat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 3.64,
+      "error": null
+    },
+    {
+      "portalPageId": 166,
+      "portalSeriesId": "2392",
+      "portalName": "Humla Karnali at Lalighat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 4.86,
+      "error": null
+    },
+    {
+      "portalPageId": 167,
+      "portalSeriesId": "2414",
+      "portalName": "Tila Nala at Raralihi Nagma",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.3,
+      "lastReadingUtc": "2026-09-07T03:05:00.000Z",
+      "lastWaterLevelM": 3.11,
+      "error": null
+    },
+    {
+      "portalPageId": 169,
+      "portalSeriesId": "2379",
+      "portalName": "Tila Nadi at Serighat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 2.98,
+      "error": null
+    },
+    {
+      "portalPageId": 170,
+      "portalSeriesId": "2356",
+      "portalName": "Lohare Khola at Dailekh",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 171,
+      "portalSeriesId": "2470",
+      "portalName": "West Rapti at Bagasoti",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 2.38,
+      "error": null
+    },
+    {
+      "portalPageId": 172,
+      "portalSeriesId": "2491",
+      "portalName": "Marsyangdi at Bimalnagar",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 7.98,
+      "error": null
+    },
+    {
+      "portalPageId": 174,
+      "portalSeriesId": "2533",
+      "portalName": "Tinau at Butwal",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 2.55,
+      "error": null
+    },
+    {
+      "portalPageId": 175,
+      "portalSeriesId": "2554",
+      "portalName": "Kali Gandaki at Jomsom",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 1.95,
+      "error": null
+    },
+    {
+      "portalPageId": 177,
+      "portalSeriesId": "3355",
+      "portalName": "Raughat Khola at Raughat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 180,
+      "portalSeriesId": "3377",
+      "portalName": "Modi Khola at  Jhaprebagar( Nayapul)",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 182,
+      "portalSeriesId": "2641",
+      "portalName": "Daaram Khola at Wamitaksar",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 1.7,
+      "lastReadingUtc": "2026-09-07T01:45:00.000Z",
+      "lastWaterLevelM": 1.68,
+      "error": null
+    },
+    {
+      "portalPageId": 183,
+      "portalSeriesId": "2662",
+      "portalName": "Seti at Gha Chowk",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 184,
+      "portalSeriesId": "2683",
+      "portalName": "Mardi Khola at Lahachowk",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 2.53,
+      "error": null
+    },
+    {
+      "portalPageId": 185,
+      "portalSeriesId": "2704",
+      "portalName": "Madi River at Sisaghat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 2.68,
+      "error": null
+    },
+    {
+      "portalPageId": 186,
+      "portalSeriesId": "2725",
+      "portalName": "Marsyangdi at Bhakundabesi",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 4.75,
+      "error": null
+    },
+    {
+      "portalPageId": 187,
+      "portalSeriesId": "3046",
+      "portalName": "Mankhola at Belgaun",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 1.42,
+      "error": null
+    },
+    {
+      "portalPageId": 188,
+      "portalSeriesId": "2767",
+      "portalName": "Chepe Khola at Garambesi",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.3,
+      "lastReadingUtc": "2026-09-07T03:05:00.000Z",
+      "lastWaterLevelM": 2.41,
+      "error": null
+    },
+    {
+      "portalPageId": 189,
+      "portalSeriesId": "3378",
+      "portalName": "Ankhu Khola at Ankhu Bagar",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 190,
+      "portalSeriesId": "2788",
+      "portalName": "Langtang Khola at Shyaprubesi",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 191,
+      "portalSeriesId": "2810",
+      "portalName": "Bhote Koshi at Shyaprubesi",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 193,
+      "portalSeriesId": "2832",
+      "portalName": "Kokhajor Khola at Hariharpur Gadi",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.3,
+      "lastReadingUtc": "2026-09-07T03:05:00.000Z",
+      "lastWaterLevelM": 2.21,
+      "error": null
+    },
+    {
+      "portalPageId": 194,
+      "portalSeriesId": "2853",
+      "portalName": "Bagmati River at Rai Gaon",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 199,
+      "portalSeriesId": "2960",
+      "portalName": "Sunkoshi River at Dolalghat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 2.31,
+      "error": null
+    },
+    {
+      "portalPageId": 200,
+      "portalSeriesId": "2982",
+      "portalName": "Indrawati at Dolalghat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 202,
+      "portalSeriesId": "3122",
+      "portalName": "Sunkoshi at Tokshelghat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 4.58,
+      "error": null
+    },
+    {
+      "portalPageId": 204,
+      "portalSeriesId": "3165",
+      "portalName": "Hongu Khola at Lokim",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 205,
+      "portalSeriesId": "3186",
+      "portalName": "Rawa Khola at Gaikhure",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 1.49,
+      "error": null
+    },
+    {
+      "portalPageId": 206,
+      "portalSeriesId": "3207",
+      "portalName": "Marin Khola at Kusuntar",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 207,
+      "portalSeriesId": "3228",
+      "portalName": "Sunkoshi River at Hampachuwar",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 8.95,
+      "error": null
+    },
+    {
+      "portalPageId": 208,
+      "portalSeriesId": "3249",
+      "portalName": "Seti Khola at SetiBeni",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 1.59,
+      "error": null
+    },
+    {
+      "portalPageId": 209,
+      "portalSeriesId": "3270",
+      "portalName": "Tamor River at Taplejung",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 1.2,
+      "lastReadingUtc": "2026-09-07T02:15:00.000Z",
+      "lastWaterLevelM": 2.89,
+      "error": null
+    },
+    {
+      "portalPageId": 210,
+      "portalSeriesId": "3291",
+      "portalName": "Mewa Khola at Taplejung",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 211,
+      "portalSeriesId": "3312",
+      "portalName": "Kabeli Khola at Taplejung",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 3.91,
+      "error": null
+    },
+    {
+      "portalPageId": 212,
+      "portalSeriesId": "3333",
+      "portalName": "Tamor River at Majhitar",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 213,
+      "portalSeriesId": "3334",
+      "portalName": "Tamor River at Triveni",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 6.45,
+      "error": null
+    },
+    {
+      "portalPageId": 217,
+      "portalSeriesId": "2469",
+      "portalName": "Dwang Khola (Chiti, Lamjung)",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 223,
+      "portalSeriesId": "3423",
+      "portalName": "Innosent for Barhbise",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 227,
+      "portalSeriesId": "3656",
+      "portalName": "Surnaya Gad at Gajur Gaon",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 2.09,
+      "error": null
+    },
+    {
+      "portalPageId": 228,
+      "portalSeriesId": "3466",
+      "portalName": "Myagdi at Mangalghat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 1.98,
+      "error": null
+    },
+    {
+      "portalPageId": 229,
+      "portalSeriesId": "3487",
+      "portalName": "West Seti at Banga",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 5.66,
+      "error": null
+    },
+    {
+      "portalPageId": 230,
+      "portalSeriesId": "3677",
+      "portalName": "Kali Gandaki at Kota Gaon",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 231,
+      "portalSeriesId": "3508",
+      "portalName": "Daraudi Khola at Naya Sangu",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 2.04,
+      "error": null
+    },
+    {
+      "portalPageId": 233,
+      "portalSeriesId": "3550",
+      "portalName": "Ridi Khola at Satmure",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.1,
+      "lastReadingUtc": "2026-09-07T03:21:00.000Z",
+      "lastWaterLevelM": 2.18,
+      "error": null
+    },
+    {
+      "portalPageId": 234,
+      "portalSeriesId": "3572",
+      "portalName": "Budhi Gandaki at Aarughat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.3,
+      "lastReadingUtc": "2026-09-07T03:05:00.000Z",
+      "lastWaterLevelM": 3.23,
+      "error": null
+    },
+    {
+      "portalPageId": 237,
+      "portalSeriesId": "3614",
+      "portalName": "Tamor River at Mulghat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 238,
+      "portalSeriesId": "3635",
+      "portalName": "Kankai River at Mainachuli",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 2.96,
+      "error": null
+    },
+    {
+      "portalPageId": 241,
+      "portalSeriesId": "3701",
+      "portalName": "Narayani River at Narayanghat Bridge",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 242,
+      "portalSeriesId": "3710",
+      "portalName": "Kali Gandaki at Purtighat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 243,
+      "portalSeriesId": "3754",
+      "portalName": "Sunkoshi at Khurkot",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0,
+      "lastReadingUtc": "2026-09-07T03:25:00.000Z",
+      "lastWaterLevelM": 6.41,
+      "error": null
+    },
+    {
+      "portalPageId": 255,
+      "portalSeriesId": "3824",
+      "portalName": "Tamakoshi at Singati",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 260,
+      "portalSeriesId": "4199",
+      "portalName": "Bagmati River at Gaurighat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 1,
+      "lastReadingUtc": "2026-09-07T02:25:00.000Z",
+      "lastWaterLevelM": 1.09,
+      "error": null
+    },
+    {
+      "portalPageId": 262,
+      "portalSeriesId": "4208",
+      "portalName": "Manohara Khola at Balkumari",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0,
+      "lastReadingUtc": "2026-09-07T03:25:00.000Z",
+      "lastWaterLevelM": 2.52,
+      "error": null
+    },
+    {
+      "portalPageId": 263,
+      "portalSeriesId": "4172",
+      "portalName": "Nakkhu at Bungmati",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.2,
+      "lastReadingUtc": "2026-09-07T03:15:00.000Z",
+      "lastWaterLevelM": 0.05,
+      "error": null
+    },
+    {
+      "portalPageId": 264,
+      "portalSeriesId": "4217",
+      "portalName": "Marin River at Bakfar (Bagmati Dovan)",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "no reading",
+      "lagHours": null,
+      "lastReadingUtc": null,
+      "lastWaterLevelM": null,
+      "error": null
+    },
+    {
+      "portalPageId": 265,
+      "portalSeriesId": "4140",
+      "portalName": "Narayani at Devghat",
+      "station": null,
+      "recordEndsYear": null,
+      "state": "live",
+      "lagHours": 0.3,
+      "lastReadingUtc": "2026-09-07T03:05:00.000Z",
+      "lastWaterLevelM": 5.05,
+      "error": null
+    }
+  ]
+}

@@ -217,3 +217,113 @@ input[type='range'] {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Always-available GIS workspace. Map and engineering panels keep their own scroll. */
+.map-explorer, .explorer-overview {
+  position: absolute; z-index: 12; background: #141619f5;
+  border: 1px solid var(--color-line-strong); border-radius: 14px;
+  box-shadow: 0 16px 50px #0005; backdrop-filter: blur(14px);
+  font-size: 12px; color: var(--color-muted);
+}
+.map-explorer { top: 58px; left: 12px; width: 302px; max-height: calc(100dvh - 112px); overflow-y: auto; }
+.explorer-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px; border-bottom: 1px solid var(--color-line); }
+.explorer-heading strong { display: block; color: var(--color-ink); font-size: 15px; }
+.explorer-heading span { display: block; font-size: 11px; margin-top: 3px; }
+.explorer-body { padding: 14px; }
+.map-explorer label { display: block; font-size: 11px; font-weight: 600; color: var(--color-ink); margin: 8px 0 7px; }
+.map-explorer input { width: 100%; min-width: 0; border: 1px solid #404750; background: #0e1114; color: var(--color-ink); border-radius: 7px; padding: 10px 9px; font-size: 12px; }
+.map-explorer input::placeholder { color: #858e98; }
+.map-explorer input:focus-visible, .map-explorer button:focus-visible, .explorer-overview button:focus-visible, .explorer-section summary:focus-visible { outline: 2px solid var(--color-river); outline-offset: 2px; }
+.explorer-input-row { display: flex; gap: 6px; }
+.explorer-input-row button, .explorer-actions button, .coordinate-target button, .explorer-section form > button, .drawing-instruction button, .mobile-tools {
+  border: 1px solid #3b454d; border-radius: 7px; padding: 8px 10px; color: var(--color-ink); background: #222a2e; font-size: 11px; cursor: pointer;
+}
+.explorer-input-row button { background: #214b56; border-color: #3a6c78; }
+.map-explorer button:hover, .explorer-overview button:hover { background-color: #ffffff0b; }
+.map-explorer button:disabled { opacity: .45; cursor: not-allowed; }
+.explorer-hint { font-size: 10.5px; line-height: 1.55; margin: 8px 0; color: #939da7; }
+.explorer-error { color: #f09a8d; font-size: 11px; margin: 8px 0; }
+.explorer-actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 9px 0; }
+.explorer-section { border-top: 1px solid var(--color-line-strong); padding-top: 10px; margin-top: 14px; }
+.explorer-section summary { color: var(--color-ink); cursor: pointer; font-size: 12px; font-weight: 600; padding: 4px 0 10px; }
+.explorer-section summary span { font-weight: 400; font-size: 10px; color: var(--color-muted); float: right; }
+.explorer-section form > button { margin-top: 8px; }
+.basemap-options { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 10px 0; }
+.basemap-options button { min-height: 38px; border: 1px solid #41474e; border-radius: 7px; font-size: 12px; text-transform: capitalize; }
+.basemap-options button[aria-pressed="true"] { border-color: #4fc1d8; background: #214550; color: #daf8ff; }
+.layer-toggle { min-height: 37px; border: 0; font-size: 11.5px; cursor: pointer; }
+.survey-toggle { width: 100%; text-align: left; border: 1px solid #41474e; padding: 8px; margin-top: 8px; border-radius: 6px; }
+.survey-toggle small { display: block; color: var(--color-muted); margin-top: 3px; }
+.search-results { max-height: 245px; overflow-y: auto; border: 1px solid var(--color-line-strong); border-radius: 7px; padding: 4px; margin-top: 8px; }
+.search-results button { display: block; width: 100%; text-align: left; padding: 9px 6px; border-bottom: 1px solid var(--color-line); cursor: pointer; }
+.search-results strong, .search-results span { display: block; overflow-wrap: anywhere; }
+.search-results strong { font-size: 11px; color: var(--color-ink); }
+.search-results span { font-size: 10px; margin-top: 4px; }
+.coordinate-target { background: #173038; padding: 10px; border: 1px solid #315661; border-radius: 8px; margin-top: 10px; }
+.coordinate-target > span { display: block; font-family: var(--font-mono); color: #bfe9f1; font-size: 11px; margin-bottom: 8px; }
+.coordinate-target small { display: block; font-size: 10px; margin-top: 7px; }
+.map-inspector { border-top: 1px solid #343b42; margin-top: 14px; padding-top: 14px; max-height: 260px; overflow-y: auto; }
+.explorer-eyebrow { display: block; color: #a1abb5; text-transform: uppercase; letter-spacing: .13em; font-size: 9px; font-weight: 600; }
+.map-inspector strong { display: block; font-size: 13px; color: var(--color-ink); margin-top: 9px; }
+.map-inspector p { margin: 7px 0; font-size: 11px; line-height: 1.55; }
+.map-inspector a, .source-links a { color: #81cedf; font-size: 11px; overflow-wrap: anywhere; }
+.coordinate-readout { display: block; font-family: var(--font-mono); font-size: 9px; color: #a3b0ba; margin-top: 10px; }
+.explorer-overview { top: 12px; right: 12px; width: 310px; max-height: calc(100dvh - 70px); overflow-y: auto; padding: 20px; }
+.explorer-overview h1 { color: var(--color-ink); font-size: 24px; line-height: 1.15; font-weight: 600; letter-spacing: -.035em; margin: 18px 0 12px; max-width: 220px; }
+.explorer-overview > p { font-size: 12px; line-height: 1.6; }
+.overview-scope { margin-top: 24px; }
+.overview-scope strong, .overview-scope span { display: block; }
+.overview-scope strong { font-size: 12px; color: var(--color-ink); }
+.overview-scope span { font-size: 10px; margin-top: 4px; }
+.inventory-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: 12px 0; }
+.inventory-stats button { text-align: left; border: 1px solid #353d44; border-radius: 9px; padding: 10px; cursor: pointer; }
+.inventory-stats button[aria-pressed="true"] { border-color: #79929a; background: #ffffff07; }
+.inventory-stats b { display: block; font-family: var(--font-mono); font-size: 22px; font-weight: 500; }
+.inventory-stats span { display: block; font-size: 10px; margin-top: 2px; }
+.inventory-list { margin-top: 14px; }
+.inventory-list button { display: flex; align-items: center; gap: 9px; padding: 12px 0; border-bottom: 1px solid #2c3238; width: 100%; text-align: left; cursor: pointer; }
+.inventory-list i { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.inventory-list button > span:nth-child(2) { flex: 1; min-width: 0; }
+.inventory-list strong, .inventory-list small { display: block; overflow-wrap: anywhere; }
+.inventory-list strong { color: var(--color-ink); font-size: 11px; font-weight: 500; }
+.inventory-list small { color: #949fa9; font-size: 10px; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.inventory-more { display: block; color: var(--color-river); width: 100%; padding: 10px; font-size: 11px; cursor: pointer; }
+.source-links { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
+.drawing-instruction { position: absolute; z-index: 25; top: 14px; left: 50%; transform: translateX(-50%); background: #20414c; color: #e0f8fc; border: 1px solid #60a8b9; border-radius: 10px; padding: 9px 12px; font-size: 12px; box-shadow: 0 5px 20px #0006; white-space: nowrap; }
+.drawing-instruction span { margin-left: 8px; font-size: 10px; }
+.drawing-instruction button { margin-left: 10px; }
+.mobile-tools { display: none; }
+
+/*
+ * Creator credit. Sits on the scale control's own baseline rather than above
+ * it: the band below .map-explorer is only 54px tall and a stacked pill
+ * collided with one or the other. pointer-events are off on the pill and back
+ * on for the links, so the map keeps every click outside the two anchors.
+ */
+.map-credit {
+  position: absolute; z-index: 12; left: 124px; bottom: 11px; pointer-events: none;
+  display: flex; align-items: center; gap: 6px;
+  background: #0e0f11b8; border: 1px solid var(--color-line); border-radius: 999px;
+  padding: 3px 10px; font-size: 10px; line-height: 1.6; color: var(--color-faint);
+  backdrop-filter: blur(8px);
+}
+.map-credit a { pointer-events: auto; color: var(--color-muted); text-decoration: none; }
+.map-credit a:hover { color: var(--color-river); }
+
+@media (max-width: 1023px) {
+  .map-credit { display: none; }
+  .map-explorer { top: 8px; left: 8px; width: calc(100% - 16px); max-height: calc(46vh - 20px); }
+  .explorer-heading { padding: 9px 11px; }
+  .explorer-heading strong { font-size: 13px; }
+  .explorer-heading span { display: none; }
+  .mobile-tools { display: block; min-height: 34px; }
+  .map-explorer[data-expanded="false"] .explorer-body { display: none; }
+  .explorer-overview { position: relative; top: auto; right: auto; width: 100%; flex: 1; min-height: 0; border-radius: 0; max-height: none; }
+  .explorer-overview h1 { max-width: none; margin: 10px 0; }
+  .inventory-stats { grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .inventory-stats b { font-size: 18px; }
+  .inventory-stats button { padding: 8px 5px; }
+  .inventory-stats span { font-size: 9px; }
+  .drawing-instruction { top: 66px; font-size: 11px; max-width: calc(100% - 16px); }
+  .drawing-instruction span { display: none; }
+}

@@ -418,6 +418,8 @@ function Slider({
 }
 
 export function Reading(props: {
+  mapAlignment?: React.ReactNode;
+  methodComparison?: React.ReactNode;
   at: Pt | null;
   region: RegionMode;
   borderKm: number | null;
@@ -640,7 +642,7 @@ export function Reading(props: {
     <aside className="reading-panel z-10 flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-line bg-panel lg:absolute lg:right-3 lg:top-3 lg:max-h-[calc(100%-1.5rem)] lg:w-[calc(34vw-18px)] lg:min-w-[380px] lg:flex-none lg:rounded-2xl lg:border lg:shadow-[0_24px_70px_rgba(0,0,0,0.55)]">
       <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-panel/90 px-4 py-2.5 backdrop-blur-md lg:rounded-t-2xl">
         <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
-          {!at ? 'Pick a river' : scheme ? 'Best scheme found' : 'Studying'}
+          {!at ? 'Pick a river' : scheme ? 'Best scheme found' : busy ? 'Studying' : 'Site assessment'}
         </span>
         {busy && (
           <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-river">
@@ -670,7 +672,9 @@ export function Reading(props: {
         </div>
       )}
 
+      {props.mapAlignment}
       {scheme && <Verdict scheme={scheme} uncertainty={uncertainty} flowChoice={flowChoice} />}
+      {props.methodComparison}
 
       {at && (
         <div className="border-b border-line px-4 py-2 text-[10.5px] leading-relaxed text-faint">

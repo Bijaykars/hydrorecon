@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { MapExplorer } from './MapExplorer.tsx';
+import { HydrologyComparison } from './HydrologyComparison.tsx';
+import { buildRiverDisplay, displayGeoJson, type RiverDisplay } from './river-display.ts';
+import { NEPAL_VIEW, NEPAL_BOUNDS, mapPadding, validPoint, readPreference, savePreference } from './map-navigation.ts';
 import {
   fetchDischarge,
   fetchDischargeYears,
@@ -21,6 +25,7 @@ import {
   SNAP_KM,
   type Reach,
 } from './rivers.ts';
+import { glaciersUpstreamOf, type GlacierScreen } from './glaciers.ts';
 import { assessCollectors } from './collector.ts';
 import { bestTransfer, loadStationSeries, transferMeetsBar, type Transfer } from './dhm.ts';
 import { discover, evaluate, SEARCH_KM, type Scheme, type SchemeInput } from './engine/discover.ts';
@@ -86,7 +91,7 @@ import {
 import { Reading } from './Reading.tsx';
 import { distanceToNepalBoundaryKm, regionFor, type RegionMode } from './region.ts';
 import { assessReadiness } from './readiness.ts';
-import { HAZARD_COLORS, hazardsFor } from './hazards.ts';
+import { HAZARD_COLORS, hazardsFor, hazardInventory } from './hazards.ts';
 import { quakesGeoJson, seismicAt, type SeismicScreen } from './seismic.ts';
 import { FAULT_COLOR, faultsFor } from './faults.ts';
 import {
@@ -134,11 +139,9 @@ const DEFAULTS: Assumptions = {
 
 const MIN_FLOW_FRAC = 0.2;
 /**
- * Keep the intake near where the user actually clicked. Two kilometres lets the
- * search slide onto a better sill without the marker teleporting down the
- * valley, which is what it used to do.
+ * Hold the intake at the selected river position unless corridor search is enabled.
  */
-const INTAKE_WINDOW_KM = 2;
+const INTAKE_WINDOW_KM = 0;
 
 /**
  * Driest monthly mean as a share of the annual mean, for a record with no dates.
@@ -170,6 +173,17 @@ export type StudyPoint = {
   km: number;
   lat: number;
   lon: number;
+  /**
+   * Where this point is DRAWN — its position on the traced channel the map
+   * shows, which differs from lat/lon by a 77 m median and up to 493 m.
+   *
+   * Markers and dragging use it so the intake sits on the blue line and a drop
+   * onto that line picks the vertex the user aimed at. Nothing numeric does:
+   * every elevation, catchment and flow figure is read at lat/lon, because
+   * moving the engine onto the traced course was measured and lost on capacity.
+   */
+  drawnLat: number;
+  drawnLon: number;
   elevationM: number;
   meanCms: number;
   /**
@@ -284,7 +298,9 @@ type BasemapId = (typeof BASEMAPS)[number]['id'];
  * "where does the power go" — not the app's internal source names.
  */
 const DEFAULT_LAYERS = {
+  gauges: true,
   site: true,
+  access: false,
   hazards: true,
   lakes: true,
   projects: true,
@@ -298,10 +314,17 @@ const DEFAULT_LAYERS = {
 };
 type LayerToggles = typeof DEFAULT_LAYERS;
 
-const LAYER_GROUPS: Record<Exclude<keyof LayerToggles, 'labels' | 'geology'>, string[]> = {
-  site: ['pondage-fill', 'pondage-dam', 'road-access-lines', 'road-access-points'],
+const LAYER_GROUPS: Record<Exclude<keyof LayerToggles, 'labels' | 'geology' | 'gauges'>, string[]> = {
+  site: ['pondage-fill', 'pondage-dam'],
+  access: ['road-access-lines', 'road-access-points'],
   hazards: ['hazards', 'hazard-labels'],
-  lakes: ['upstream-routes', 'upstream-sources'],
+  lakes: [
+    'glaciers-upstream-fill',
+    'glaciers-upstream-line',
+    'upstream-routes',
+    'upstream-sources',
+    'upstream-source-labels',
+  ],
   projects: ['licences', 'licence-labels', 'cascade-routes', 'cascade-projects', 'cascade-labels'],
   areas: ['licence-area-fill', 'licence-area-line'],
   grid: ['grid-lines', 'grid-line-labels', 'grid-substations', 'grid-substation-labels'],
@@ -318,6 +341,7 @@ const LABEL_LAYERS = new Set([
   'grid-line-labels',
   'grid-substation-labels',
   'geology-sheet-labels',
+  'upstream-source-labels',
 ]);
 
 /** A secondary intake, resolved against the river network and the terrain. */
@@ -387,18 +411,21 @@ const JUNCTION_FLOW_SHARE = 0.5;
  */
 const GEOLOGY_ZOOM_OUT = 1.15;
 
-type UrlState = { view: { lat: number; lon: number; zoom: number }; at: Pt | null };
+type UrlState = { view: { lat: number; lon: number; zoom: number }; at: Pt | null; hasView: boolean };
 
 function readUrl(): UrlState {
   const p = new URLSearchParams(location.hash.slice(1));
   const m = p.get('at')?.split(',').map(Number);
   const v = p.get('map')?.split('/').map(Number);
+  const hasView = !!(v && v.length === 3 && v.every(Number.isFinite) && v[0] >= 0 && v[0] <= 22 && validPoint({ lat: v[1], lon: v[2] }));
+  const at = m && m.length === 2 && validPoint({ lat: m[0], lon: m[1] }) ? { lat: m[0], lon: m[1] } : null;
   return {
+    hasView: hasView || !!at,
     view:
-      v && v.length === 3 && v.every(Number.isFinite)
+      hasView && v
         ? { zoom: v[0], lat: v[1], lon: v[2] }
-        : { zoom: 3.2, lat: 22, lon: 20 },
-    at: m && m.length === 2 && m.every(Number.isFinite) ? { lat: m[0], lon: m[1] } : null,
+        : at ? { ...at, zoom: 12 } : NEPAL_VIEW,
+    at,
   };
 }
 
@@ -472,6 +499,18 @@ export default function App() {
   );
 
   const [study, setStudy] = useState<Study | null>(null);
+  const [displayResult, setDisplayResult] = useState<{ path: StudyPoint[]; geometry: RiverDisplay | null } | null>(null);
+  const [showModelGeometry, setShowModelGeometry] = useState(false);
+  const riverDisplay = displayResult?.path === study?.path ? displayResult?.geometry : null;
+  useEffect(() => {
+    if (!study || study.tracedFromTerrain) { setDisplayResult(null); return; }
+    let cancelled = false;
+    const path = study.path;
+    void buildRiverDisplay(path).then((geometry) => {
+      if (!cancelled) setDisplayResult({ path, geometry });
+    }).catch(() => { if (!cancelled) setDisplayResult({ path, geometry: null }); });
+    return () => { cancelled = true; };
+  }, [study?.path]);
   /**
    * The live study, readable from inside an in-flight async callback.
    *
@@ -506,6 +545,7 @@ export default function App() {
   const [tweaked, setTweaked] = useState(false);
   /** Sweep the whole downstream reach instead of anchoring to the click. */
   const [wideSearch, setWideSearch] = useState(false);
+  const [maxWaterwayKm, setMaxWaterwayKm] = useState(6);
   /**
    * Secondary intakes feeding the same powerhouse — a collector scheme, the
    * Khimti pattern. Spawned by Ctrl-dragging the intake pin onto a tributary.
@@ -538,6 +578,9 @@ export default function App() {
     error: string | null;
   } | null>(null);
   const [auditBusy, setAuditBusy] = useState<string | null>(null);
+  const auditGeneration = useRef(0);
+  const auditTarget = useRef({ study, i: pick?.i, j: pick?.j, measured });
+  auditTarget.current = { study, i: pick?.i, j: pick?.j, measured };
   /** Canal-vs-tunnel read along the chosen waterway; null until terrain arrives. */
   const [corridor, setCorridor] = useState<CorridorTerrain | null>(null);
   /** Retained level above the DEM-detected channel floor at the intake. */
@@ -587,6 +630,9 @@ export default function App() {
       maxTileCacheZoomLevels: 10,
     });
     map.current = m;
+    if (!initial.hasView) {
+      m.fitBounds([[NEPAL_BOUNDS.west, NEPAL_BOUNDS.south], [NEPAL_BOUNDS.east, NEPAL_BOUNDS.north]], { padding: mapPadding(), duration: 0 });
+    }
     (window as unknown as { __map: maplibregl.Map }).__map = m;
     m.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'bottom-right');
     m.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
@@ -1046,6 +1092,28 @@ export default function App() {
           'line-dasharray': [2, 2],
         },
       });
+      /**
+       * Connected ice, under the lakes rather than over them.
+       *
+       * Figure 11 used to be 43 anonymous dots on a 151 km frame with the
+       * alignment a squiggle in one corner: it proved lakes exist upstream and
+       * answered nothing else. The ice is what a reader is looking for when they
+       * ask which glacier feeds this river, and it is what makes the lakes read
+       * as a chain rather than a scatter.
+       */
+      m.addSource('glaciers-upstream', { type: 'geojson', data: empty() });
+      m.addLayer({
+        id: 'glaciers-upstream-fill',
+        type: 'fill',
+        source: 'glaciers-upstream',
+        paint: { 'fill-color': '#8fd6ef', 'fill-opacity': 0.45 },
+      });
+      m.addLayer({
+        id: 'glaciers-upstream-line',
+        type: 'line',
+        source: 'glaciers-upstream',
+        paint: { 'line-color': '#4aa8cc', 'line-width': 0.7, 'line-opacity': 0.9 },
+      });
       m.addSource('upstream-sources', { type: 'geojson', data: empty() });
       m.addLayer({
         id: 'upstream-sources',
@@ -1070,6 +1138,38 @@ export default function App() {
           'icon-allow-overlap': true,
         },
       });
+      /**
+       * Off in the app, on for the figure. On screen these labels stack on top
+       * of every lake at once and the map stops being readable; in a framed
+       * capture of the few lakes that matter, the flow-path distance IS the
+       * finding and a dot without it says nothing at all.
+       */
+      m.addLayer({
+        id: 'upstream-source-labels',
+        type: 'symbol',
+        source: 'upstream-sources',
+        filter: ['==', ['get', 'sourceType'], 'lake'],
+        layout: {
+          visibility: 'none',
+          'text-field': [
+            'case',
+            ['==', ['get', 'pdgl'], 1],
+            ['concat', ['get', 'pdglName'], ' — ', ['get', 'route'], ' km'],
+            ['concat', ['get', 'route'], ' km'],
+          ],
+          'text-size': ['case', ['==', ['get', 'pdgl'], 1], 12, 10],
+          'text-offset': [0, 1.1],
+          'text-anchor': 'top',
+          'text-allow-overlap': false,
+          'text-optional': true,
+        },
+        paint: {
+          'text-color': '#0b6a9e',
+          'text-halo-color': '#ffffff',
+          'text-halo-width': 1.6,
+        },
+      });
+
       m.on('click', 'upstream-sources', (e) => {
         const feature = e.features?.[0];
         if (!feature) return;
@@ -1151,7 +1251,7 @@ export default function App() {
         new maplibregl.Popup({ closeButton: false })
           .setLngLat(e.lngLat)
           .setHTML(
-            `<b>${p.title}</b><br/><span style="color:#9aa1a9">${p.date} · ${p.distance} km from reach</span>` +
+            `<b>${p.title}</b><br/><span style="color:#9aa1a9">${p.date}${p.distance ? ` · ${p.distance} km from reach` : ' · historical report'}</span>` +
               `<br/><a href="https://bipadportal.gov.np/incidents/${p.id}/response" target="_blank" rel="noopener">official BIPAD record ↗</a>`
           )
           .addTo(m);
@@ -1495,6 +1595,11 @@ export default function App() {
 
       // The diverted reach of the selected scheme.
       m.addSource('scheme', { type: 'geojson', data: empty() });
+      m.addSource('display-channel', { type: 'geojson', data: empty() });
+      m.addLayer({ id: 'display-channel', type: 'line', source: 'display-channel', filter: ['==', ['get', 'traced'], true], paint: { 'line-color': '#4fc1d8', 'line-width': 2.5, 'line-opacity': 0.9 } });
+      m.addLayer({ id: 'display-channel-approximate', type: 'line', source: 'display-channel', filter: ['==', ['get', 'traced'], false], paint: { 'line-color': '#4fc1d8', 'line-width': 2, 'line-dasharray': [2, 2] } });
+      m.addSource('model-reference', { type: 'geojson', data: empty() });
+      m.addLayer({ id: 'model-reference', type: 'line', source: 'model-reference', paint: { 'line-color': '#f4e4cb', 'line-width': 1.5, 'line-dasharray': [4, 3] } });
       m.addLayer({
         id: 'scheme-glow',
         type: 'line',
@@ -1506,9 +1611,11 @@ export default function App() {
         id: 'scheme-line',
         type: 'line',
         source: 'scheme',
+        filter: ['!=', ['get', 'traced'], false],
         layout: { 'line-cap': 'round' },
         paint: { 'line-color': '#ffb454', 'line-width': 3 },
       });
+      m.addLayer({ id: 'scheme-approximate', type: 'line', source: 'scheme', filter: ['==', ['get', 'traced'], false], paint: { 'line-color': '#ffb454', 'line-width': 3, 'line-dasharray': [2, 2] } });
 
       // Connected level-pool cells behind the intake's inferred dam axis.
       // The fill sits under the selected waterway; the proposed axis remains
@@ -1645,7 +1752,19 @@ export default function App() {
       writeUrl({ lat: c.lat, lon: c.lng, zoom: m.getZoom() }, atRef.current);
     });
 
+    const restoreLocation = () => {
+      const saved = readUrl();
+      m.jumpTo({ center: [saved.view.lon, saved.view.lat], zoom: saved.view.zoom, padding: { top: 0, right: 0, bottom: 0, left: 0 } });
+      if (saved.at) {
+        if (saved.at.lat !== atRef.current?.lat || saved.at.lon !== atRef.current?.lon) void onClick(saved.at.lat, saved.at.lon);
+      } else {
+        reset();
+      }
+    };
+    window.addEventListener('hashchange', restoreLocation);
+
     return () => {
+      window.removeEventListener('hashchange', restoreLocation);
       ro.disconnect();
       setMapReady(false);
       // Markers die with the map they were added to. Leaving stale Marker
@@ -1697,12 +1816,17 @@ export default function App() {
     let best: Pt | null = null;
     let bestD = Infinity;
     const consider = (coords: GeoJSON.Position[]) => {
-      for (const c of coords) {
-        const p = m.project([c[0], c[1]]);
+      for (let k = 1; k < coords.length; k++) {
+        const a = m.project([coords[k - 1][0], coords[k - 1][1]]);
+        const b = m.project([coords[k][0], coords[k][1]]);
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const t = Math.max(0, Math.min(1, ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+        const p = { x: a.x + t * dx, y: a.y + t * dy };
         const d = (p.x - pt.x) ** 2 + (p.y - pt.y) ** 2;
         if (d < bestD) {
           bestD = d;
-          best = { lat: c[1], lon: c[0] };
+          const ll = m.unproject([p.x, p.y]);
+          best = { lat: ll.lat, lon: ll.lng };
         }
       }
     };
@@ -1755,8 +1879,11 @@ export default function App() {
     [snapToWaterway]
   );
 
+  const clickSequence = useRef(0);
   const onClick = useCallback(async (lat: number, lon: number) => {
+    const sequence = ++clickSequence.current;
     const hit = await nearestReach(lat, lon).catch(() => null);
+    if (sequence !== clickSequence.current) return;
     setPick(null);
     setTweaked(false);
     setWideSearch(false);
@@ -1829,7 +1956,7 @@ export default function App() {
         flowError = e instanceof Error ? e.message : String(e);
         return null;
       });
-      let river = await downstreamPath(origin.lat, origin.lon, SEARCH_KM).catch(() => null);
+      let river = await downstreamPath(origin.lat, origin.lon, SEARCH_KM, 0.12, { continuousStart: true }).catch(() => null);
       /**
        * Read the river, not the rivulet beside it (reachToRead in rivers.ts).
        * The marker stays exactly where it was put; only the hydrology moves,
@@ -1917,7 +2044,16 @@ export default function App() {
           // meanCms 0 = no mapped network here, so the flood model's own
           // magnitude is used unscaled and the panel says so. A terrain trace
           // carries no catchment either.
-          path: trace.points.map((p) => ({ ...p, meanCms: 0, uplandKm2: 0, networkIndex: -1 })),
+          // A terrain trace follows the DEM downhill and has no mapped channel
+          // behind it, so drawn and computed positions are the same point.
+          path: trace.points.map((p) => ({
+            ...p,
+            meanCms: 0,
+            uplandKm2: 0,
+            networkIndex: -1,
+            drawnLat: p.lat,
+            drawnLon: p.lon,
+          })),
           flow: flow ?? emptyFlowAt(at),
           flowUnavailable: flow ? null : flowError,
           dem: {
@@ -1966,7 +2102,7 @@ export default function App() {
    * The reach as it applies AT THE SELECTED INTAKE, not at the click.
    *
    * `study.reach` describes where the user clicked. The engine may site the
-   * intake up to INTAKE_WINDOW_KM downstream, and past a confluence that is a
+   * intake downstream during corridor search or manual placement, past a confluence that is a
    * materially different catchment — the network flow the engine uses grows
    * there, while every independent check of that flow stayed frozen upstream.
    * Rescaling the catchment-derived fractions by the area ratio keeps the
@@ -2158,16 +2294,13 @@ export default function App() {
       headLossFrac: assume.headLossFrac,
       minFlowFrac: MIN_FLOW_FRAC,
       intakeWindowKm: wideSearch ? Number.POSITIVE_INFINITY : INTAKE_WINDOW_KM,
+      maxWaterwayKm,
     };
-  }, [study, assume, effectiveResidualFrac, wideSearch, measured, flowChoice]);
+  }, [study, assume, effectiveResidualFrac, wideSearch, maxWaterwayKm, measured, flowChoice]);
 
   // Who already holds or has applied for this river. The official DoED bundle
   // ships with the app, so this works offline and has an explicit source date.
   useEffect(() => {
-    if (!study || !isNepal) {
-      setDoedProjects(null);
-      return;
-    }
     let dead = false;
     loadLicences()
       .then((all) => {
@@ -2179,7 +2312,7 @@ export default function App() {
     return () => {
       dead = true;
     };
-  }, [study, isNepal]);
+  }, []);
 
   // Where a real measured record exists. Flow is the dominant error here, and
   // this is the only thing that would actually shrink it — so it is worth
@@ -2291,16 +2424,85 @@ export default function App() {
     return discover(input);
   }, [input, study?.followsRiver]);
 
-  // Show the strongest alternative straight away — one click, an answer.
+  /**
+   * KEEP THE SAME OBJECT WHEN THE ANSWER IS THE SAME. THIS WAS AN INFINITE LOOP.
+   *
+   * `setPick({ i, j })` built a fresh object every run. React bails out of a
+   * state update only on `Object.is`, so a new object with identical contents is
+   * still a change — and this effect depends on `found`, which is derived from
+   * `pick`:
+   *
+   *   pick -> intakeReach -> flowChoice -> input -> found -> this effect -> pick
+   *
+   * Every turn of that ring re-ran `discover()` over 139 candidate layouts,
+   * `evaluate()`, and `sweepDesignFlow()`'s seventeen further evaluations. The
+   * ring never settled, so it ran forever: measured on a loaded site, the main
+   * thread was blocked in 2.4-second tasks back to back, `requestAnimationFrame`
+   * fired ZERO times in 4.7 seconds, and the app burned a core doing nothing but
+   * recomputing the same scheme. Every pan, zoom and slider felt broken because
+   * the browser genuinely never got the thread back.
+   *
+   * Returning the PREVIOUS reference when i and j are unchanged is what stops
+   * it: React compares, sees the same object, and does not re-render. The ring
+   * still exists — it is the natural shape of "search, then select the best
+   * result" — but it now converges after one pass.
+   */
+  /**
+   * THE RING HAS TWO FIXED POINTS AT SOME SITES, AND REFERENCE EQUALITY CANNOT SEE IT.
+   *
+   * The fix above stops the ring turning when i and j are UNCHANGED. It does
+   * nothing when they genuinely alternate, and at some sites they do:
+   *
+   *   pick.i -> MERIT's per-vertex upland area there -> chooseFlowMagnitude ->
+   *   design flow -> the best layout the search finds -> pick.i
+   *
+   * `intakeReach` rescales the catchment to the area MERIT samples AT THE
+   * CURRENT INTAKE VERTEX, so the flow decision depends on which candidate the
+   * search currently prefers. Measured at 29.2583 N, 81.9333 E: the app flips
+   * every ~2.5 seconds between (i=12, j=120, authority "model", 12.48 m3/s,
+   * 24.76 MW) and (i=0, j=104, authority "network", 0.43 m3/s, 0.82 MW) — a 29x
+   * swing in flow and a 30x swing in capacity, 29 times in 75 seconds, with no
+   * React warning because this is not a render loop. It is a genuine limit cycle
+   * in the model, and MERIT's documented bleed across confluences is what makes
+   * the two vertices disagree so violently.
+   *
+   * Whichever state the app happened to show was a coin toss, and two renders of
+   * one coordinate produced 24.76 MW and 0.82 MW.
+   *
+   * SO: STOP, AND SAY SO. Revisiting a layout this study has already left is a
+   * cycle, not an improvement. The pick is frozen at that point and the site is
+   * flagged, because picking one of two answers 30x apart and printing it
+   * without comment is the failure this whole project is built against. A site
+   * that converges never reaches the guard, so no settled answer moves.
+   */
+  const visitedPicks = useRef<Set<string>>(new Set());
+  const [pickCycle, setPickCycle] = useState<{ a: string; b: string } | null>(null);
+  useEffect(() => {
+    visitedPicks.current = new Set();
+    setPickCycle(null);
+  }, [study, maxWaterwayKm]);
+
   useEffect(() => {
     if (tweaked) return;
-    if (found && found.schemes.length > 0) {
-      setPick({ i: found.schemes[0].i, j: found.schemes[0].j });
-    } else if (study && !study.followsRiver && study.path.length > 1) {
-      setPick({ i: 0, j: study.path.length - 1 });
-    } else {
+    const next =
+      found && found.schemes.length > 0
+        ? { i: found.schemes[0].i, j: found.schemes[0].j }
+        : null;
+    if (!next) {
       setPick(null);
+      return;
     }
+    const key = `${next.i}/${next.j}`;
+    setPick((prev) => {
+      if (prev && prev.i === next.i && prev.j === next.j) return prev;
+      if (prev && visitedPicks.current.has(key)) {
+        // Already been here and left. Freeze on what is on screen.
+        setPickCycle({ a: `${prev.i}/${prev.j}`, b: key });
+        return prev;
+      }
+      visitedPicks.current.add(key);
+      return next;
+    });
   }, [found, study, tweaked]);
 
   const scheme: Scheme | null = useMemo(
@@ -2451,13 +2653,13 @@ export default function App() {
 
   /** DoED range screening follows the chosen layout, not the full 22 km search corridor. */
   const licences = useMemo(
-    () => doedProjects && study
+    () => isNepal && doedProjects && study
       ? licencesAlong(
           doedProjects,
           scheme ? study.path.slice(scheme.i, scheme.j + 1) : study.path
         )
       : null,
-    [doedProjects, study, scheme]
+    [isNepal, doedProjects, study, scheme]
   );
 
   /** Historical reports near this exact intake-powerhouse reach, Nepal only. */
@@ -2511,6 +2713,40 @@ export default function App() {
   const upstreamConnectivity = currentConnectivity?.screen ?? null;
   const connectivityError = currentConnectivity?.error ?? null;
   const connectivityBusy = Boolean(connectivityKey && currentConnectivity && !currentConnectivity.screen && !currentConnectivity.error);
+
+  /**
+   * The ice upstream, routed the same way the lakes are.
+   *
+   * Reuses `connectivityKey`: ice only matters where the lake screen also runs,
+   * it is keyed on the same intake, and re-deriving the key would let the two
+   * drift apart. Failure is silent by design — a site with no glaciers and a
+   * site whose network could not be walked both end up with no ice, and neither
+   * should stop the report.
+   */
+  const [glacierScreen, setGlacierScreen] = useState<{
+    key: string;
+    screen: GlacierScreen | null;
+  } | null>(null);
+  useEffect(() => {
+    if (!connectivityKey || !schemeRef.current) {
+      setGlacierScreen(null);
+      return;
+    }
+    const s0 = schemeRef.current;
+    let dead = false;
+    const km2 = studyRef.current?.path[s0.i]?.uplandKm2 ?? null;
+    glaciersUpstreamOf(s0.intake, km2)
+      .then((screen) => {
+        if (!dead) setGlacierScreen({ key: connectivityKey, screen });
+      })
+      .catch(() => {
+        if (!dead) setGlacierScreen({ key: connectivityKey, screen: null });
+      });
+    return () => {
+      dead = true;
+    };
+  }, [connectivityKey]);
+  const glaciers = glacierScreen?.key === connectivityKey ? glacierScreen.screen : null;
 
   /** Upstream/downstream DoED project candidates on the directed network. */
   const cascadeKey = useMemo(
@@ -2913,7 +3149,7 @@ export default function App() {
     const m = map.current;
     if (!m) return;
     setFocus({ lat, lon });
-    m.flyTo({ center: [lon, lat], zoom: Math.max(m.getZoom(), 12.5), duration: 900 });
+    m.flyTo({ center: [lon, lat], zoom: Math.max(m.getZoom(), 12.5), padding: mapPadding(), duration: 900 });
   }, []);
   useEffect(() => {
     const m = map.current;
@@ -2940,10 +3176,13 @@ export default function App() {
    * on imagery works on imagery every session and should not re-pick it.
    */
   const [basemap, setBasemap] = useState<BasemapId>(
-    () => (localStorage.getItem('hydrorecon.basemap') as BasemapId | null) ?? 'dark'
+    () => {
+      try { const id = localStorage.getItem('hydrorecon.basemap'); return BASEMAPS.find((b) => b.id === id)?.id ?? 'dark'; }
+      catch { return 'dark'; }
+    }
   );
   useEffect(() => {
-    localStorage.setItem('hydrorecon.basemap', basemap);
+    savePreference('hydrorecon.basemap', basemap);
     const m = map.current;
     if (!m || !mapReady) return;
     for (const b of BASEMAPS) {
@@ -2961,8 +3200,9 @@ export default function App() {
   }, [basemap, mapReady]);
 
   /** Legend toggles — visibility only, so switching costs nothing and loses nothing. */
-  const [layersOn, setLayersOn] = useState<LayerToggles>(DEFAULT_LAYERS);
+  const [layersOn, setLayersOn] = useState<LayerToggles>(() => readPreference('hydrorecon.layers', DEFAULT_LAYERS));
   useEffect(() => {
+    savePreference('hydrorecon.layers', JSON.stringify(layersOn));
     const m = map.current;
     if (!m || !mapReady) return;
     for (const [group, ids] of Object.entries(LAYER_GROUPS)) {
@@ -3089,8 +3329,10 @@ export default function App() {
   // one specific intake/powerhouse pair. An upgraded flow record lives inside
   // `study` and rightly survives — it belongs to the click, not the pair.
   useEffect(() => {
+    auditGeneration.current++;
     setAudit(null);
-  }, [pick?.i, pick?.j, at]);
+    setAuditBusy(null);
+  }, [pick?.i, pick?.j, at, measured]);
 
   const uncertainty = useMemo(() => {
     if (!input || !scheme || !study) return null;
@@ -3261,10 +3503,24 @@ export default function App() {
     // Dragging slides the end along the studied river — no refetch needed.
     const slide = (which: 'i' | 'j') => (p: Pt) => {
       if (!study || !pick) return;
-      let best = 0;
+      let best = which === 'i' ? pick.i : pick.j;
       let bd = Infinity;
       for (let k = 0; k < study.path.length; k++) {
-        const d = haversineKm([p.lat, p.lon], [study.path[k].lat, study.path[k].lon]);
+        const i = which === 'i' ? k : pick.i;
+        const j = which === 'j' ? k : pick.j;
+        if (j <= i || study.path[j].km - study.path[i].km > maxWaterwayKm + 1e-9) continue;
+        /**
+         * Match against the DRAWN position, not the modelled one.
+         *
+         * The display geometry keeps a matched point for every model sample.
+         * Matching a drop against the modelled positions meant dropping the
+         * marker on the visible blue river picked whichever vertex happened to
+         * be nearest a line the user cannot see — the marker then re-rendered
+         * somewhere else, which reads exactly like the app refusing the
+         * position. Aim at what is on screen.
+         */
+        const displayed = riverDisplay?.points[k] ?? study.path[k];
+        const d = haversineKm([p.lat, p.lon], [displayed.lat, displayed.lon]);
         if (d < bd) {
           bd = d;
           best = k;
@@ -3278,9 +3534,20 @@ export default function App() {
       );
     };
 
+    /**
+     * Draw each end on the same display geometry as the highlighted course.
+     * Nothing numeric moves: `scheme.intake`
+     * and `scheme.power` are still the modelled positions, and every elevation,
+     * catchment and flow figure is still read there.
+     */
+    const drawnAt = (k: number | undefined) => {
+      if (k == null || !study?.path[k]) return null;
+      const p = riverDisplay?.points[k] ?? study.path[k];
+      return { lat: p.lat, lon: p.lon };
+    };
     place(
       'a',
-      scheme?.intake ?? at,
+      drawnAt(pick?.i) ?? scheme?.intake ?? at,
       '#4db8ff',
       'intake',
       'Intake — drag along the river · Ctrl-drag onto another stream to add a collector intake',
@@ -3296,14 +3563,15 @@ export default function App() {
          * threshold is a guess about intent.
          */
         if (scheme && ctrl) {
-          markers.current.a?.setLngLat([scheme.intake.lon, scheme.intake.lat]);
+          const shown = drawnAt(pick?.i) ?? scheme.intake;
+          markers.current.a?.setLngLat([shown.lon, shown.lat]);
           void addExtraIntake(p);
         } else {
           slide('i')(p);
         }
       }
     );
-    place('b', scheme?.power ?? null, '#3fb950', 'powerhouse', 'Powerhouse — drag along the river', (p) =>
+    place('b', drawnAt(pick?.j) ?? scheme?.power ?? null, '#3fb950', 'powerhouse', 'Powerhouse — drag along the river', (p) =>
       slide('j')(p)
     );
 
@@ -3422,7 +3690,7 @@ export default function App() {
     if (lic) {
       lic.setData({
         type: 'FeatureCollection',
-        features: (licences ?? []).map((l) => ({
+        features: (doedProjects ?? []).map((l) => ({
           type: 'Feature',
           geometry: { type: 'Point', coordinates: [l.lon, l.lat] },
           properties: {
@@ -3444,7 +3712,7 @@ export default function App() {
     if (licAreas) {
       licAreas.setData({
         type: 'FeatureCollection',
-        features: (licences ?? [])
+        features: (doedProjects ?? [])
           .filter((l) => l.bounds)
           .map((l) => {
             // Published as [south, west, north, east].
@@ -3470,7 +3738,7 @@ export default function App() {
     if (hazardSource) {
       hazardSource.setData({
         type: 'FeatureCollection',
-        features: (hazards?.records ?? []).map((record) => {
+        features: hazardInventory().map((record) => {
           const year = Number(record.date.slice(0, 4));
           return {
             type: 'Feature' as const,
@@ -3480,7 +3748,7 @@ export default function App() {
               kind: record.kind,
               title: record.title,
               date: record.date,
-              distance: record.distanceKm.toFixed(1),
+              distance: hazards?.records.find((h) => h.id === record.id)?.distanceKm.toFixed(1) ?? '',
               label: `${record.title} · ${record.date.slice(0, 4)}`,
               age: Number.isFinite(year) ? Math.max(0, new Date().getFullYear() - year) : 5,
             },
@@ -3523,6 +3791,7 @@ export default function App() {
               detail:
                 `${lake.basin} · ${lake.country} · ${Math.round(lake.elevationM)} m` +
                 (lake.pdgl ? ` · ICIMOD Rank ${'I'.repeat(lake.pdgl.rank)} of III (2020)` : ''),
+              pdglName: lake.pdgl?.name ?? 'ICIMOD danger list',
               route: lake.routeKm.toFixed(1), snap: lake.snapKm.toFixed(2),
               url: upstreamConnectivity?.lakeInventory.source ?? '',
             },
@@ -3537,6 +3806,18 @@ export default function App() {
             },
           })),
         ],
+      });
+    }
+
+    const glacierSource = m.getSource('glaciers-upstream') as maplibregl.GeoJSONSource | undefined;
+    if (glacierSource) {
+      glacierSource.setData({
+        type: 'FeatureCollection',
+        features: (glaciers?.connected ?? []).map((g) => ({
+          type: 'Feature' as const,
+          geometry: { type: 'Polygon' as const, coordinates: g.rings },
+          properties: { id: g.id, name: g.name ?? '', areaKm2: g.areaKm2, routeKm: g.routeKm },
+        })),
       });
     }
 
@@ -3653,7 +3934,7 @@ export default function App() {
     if (src) {
       src.setData(
         study && scheme
-          ? {
+          ? riverDisplay ? displayGeoJson(riverDisplay, scheme.i, scheme.j) : {
               type: 'FeatureCollection',
               features: [
                 {
@@ -3671,7 +3952,23 @@ export default function App() {
           : empty()
       );
     }
-  }, [scheme, at, study, pick, licences, hazards, upstreamConnectivity, cascade, faults, geology, mapReady, extraIntakes, collectors, addExtraIntake, pondageState.result, roadAccessState.result]);
+  }, [scheme, at, study, pick, riverDisplay, maxWaterwayKm, licences, doedProjects, hazards, upstreamConnectivity, cascade, faults, geology, mapReady, extraIntakes, collectors, addExtraIntake, pondageState.result, roadAccessState.result]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !mapReady) return;
+    (m.getSource('display-channel') as maplibregl.GeoJSONSource)?.setData(riverDisplay ? displayGeoJson(riverDisplay) : empty());
+    (m.getSource('model-reference') as maplibregl.GeoJSONSource)?.setData(showModelGeometry && study ? { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: study.path.map((p) => [p.lon, p.lat]) } }] } : empty());
+    const sync = () => {
+      const visibility = !riverDisplay || showModelGeometry ? 'visible' : 'none';
+      if (m.getLayer('reaches') && m.getLayoutProperty('reaches', 'visibility') !== visibility) m.setLayoutProperty('reaches', 'visibility', visibility);
+    };
+    sync();
+    // The network can finish loading after the display geometry.
+    const onSource = (e: maplibregl.MapSourceDataEvent) => { if (e.sourceId === 'reaches') sync(); };
+    m.on('sourcedata', onSource);
+    return () => { m.off('sourcedata', onSource); };
+  }, [riverDisplay, showModelGeometry, study, mapReady]);
 
   useEffect(() => {
     const m = map.current;
@@ -3701,6 +3998,7 @@ export default function App() {
       faults,
       geology,
       hydest,
+      glaciers,
       flowChoice,
       pondage: pondageState.result,
       pondageSweep,
@@ -3724,12 +4022,21 @@ export default function App() {
           ? [scheme, ...found.schemes]
           : found.schemes,
       selected: scheme,
+      /**
+       * Set when the scheme search and the flow arbitration disagree in a loop
+       * and the pick had to be frozen. Two layouts, two flow authorities, and
+       * no basis in the data for preferring either — a reader must be told that
+       * rather than handed whichever one the race stopped on.
+       */
+      pickUnstable: pickCycle,
       path: study.path,
       demSource: study.dem.source,
       demResolutionM: study.dem.resolutionM,
       flowYears: new Set(study.flow.dates.map((d) => d.slice(0, 4))).size,
       flowMeanCms: meanOf(study.flow.values),
       networkMeanCms: study.reach?.meanDischargeCms ?? null,
+      catchmentRainMm:
+        study.reach && Number.isFinite(study.reach.annualPrecipMm) ? study.reach.annualPrecipMm : null,
       mhsp,
       flowShape,
       uncertainty,
@@ -3804,7 +4111,7 @@ export default function App() {
         residualFrac: effectiveResidualFrac,
       },
     };
-  }, [at, region, borderKm, readiness, hazards, upstreamConnectivity, cascade, faults, geology, hydest, flowChoice, pondageState.result, pondageSweep, roadAccessState.result, landcover, geologyUnits, ambiguity, designSweep, study, found, scheme, licences, gauges, grid, sediment, bench, measured, assume, effectiveResidualFrac, uncertainty]);
+  }, [at, region, borderKm, readiness, hazards, upstreamConnectivity, cascade, faults, geology, hydest, flowChoice, pondageState.result, pondageSweep, roadAccessState.result, landcover, geologyUnits, ambiguity, designSweep, study, found, scheme, licences, gauges, grid, sediment, bench, measured, assume, effectiveResidualFrac, uncertainty, pickCycle]);
 
   /**
    * The assembled export context, for harnesses and for checking the printed
@@ -3815,6 +4122,80 @@ export default function App() {
     if (!import.meta.env.DEV) return;
     (window as unknown as { __exportCtx: typeof exportCtx }).__exportCtx = exportCtx;
   }, [exportCtx]);
+
+  /**
+   * Pin the intake and powerhouse from outside, for rendering a report at a
+   * layout somebody else chose.
+   *
+   * The app's own answer to "where does this scheme go" is `discover()`, and a
+   * user overrides it by DRAGGING a marker. A caller with two coordinates — a
+   * developer's own bounding box, a licence application, a report being
+   * reproduced — has no way to say so, and `setPick` is component state that
+   * nothing outside can reach.
+   *
+   * This is exactly what `slide()` does on a drag, for both ends at once,
+   * including `setTweaked(true)` — without it the auto-select effect above
+   * overwrites the pinned layout on its next pass and the report silently
+   * describes a different scheme.
+   *
+   * It RETURNS THE SNAP DISTANCE because the ends can only sit on vertices of
+   * the studied river: a coordinate 300 m up a hillside becomes the nearest
+   * point on the channel, and a caller who is not told that will read the
+   * report as describing the point they asked for. Development only, like the
+   * two hooks above.
+   */
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const nearest = (p: { lat: number; lon: number }) => {
+      let best = 0;
+      let bd = Infinity;
+      for (let k = 0; k < (study?.path.length ?? 0); k++) {
+        const d = haversineKm([p.lat, p.lon], [study!.path[k].lat, study!.path[k].lon]);
+        if (d < bd) {
+          bd = d;
+          best = k;
+        }
+      }
+      return { index: best, snapKm: bd };
+    };
+    (
+      window as unknown as {
+        __placeScheme: (
+          intake: { lat: number; lon: number },
+          powerhouse: { lat: number; lon: number }
+        ) => unknown;
+      }
+    ).__placeScheme = (intake, powerhouse) => {
+      if (!study || study.path.length < 2) return { ok: false, why: 'no studied river yet' };
+      const a = nearest(intake);
+      const b = nearest(powerhouse);
+      if (a.index === b.index) {
+        return { ok: false, why: 'both points snap to the same river vertex', a, b };
+      }
+      // The engine requires the intake upstream of the powerhouse. If the two
+      // arrive the other way round the caller has them reversed, or the river
+      // runs the other way; say so rather than silently swapping.
+      if (a.index > b.index) {
+        return {
+          ok: false,
+          why: 'the intake snaps DOWNSTREAM of the powerhouse on this river',
+          a,
+          b,
+        };
+      }
+      if (study.path[b.index].km - study.path[a.index].km > maxWaterwayKm + 1e-9) {
+        return { ok: false, why: `layout exceeds the selected ${maxWaterwayKm} km limit`, a, b };
+      }
+      setTweaked(true);
+      setPick({ i: a.index, j: b.index });
+      return {
+        ok: true,
+        intake: { ...study.path[a.index], index: a.index, snapKm: a.snapKm },
+        powerhouse: { ...study.path[b.index], index: b.index, snapKm: b.snapKm },
+        pathLength: study.path.length,
+      };
+    };
+  }, [study, maxWaterwayKm]);
 
   /**
    * Who the desk study is from. Nothing in the hydrology knows the project's
@@ -3878,6 +4259,7 @@ export default function App() {
       zoom: m.getZoom(),
       bearing: m.getBearing(),
       pitch: m.getPitch(),
+      padding: m.getPadding(),
     };
     const frame = (extra: [number, number][] = []) => {
       const pts: [number, number][] = [...extra];
@@ -3949,6 +4331,9 @@ export default function App() {
     };
 
     const ids = [
+      'display-channel', 'display-channel-approximate', 'model-reference', 'scheme-approximate',
+      'inventory-gauges', 'inventory-gauges-labels', 'inventory-lakes', 'inventory-lakes-labels',
+      'explorer-area-fill', 'explorer-area-line',
       ...BASEMAPS.filter((b) => b.tiles).map((b) => `basemap-${b.id}`),
       'hillshade',
       'report-ends-dot',
@@ -4118,12 +4503,19 @@ export default function App() {
     }
 
     const out: ReportFigures = {};
+    const schemeSource = m.getSource('scheme') as maplibregl.GeoJSONSource | undefined;
+    const interactiveScheme = schemeSource?.serialize().data;
     try {
+      // Reports and their endpoint labels describe calculation coordinates.
+      // Keep the display-only OSM trace out of those figures and restore it after.
+      for (const id of ['display-channel', 'display-channel-approximate', 'model-reference', 'scheme-approximate']) show(id, false);
+      if (study && scheme) schemeSource?.setData({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: study.path.slice(scheme.i, scheme.j + 1).map((p) => [p.lon, p.lat]) } }] });
+      for (const id of ['inventory-gauges', 'inventory-gauges-labels', 'inventory-lakes', 'inventory-lakes-labels', 'explorer-area-fill', 'explorer-area-line']) show(id, false);
       frame();
       show('report-ends-dot', true);
       show('report-ends-label', true);
       const hazardLayers = new Set([...LAYER_GROUPS.hazards, ...LAYER_GROUPS.lakes]);
-      const siteLayers = new Set(LAYER_GROUPS.site);
+      const siteLayers = new Set([...LAYER_GROUPS.site, ...LAYER_GROUPS.access]);
 
       // 1. Layout on the dark basemap, hazards off so the scheme reads clearly.
       //    Licence areas ON regardless of the legend: a reviewer looking at the
@@ -4239,18 +4631,64 @@ export default function App() {
        * sit, how far up the flow path, and whether they are above the intake at
        * all. Every other layer is off: this figure has one subject.
        *
-       * The frame is wide by necessity, because the lakes are tens of kilometres
-       * upstream. That IS the finding, and the caption states the width so the
-       * distance can be read rather than guessed.
+       * FRAMED ON THE LAKES THAT DECIDE THE VERDICT, NOT ON ALL OF THEM.
+       *
+       * Framing on every connected lake put 151 km on the page: 43 anonymous
+       * three-pixel dots scattered across Tibet with the alignment reduced to a
+       * squiggle in one corner. It proved lakes exist upstream and answered
+       * nothing a reader would ask — which lake, how far, and does it matter.
+       *
+       * The GLOF finding is formed on the lakes within 60 km of flow path, so
+       * that is what the figure shows. Where none qualifies the nearest six
+       * stand in, because a figure of the lakes that were CONSIDERED is still
+       * the subject; a figure of every lake in the basin is a different picture
+       * with the same title. The count that was dropped is reported in the
+       * caption rather than quietly lost — the same rule the hazard figure
+       * learned when one distant geocoding centroid turned out to carry 39 of
+       * 103 landslides.
+       *
+       * The labels come on here and nowhere else: at this framing the flow-path
+       * distance is the finding, and a dot without it says nothing.
        */
       if (upstreamConnectivity?.lakes?.length && scheme) {
         setBase(null);
         for (const id of hazardLayers) show(id, false);
         for (const id of LAYER_GROUPS.lakes) show(id, true);
-        const lakePts = upstreamConnectivity.lakes
-          .filter((l) => Number.isFinite(l.lat) && Number.isFinite(l.lon))
-          .map((l) => [l.lon, l.lat] as [number, number]);
+        const sited = upstreamConnectivity.lakes.filter(
+          (l) => Number.isFinite(l.lat) && Number.isFinite(l.lon)
+        );
+        const GLOF_ROUTE_KM = 60;
+        const near = sited.filter((l) => l.routeKm <= GLOF_ROUTE_KM);
+        const subject = (near.length ? near : [...sited].sort((a, b) => a.routeKm - b.routeKm).slice(0, 6));
+        out.lakesShown = subject.length;
+        out.lakesTotal = sited.length;
+        out.lakesWithinKm = near.length ? GLOF_ROUTE_KM : null;
+        const lakePts = subject.map((l) => [l.lon, l.lat] as [number, number]);
         if (lakePts.length) {
+          // The works anchor the frame, so the reader can see where the chain
+          // arrives rather than only where it starts.
+          lakePts.push([scheme.intake.lon, scheme.intake.lat]);
+          /**
+           * And the ice, or it sits half off the top edge.
+           *
+           * The first version framed on lakes and works only, and the connected
+           * glaciers — the thing a reader is looking at this figure to find —
+           * were clipped by the neat line. The ice is upstream of the lakes by
+           * definition, so it never fits by accident; it has to be asked for.
+           *
+           * Only the ice that shares the frame's own scale: glaciers within
+           * twice the furthest lake's flow path. A 90 km² glacier 150 km up a
+           * Tibetan headwater is connected and would pull the frame back to the
+           * useless width this figure was rebuilt to escape.
+           */
+          const reach = Math.max(...subject.map((l) => l.routeKm), 10) * 2;
+          for (const g of glaciers?.connected ?? []) {
+            if (g.routeKm > reach) continue;
+            // The OUTLINE, not the centroid. Framing on centroids put the ice
+            // half off the top edge: a glacier is kilometres long and its
+            // centre of area says nothing about where its tongue ends.
+            for (const ring of g.rings) for (const [lon, lat] of ring) lakePts.push([lon, lat]);
+          }
           frame(lakePts);
           const restoreLakeGround = monoGround([
             'hillshade',
@@ -4615,6 +5053,7 @@ export default function App() {
       }
       restoreGround();
     } finally {
+      if (interactiveScheme) schemeSource?.setData(interactiveScheme);
       void syncGeologyOverlay(m, layersOn.geology);
       show('report-ends-dot', false);
       show('report-ends-label', false);
@@ -4624,7 +5063,7 @@ export default function App() {
       }
     }
     return out;
-  }, [scheme, study, hazards, gauges, upstreamConnectivity, faults, seismic, grid, layersOn.geology]);
+  }, [scheme, study, hazards, gauges, upstreamConnectivity, glaciers, faults, seismic, grid, layersOn.geology]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -4666,7 +5105,6 @@ export default function App() {
     setNeighbours(null);
     setError(null);
     setFlowOnly(null);
-    setDoedProjects(null);
     setGauges(null);
     setMeasured(null);
     setWideSearch(false);
@@ -4702,7 +5140,10 @@ export default function App() {
      * `study` is the identity: every site change replaces the object.
      */
     const forStudy = study;
-    const live = () => studyRef.current === forStudy;
+    const generation = ++auditGeneration.current;
+    const live = () => auditGeneration.current === generation &&
+      auditTarget.current.study === forStudy && auditTarget.current.i === pick.i &&
+      auditTarget.current.j === pick.j && auditTarget.current.measured === measured;
     setAuditBusy('measuring the head on the second terrain product…');
     let head: HeadAudit | null = null;
     let shape: ShapeAudit | null = null;
@@ -4736,7 +5177,7 @@ export default function App() {
     } catch (e) {
       auditError = e instanceof Error ? e.message : String(e);
     } finally {
-      if (live()) setAuditBusy(null);
+      if (auditGeneration.current === generation) setAuditBusy(null);
     }
     if (!live()) return;
     setAudit({ head, shape, years, error: auditError });
@@ -4782,7 +5223,7 @@ export default function App() {
         // has since narrowed.
         right: window.innerWidth >= 1024 ? Math.round(window.innerWidth * 0.34) + 36 : 36,
         bottom: 54,
-        left: 36,
+        left: window.innerWidth >= 1024 ? 334 : 36,
       },
       maxZoom: 11.8,
       duration: 500,
@@ -4801,17 +5242,48 @@ export default function App() {
         </div>
       </header>
 
-      {isNepal && at && (
+      <div className="map-credit">
+        <span>Built by <a href="https://www.linkedin.com/in/bijay-karki-/" target="_blank" rel="noopener noreferrer">Bijay Karki</a></span>
+        <a href="mailto:bijay.karki.work@gmail.com" title="bijay.karki.work@gmail.com">mail</a>
+      </div>
+
+      <MapExplorer map={mapReady ? map.current : null} at={at} projects={doedProjects}
+        gaugesOn={layersOn.gauges} lakesOn={layersOn.lakes} labelsOn={layersOn.labels}
+        onStudy={(lat, lon) => { void onClick(lat, lon); }} onLocate={onLocate}>
         <MapLegend
           onFit={focusEvidence}
+          hasStudy={!!at}
+          onReset={() => setLayersOn({ ...DEFAULT_LAYERS })}
+          topoCount={topoCount} topoOn={topoOn} onTopo={() => setTopoOn((on) => !on)}
           layers={layersOn}
           onToggle={(key) => setLayersOn((s) => ({ ...s, [key]: !s[key] }))}
           basemap={basemap}
           onBasemap={setBasemap}
         />
-      )}
+      </MapExplorer>
 
-      <Reading
+      {at && <Reading
+        methodComparison={isNepal && input && scheme && study ? <HydrologyComparison input={input} scheme={scheme} reach={intakeReach} networkMeanCms={study.path[scheme.i]?.meanCms ?? 0} flowChoice={flowChoice} measured={!!measured} head={audit?.head ?? null} auditBusy={auditBusy} auditCompleted={!!audit} auditError={audit?.error ?? null} auditYears={audit?.years ?? null} onAudit={onAudit} terrainSource={study.dem.source} /> : null}
+        mapAlignment={study && <div className="border-b border-line px-4 py-3 text-[11px] leading-relaxed text-muted" aria-label="River alignment">
+          <label className="mb-2 flex items-center justify-between gap-2 text-ink">Maximum layout length
+            <select aria-label="Maximum layout length" className="rounded border border-line bg-bg px-2 py-1" value={maxWaterwayKm} onChange={(e) => { setTweaked(false); setMaxWaterwayKm(Number(e.target.value)); }}>
+              <option value={5}>5 km · compact</option><option value={6}>6 km · default</option><option value={10}>10 km · extended</option>
+            </select>
+          </label>
+          <p className="mb-2">Distance along the river between intake and powerhouse. Actual tunnel routing may be shorter. {wideSearch ? 'Corridor search may move the intake.' : 'Intake held at the selected model river position.'}</p>
+          {!scheme && !busy && <p className="mb-2 text-amber">No viable layout found within {maxWaterwayKm} km. Try a different intake or a longer limit.</p>}
+          <strong className="text-ink">{riverDisplay ? 'River alignment · OpenStreetMap trace' : 'River alignment · model geometry'}</strong>
+          {riverDisplay && scheme ? <>
+            <p className="mt-1">Intake display offset: <b className="text-river">{Math.round(riverDisplay.points[scheme.i].offsetM)} m</b> from the calculation point. Powerhouse: {Math.round(riverDisplay.points[scheme.j].offsetM)} m.</p>
+            <p className="mt-1">Solid lines follow a matched channel; dashed connectors are approximate. {Math.round(100 * riverDisplay.points.filter((p) => p.traced).length / riverDisplay.points.length)}% of sample positions matched.</p>
+            <label className="mt-2 flex items-center gap-2"><input type="checkbox" checked={showModelGeometry} onChange={(e) => setShowModelGeometry(e.target.checked)} />Show model reference geometry</label>
+            <details className="mt-2"><summary className="cursor-pointer text-river">Coordinates and source limits</summary>
+              <p>Displayed intake: {riverDisplay.points[scheme.i].lat.toFixed(6)}, {riverDisplay.points[scheme.i].lon.toFixed(6)}<br/>Calculation point: {scheme.intake.lat.toFixed(6)}, {scheme.intake.lon.toFixed(6)}</p>
+              <p className="mt-1">This is a map alignment correction, not a surveyed relocation. Head, flow, pondage, engineering exports and report figures retain their model coordinates. Confirm positions before engineering use.</p>
+              <a className="text-river" href="https://www.hydrosheds.org/products/hydrorivers" target="_blank" rel="noopener noreferrer">HydroRIVERS model source ↗</a><span> · </span><a className="text-river" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OSM channel trace · ODbL ↗</a>
+            </details>
+          </> : <p className="mt-1">{study.tracedFromTerrain ? 'The course was inferred from terrain.' : displayResult?.path === study.path ? 'A channel trace is unavailable; the displayed positions are approximate model coordinates.' : 'Checking the available channel trace…'}</p>}
+        </div>}
         at={at}
         region={region}
         borderKm={borderKm}
@@ -4902,7 +5374,7 @@ export default function App() {
         onProbe={runProbe}
         onReset={reset}
         tweaked={tweaked}
-      />
+      />}
     </div>
   );
 }
@@ -4931,6 +5403,11 @@ function MapLegend({
   onToggle,
   basemap,
   onBasemap,
+  hasStudy,
+  onReset,
+  topoCount,
+  topoOn,
+  onTopo,
 }: {
   onFit: () => void;
   layers: LayerToggles;
@@ -4939,6 +5416,11 @@ function MapLegend({
   onToggle: (key: keyof LayerToggles) => void;
   basemap: BasemapId;
   onBasemap: (id: BasemapId) => void;
+  hasStudy: boolean;
+  onReset: () => void;
+  topoCount: number;
+  topoOn: boolean;
+  onTopo: () => void;
 }) {
   const badge = (label: string, color: string, shape = 'rounded-sm') => (
     <span
@@ -4953,16 +5435,19 @@ function MapLegend({
   // can turn off, in the same place you learned what it means.
   const row = (key: Exclude<keyof LayerToggles, 'labels'>, icons: ReactNode, text: string) => {
     const on = layers[key];
+    const needsStudy = (key === 'site' || key === 'access' || key === 'geo') && !hasStudy;
     return (
       <button
         type="button"
         onClick={() => onToggle(key)}
         title={on ? `hide ${text}` : `show ${text}`}
+        aria-label={text}
         aria-pressed={on}
-        className={`flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left transition-opacity hover:bg-white/[0.06] ${on ? '' : 'opacity-35'}`}
+        disabled={needsStudy}
+        className={`layer-toggle flex w-full items-center gap-2 rounded-md px-1.5 py-2 text-left hover:bg-white/[0.06] ${on ? 'text-ink' : 'text-muted'}`}
       >
         {icons}
-        <span className="min-w-0 flex-1 truncate">{text}</span>
+        <span className="min-w-0 flex-1">{text}{needsStudy && <small className="block text-faint">Select a river first</small>}</span>
         {/* A real switch, so nobody has to guess these rows are clickable. */}
         <span
           className={`relative h-3.5 w-6 shrink-0 rounded-full transition-colors ${on ? 'bg-river/40' : 'bg-line'}`}
@@ -4976,28 +5461,27 @@ function MapLegend({
     );
   };
   return (
-    <div className="absolute left-3 top-14 z-10 hidden w-[232px] rounded-xl border border-line bg-bg/88 p-2.5 shadow-[0_14px_40px_rgba(0,0,0,0.45)] backdrop-blur-md lg:block">
+    <details className="explorer-section map-layer-controls" open>
+      <summary>Map layers <span>{Object.values(layers).filter(Boolean).length} enabled</span></summary>
       <div className="mb-1.5 flex items-center justify-between gap-2 px-1.5">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">map layers</span>
+        <button type="button" onClick={onReset} className="text-[11px] text-muted">Reset layers</button>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => onToggle('labels')}
             aria-pressed={layers.labels}
-            title="show or hide all map labels"
+            title="show or hide overlay labels; basemap place names remain"
             className={`rounded-full border px-2 py-px text-[9.5px] leading-4 transition-colors ${
               layers.labels ? 'border-river/50 bg-river/10 text-river' : 'border-line text-faint'
             }`}
           >
-            labels
+            overlay labels
           </button>
-          <button type="button" onClick={onFit} className="text-[10.5px] text-river hover:text-ink">
-            fit
-          </button>
+          {hasStudy && <button type="button" onClick={onFit} className="text-[10.5px] text-river hover:text-ink">Fit study</button>}
         </div>
       </div>
       {/* Mutually exclusive, so a segmented row rather than the switches below. */}
-      <div className="mb-2 flex gap-px overflow-hidden rounded-md border border-line">
+      <div className="basemap-options" aria-label="Basemap">
         {BASEMAPS.map((b) => (
           <button
             key={b.id}
@@ -5014,14 +5498,15 @@ function MapLegend({
         ))}
       </div>
       <div className="flex flex-col text-[10.5px] text-muted">
+        {row('gauges', badge('Q', '#63b981', 'rounded-full'), 'DHM river gauges')}
         {row(
           'site',
           <>
             <i className="size-4 shrink-0 rounded-sm border border-[#38bde8] bg-[#38bde8]/35" />
-            <i className="w-4 shrink-0 border-t-2 border-dashed border-[#65c87a]" />
           </>,
-          'pondage · motor-road gaps'
+          'Pondage footprint'
         )}
+        {row('access', <i className="w-4 shrink-0 border-t-2 border-dashed border-[#65c87a]" />, 'Road-access gaps')}
         {row(
           'hazards',
           <>
@@ -5070,9 +5555,10 @@ function MapLegend({
           'faults · geology sheets'
         )}
       </div>
+      {topoCount > 0 && <button className="survey-toggle" aria-pressed={topoOn} onClick={onTopo}>Survey topo sheets · {topoOn ? 'On' : 'Off'}<small>{topoCount} locally installed sheets</small></button>}
       <div className="mt-1.5 border-t border-line px-1.5 pt-1.5 text-[9.5px] leading-snug text-faint">
-        Click a row to show or hide it. Symbols open their official source; labels arrive as you zoom.
+        Layers stay available while browsing. Overlay labels appear as you zoom; basemap place names are separate.
       </div>
-    </div>
+    </details>
   );
 }

@@ -103,6 +103,13 @@ type RiverNet = {
   annualMm: Uint16Array | null;
   /** Per-vertex position pulled onto the OSM-traced channel; 0 where untraced. */
   snapped: Int32Array | null;
+  /**
+   * The traced COURSE per reach, variable length — OSM's own vertices between
+   * the snapped ones. `len[i] === 0` where no traced course was built, which is
+   * why this needs its own offset table instead of being parallel to `xy`.
+   * Drawing only, like `snapped`.
+   */
+  channel: { len: Int32Array; start: Int32Array; xy: Int32Array } | null;
   upaLo: number;
   upaHi: number;
 };
@@ -304,7 +311,41 @@ function load(): Promise<RiverNet> {
       // Enhancement only.
     }
 
-    return { count, scale, upland, dis, ord, start, len, xy, grid, byFirst, hypso, hypsoStride, upa, upaLo, upaHi, elev, annualMm, snapped };
+    /**
+     * The traced COURSE, not just traced corners. Built by
+     * pipeline/build-channel-geometry.mjs; drawing only, same as `snapped`.
+     *
+     * `snapped` moves each vertex onto the channel and leaves the ~500 m chord
+     * between them straight, so a drawn meander still cuts across the valley.
+     * This carries OSM's own intermediate vertices per reach — a variable-length
+     * polyline, hence its own offset table rather than a parallel array.
+     */
+    let channel: { len: Int32Array; start: Int32Array; xy: Int32Array } | null = null;
+    try {
+      const cr = await fetch(`${baseUrl}nepal-channel.dat`);
+      if (cr.ok) {
+        const ab = await cr.arrayBuffer();
+        const dv = new DataView(ab);
+        if (dv.getUint32(0, true) === 0x4e434831 && dv.getUint32(4, true) === count) {
+          const total = dv.getUint32(8, true);
+          const clen = new Int32Array(count);
+          const cstart = new Int32Array(count);
+          let acc = 0;
+          for (let i = 0; i < count; i++) {
+            clen[i] = dv.getUint32(16 + i * 4, true);
+            cstart[i] = acc;
+            acc += clen[i];
+          }
+          if (acc === total) {
+            channel = { len: clen, start: cstart, xy: new Int32Array(ab, 16 + count * 4, total * 2) };
+          }
+        }
+      }
+    } catch {
+      // Enhancement only.
+    }
+
+    return { count, scale, upland, dis, ord, start, len, xy, grid, byFirst, hypso, hypsoStride, upa, upaLo, upaHi, elev, annualMm, snapped, channel };
   })().catch((e) => {
     net = null; // allow a retry
     throw e;
@@ -341,6 +382,7 @@ type ReachCandidate = {
   distanceKm: number;
   point: { lat: number; lon: number };
   vertex: number;
+  segmentStart: number;
 };
 
 /** Candidate reaches and their closest stored vertex around one WGS84 point. */
@@ -369,6 +411,7 @@ function reachCandidates(n: RiverNet, lat: number, lon: number): Map<number, Rea
     let d2 = Infinity;
     let point = { lat, lon };
     let vertex = 0;
+    let segmentStart = 0;
     const count = n.len[i];
     for (let k = 0; k < count; k++) {
       const vLon = n.xy[(a + k) * 2] / s;
@@ -381,6 +424,7 @@ function reachCandidates(n: RiverNet, lat: number, lon: number): Map<number, Rea
         d2 = vd;
         point = { lat: vLat, lon: vLon };
         vertex = k;
+        segmentStart = k;
       }
       if (k + 1 >= count) continue;
 
@@ -403,9 +447,10 @@ function reachCandidates(n: RiverNet, lat: number, lon: number): Map<number, Rea
         // The endpoint the projection sits nearer to: the downstream walk is
         // indexed by stored vertex, so it must be one of the two real ones.
         vertex = t < 0.5 ? k : k + 1;
+        segmentStart = k;
       }
     }
-    seen.set(i, { distanceKm: Math.sqrt(d2) * degToKm, point, vertex });
+    seen.set(i, { distanceKm: Math.sqrt(d2) * degToKm, point, vertex, segmentStart });
   };
 
   for (let ring = 0; ring <= 6; ring++) {
@@ -859,6 +904,23 @@ export type PathPoint = {
   /** Directed HydroRIVERS reach and stored vertex used by topology screens. */
   networkIndex: number;
   networkVertex: number;
+  /**
+   * Where this point is DRAWN, which is not where it is computed.
+   *
+   * `lat`/`lon` are the modelled HydroRIVERS position and every elevation,
+   * catchment and flow figure is read there — deliberately, because moving the
+   * engine onto the traced course was measured against the built plants and
+   * lost on capacity. But the map draws the traced course, and a marker placed
+   * at the modelled position then floats off the blue line by the 77 m median
+   * (493 m worst) the two geometries differ by, so dropping the intake on the
+   * river appears to be refused.
+   *
+   * This is the same point's position on the line the user can see. Markers and
+   * dragging use it; nothing numeric does. Equal to lat/lon where OSM never
+   * traced the channel.
+   */
+  drawnLat: number;
+  drawnLon: number;
 };
 
 const haversineKmLocal = (a: [number, number], b: [number, number]) => {
@@ -1103,7 +1165,8 @@ export async function downstreamPath(
   lat: number,
   lon: number,
   maxKm = 25,
-  spacingKm = 0.12
+  spacingKm = 0.12,
+  options: { continuousStart?: boolean } = {}
 ): Promise<PathPoint[] | null> {
   if (!hasReachData(lat, lon)) return null;
   const n = await load();
@@ -1114,6 +1177,9 @@ export async function downstreamPath(
   const s = n.scale;
   const bestI = hit.nearest.networkIndex;
   const bestK = hit.nearest.networkVertex;
+  const start = options.continuousStart
+    ? reachCandidates(n, lat, lon).get(bestI)
+    : null;
 
   // Collect raw vertices downstream, starting mid-reach where the user clicked.
   const raw: {
@@ -1123,10 +1189,12 @@ export async function downstreamPath(
     meanCms: number;
     networkIndex: number;
     networkVertex: number;
+    drawnLat: number;
+    drawnLon: number;
   }[] = [];
   const visited = new Set<number>();
   let cur = bestI;
-  let from = bestK;
+  let from = start?.segmentStart ?? bestK;
   let km = 0;
   while (km < maxKm) {
     visited.add(cur);
@@ -1149,7 +1217,29 @@ export async function downstreamPath(
         meanCms: n.dis[cur] / 1000,
         networkIndex: cur,
         networkVertex: k,
+        // The traced position of this same vertex, where one exists. The
+        // densified course in nepal-channel.dat passes exactly through these,
+        // so a marker placed here sits ON the drawn line rather than beside it.
+        drawnLat: (() => {
+          const sy = n.snapped ? n.snapped[(n.start[cur] + k) * 2] : 0;
+          return sy !== 0 ? sy / 1e6 : n.xy[(n.start[cur] + k) * 2 + 1] / s;
+        })(),
+        drawnLon: (() => {
+          const sy = n.snapped ? n.snapped[(n.start[cur] + k) * 2] : 0;
+          const sx = n.snapped ? n.snapped[(n.start[cur] + k) * 2 + 1] : 0;
+          return sy !== 0 && sx !== 0 ? sx / 1e6 : n.xy[(n.start[cur] + k) * 2] / s;
+        })(),
       };
+      // The first sample is the projection onto the selected segment, not its
+      // nearest endpoint. Keep the same reach/area decision as nearestReach.
+      if (raw.length === 0 && start) {
+        p.lat = start.point.lat;
+        p.lon = start.point.lon;
+        p.drawnLat = p.lat;
+        p.drawnLon = p.lon;
+        p.uplandKm2 = hit.nearest.uplandKm2;
+        p.networkVertex = bestK;
+      }
       if (raw.length > 0) {
         const prev = raw[raw.length - 1];
         const seg = haversineKmLocal([prev.lat, prev.lon], [p.lat, p.lon]);
@@ -1206,6 +1296,11 @@ export async function downstreamPath(
         meanCms: raw[i].meanCms,
         networkIndex: raw[i].networkIndex,
         networkVertex: raw[i].networkVertex,
+        // Interpolated on the same fraction, so a resampled point sits on the
+        // drawn line between its two neighbours just as it does on the
+        // modelled one.
+        drawnLat: raw[i - 1].drawnLat + f * (raw[i].drawnLat - raw[i - 1].drawnLat),
+        drawnLon: raw[i - 1].drawnLon + f * (raw[i].drawnLon - raw[i - 1].drawnLon),
       });
       t += spacingKm;
     }
@@ -1239,21 +1334,69 @@ export async function downstreamPath(
  * A vertex OSM never traced keeps its modelled position, so the line degrades
  * to what it always was rather than to a guess.
  */
+/**
+ * Both positions of one vertex: where the model put it, and where OSM traced it.
+ *
+ * `riversGeoJson` above already chooses between these two for DRAWING, and the
+ * engine deliberately samples the modelled one. That difference has never been
+ * priced — the head figure in CLAUDE.md comes from three DEMs compared at
+ * IDENTICAL coordinates, which is structurally blind to both of them being
+ * sampled off the channel. This exists so a probe can put a number on it
+ * without reimplementing the vertex indexing and measuring its own copy.
+ *
+ * Returns `snapped: null` where OSM never traced that vertex, which is the
+ * honest answer and not a fallback to the modelled position.
+ */
+export async function vertexPositions(
+  networkIndex: number,
+  networkVertex: number
+): Promise<{ raw: { lat: number; lon: number }; snapped: { lat: number; lon: number } | null } | null> {
+  const n = await load();
+  if (!Number.isInteger(networkIndex) || networkIndex < 0 || networkIndex >= n.count) return null;
+  if (!Number.isInteger(networkVertex) || networkVertex < 0 || networkVertex >= n.len[networkIndex]) {
+    return null;
+  }
+  const v = n.start[networkIndex] + networkVertex;
+  // xy is (lon, lat) at `scale`; the snapped store is (lat, lon) at 1e6. The
+  // two orderings are the source's, not a choice made here.
+  const raw = { lat: n.xy[v * 2 + 1] / n.scale, lon: n.xy[v * 2] / n.scale };
+  const sy = n.snapped ? n.snapped[v * 2] : 0;
+  const sx = n.snapped ? n.snapped[v * 2 + 1] : 0;
+  const snapped = sy !== 0 && sx !== 0 ? { lat: sy / 1e6, lon: sx / 1e6 } : null;
+  return { raw, snapped };
+}
+
 export async function riversGeoJson(): Promise<GeoJSON.FeatureCollection> {
   const n = await load();
   const features: GeoJSON.Feature[] = [];
   for (let i = 0; i < n.count; i++) {
     if (n.ord[i] < 2) continue;
-    const a = n.start[i];
-    const coordinates: [number, number][] = new Array(n.len[i]);
-    for (let k = 0; k < n.len[i]; k++) {
-      const v = a + k;
-      const sy = n.snapped ? n.snapped[v * 2] : 0;
-      const sx = n.snapped ? n.snapped[v * 2 + 1] : 0;
-      coordinates[k] =
-        sy !== 0 && sx !== 0
-          ? [sx / 1e6, sy / 1e6]
-          : [n.xy[v * 2] / n.scale, n.xy[v * 2 + 1] / n.scale];
+    let coordinates: [number, number][];
+    /**
+     * Prefer the traced COURSE where it was built. Falling back per reach
+     * rather than globally means a river OSM has not traced degrades to the
+     * snapped corners, and one it has not touched at all degrades to the
+     * modelled line — each reach drawn as well as its own evidence allows.
+     */
+    const cn = n.channel;
+    if (cn && cn.len[i] > 0) {
+      const c0 = cn.start[i];
+      coordinates = new Array(cn.len[i]);
+      for (let k = 0; k < cn.len[i]; k++) {
+        coordinates[k] = [cn.xy[(c0 + k) * 2 + 1] / 1e6, cn.xy[(c0 + k) * 2] / 1e6];
+      }
+    } else {
+      const a = n.start[i];
+      coordinates = new Array(n.len[i]);
+      for (let k = 0; k < n.len[i]; k++) {
+        const v = a + k;
+        const sy = n.snapped ? n.snapped[v * 2] : 0;
+        const sx = n.snapped ? n.snapped[v * 2 + 1] : 0;
+        coordinates[k] =
+          sy !== 0 && sx !== 0
+            ? [sx / 1e6, sy / 1e6]
+            : [n.xy[v * 2] / n.scale, n.xy[v * 2 + 1] / n.scale];
+      }
     }
     features.push({
       type: 'Feature',

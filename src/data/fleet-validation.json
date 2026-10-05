@@ -1,7 +1,7 @@
 {
  "_what": "HydroRecon run at commissioned DoED-licensed plants from one coordinate each, letting the engine choose its own scheme. Capacity only — DoED publishes no head or design flow.",
  "_caveat": "A licensed capacity is an economic choice, not a property of the river. Individual rows are weak evidence; the distribution is the measurement.",
- "_generated": "2026-08-24",
+ "_generated": "2026-08-25",
  "_headline": "The ratio below is NOT an accuracy score. HydroRecon is asked for the largest scheme in its search window and the largest always sits at the window edge, so the ratio partly measures the window. The measurement is impliedWaterwayKm: the shortest waterway at which the engine reaches the capacity that was actually built. Nepali run-of-river headraces run about 1-10 km; a median inside that range means the built plant lies on the engine's own curve at a buildable length.",
  "_summary": {
   "impliedWaterwayMedianKm": 3.215386134701035,
@@ -34,7 +34,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Mardi Khola",
     "ok": true,
@@ -804,7 +804,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Bhim Khola Small HEP",
     "ok": true,
@@ -1558,7 +1558,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Piluwa Khola",
     "ok": true,
@@ -2308,7 +2308,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Sabha Khola",
     "ok": true,
@@ -3062,7 +3062,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Tadi",
     "ok": true,
@@ -3847,7 +3847,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Phawa HPP",
     "ok": true,
@@ -4629,7 +4629,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Siuri Khola",
     "ok": true,
@@ -5415,7 +5415,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Suri Khola HPP",
     "ok": true,
@@ -6192,7 +6192,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Singati Khola hydropower project",
     "ok": true,
@@ -6962,7 +6962,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Chameliya Khola",
     "ok": true,
@@ -7672,7 +7672,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Dordi Khola",
     "ok": true,
@@ -8418,7 +8418,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Lower Modi Khola",
     "ok": true,
@@ -9163,7 +9163,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Madhya Marsyangdi",
     "ok": true,
@@ -9885,7 +9885,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Tamakoshi HPP",
     "ok": true,
@@ -10630,7 +10630,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Trishuli 3A",
     "ok": true,
@@ -11412,7 +11412,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Khudi Khola",
     "ok": true,
@@ -12158,7 +12158,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Dwari Khola SHP",
     "ok": true,
@@ -12939,7 +12939,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Puwa",
     "ok": true,
@@ -13684,7 +13684,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Sunigad HEP",
     "ok": true,
@@ -14446,7 +14446,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Mid Solu Khola HEP",
     "ok": true,
@@ -15232,7 +15232,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Super Hewa HPP",
     "ok": true,
@@ -16014,7 +16014,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Namarjun Madi",
     "ok": true,
@@ -16759,7 +16759,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Super Madi",
     "ok": true,
@@ -17513,7 +17513,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Kabeli-3 Cascade HEP",
     "ok": true,
@@ -18290,7 +18290,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Super Dordi Kha Hydropower Project",
     "ok": true,
@@ -19079,7 +19079,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Kabeli B - 1",
     "ok": true,
@@ -19821,7 +19821,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Marsyangdi",
     "ok": true,
@@ -20574,7 +20574,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Sanjen Khola",
     "ok": true,
@@ -21360,7 +21360,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Nilgiri Khola-II cascade Project",
     "ok": false,
@@ -21382,7 +21382,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Madhya Bhotekoshi",
     "ok": true,
@@ -22156,7 +22156,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Theule Khola HPP",
     "ok": true,
@@ -22837,7 +22837,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Tungun - Thosne Khola",
     "ok": true,
@@ -23611,7 +23611,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Kapadigad",
     "ok": true,
@@ -24393,7 +24393,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Phewa",
     "ok": true,
@@ -25159,7 +25159,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Daram Khola-A",
     "ok": true,
@@ -25873,7 +25873,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Rele Khola",
     "ok": false,
@@ -25895,7 +25895,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Hewa Khola A",
     "ok": true,
@@ -26665,7 +26665,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Ghalemdi Khola",
     "ok": false,
@@ -26687,7 +26687,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Sun Koshi",
     "ok": true,
@@ -27321,7 +27321,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Sipring Khola",
     "ok": true,
@@ -28099,7 +28099,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Mathillo Thulo Khola A HEP",
     "ok": false,
@@ -28121,7 +28121,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Chaku A",
     "ok": true,
@@ -28907,7 +28907,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Seti Khola HPP",
     "ok": true,
@@ -29684,7 +29684,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Likhu -1",
     "ok": true,
@@ -30434,7 +30434,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Rasuwagadhi",
     "ok": true,
@@ -31192,7 +31192,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Mewa Khola Hydropower project",
     "ok": true,
@@ -31961,7 +31961,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Solu Hydropower Project",
     "ok": true,
@@ -32715,7 +32715,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Lower Hewa",
     "ok": true,
@@ -33429,7 +33429,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Kali Gandaki A",
     "ok": true,
@@ -33727,7 +33727,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Solu Khola (Dudha Koshi)",
     "ok": true,
@@ -34456,7 +34456,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Middle Tamor",
     "ok": true,
@@ -35218,7 +35218,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Likhu-4",
     "ok": true,
@@ -35992,7 +35992,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Karuwa Seti HEP",
     "ok": true,
@@ -36750,7 +36750,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Kalangad",
     "ok": true,
@@ -37532,7 +37532,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Khimti -I",
     "ok": true,
@@ -38310,7 +38310,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Lower Solu Hydropower Project",
     "ok": true,
@@ -39084,7 +39084,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Chirkhuwa Khola",
     "ok": true,
@@ -39845,7 +39845,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Piluwa 3 HPP",
     "ok": true,
@@ -40611,7 +40611,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Sardi Khola",
     "ok": true,
@@ -41373,7 +41373,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Mai Khola",
     "ok": true,
@@ -42107,7 +42107,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Super Chepe HEP",
     "ok": true,
@@ -42845,7 +42845,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Mardi Hydropower Project",
     "ok": true,
@@ -43611,7 +43611,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Molun Khola SHP",
     "ok": true,
@@ -44349,7 +44349,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Madkyu Khola",
     "ok": true,
@@ -45099,7 +45099,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Buku Khola",
     "ok": true,
@@ -45864,7 +45864,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Chilime",
     "ok": true,
@@ -46649,7 +46649,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Rahughat Mangale",
     "ok": true,
@@ -47423,7 +47423,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Bagmati Nadi",
     "ok": true,
@@ -48153,7 +48153,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Lower Tadi",
     "ok": true,
@@ -48939,7 +48939,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Chhandi Khola",
     "ok": true,
@@ -49716,7 +49716,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Padam Khola SHP",
     "ok": true,
@@ -50502,7 +50502,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Lohore SHP",
     "ok": true,
@@ -51264,7 +51264,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Khimti II",
     "ok": true,
@@ -52042,7 +52042,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Kabeli B1 Cascade HPP",
     "ok": true,
@@ -52656,7 +52656,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Jhimruk Khola",
     "ok": true,
@@ -53314,7 +53314,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Mailun Khola",
     "ok": true,
@@ -54100,7 +54100,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Nyadi Khola",
     "ok": true,
@@ -54866,7 +54866,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Radhi Small",
     "ok": true,
@@ -55632,7 +55632,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Rawa Khola",
     "ok": true,
@@ -56393,7 +56393,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Piluwa Khola-2 SHP",
     "ok": true,
@@ -57163,7 +57163,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Puwa-1",
     "ok": false,
@@ -57185,7 +57185,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Richet Khola SHP",
     "ok": true,
@@ -57966,7 +57966,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Mai Hydropower Project (Panchakanya Mai Hydropwer limi",
     "ok": false,
@@ -57988,7 +57988,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Maya Khola Hydropower Project",
     "ok": true,
@@ -58762,7 +58762,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Thulo Khola Hydropower Project",
     "ok": false,
@@ -58784,7 +58784,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Mristi Khola",
     "ok": true,
@@ -59514,7 +59514,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Trishuli",
     "ok": true,
@@ -60300,7 +60300,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Seti",
     "ok": true,
@@ -61022,7 +61022,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Baramchi Khola HPP",
     "ok": true,
@@ -61795,7 +61795,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Lower Irkhuwa Khola",
     "ok": true,
@@ -62481,7 +62481,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Chepe Khola HEP",
     "ok": true,
@@ -63231,7 +63231,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Sagu khola 1 HPP",
     "ok": true,
@@ -64009,7 +64009,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Sapsup Khola Small Hydro Electric Project",
     "ok": true,
@@ -64774,7 +64774,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Nilgiri Khola",
     "ok": false,
@@ -64796,7 +64796,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Chameliya HP",
     "ok": true,
@@ -65582,7 +65582,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Sagu Khola HEP",
     "ok": true,
@@ -66328,7 +66328,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Chaku Khola",
     "ok": true,
@@ -67073,7 +67073,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Machha Khola HEP",
     "ok": true,
@@ -67855,7 +67855,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Richet Khola SHP",
     "ok": true,
@@ -68637,7 +68637,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Jogmai Khola",
     "ok": true,
@@ -69391,7 +69391,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Midim Khola SHP",
     "ok": true,
@@ -70169,7 +70169,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Solu Khola HPP",
     "ok": true,
@@ -70931,7 +70931,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Hugdi",
     "ok": false,
@@ -70953,7 +70953,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Lower Jogmai Khola HPP",
     "ok": true,
@@ -71710,7 +71710,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Sanjen",
     "ok": true,
@@ -72475,7 +72475,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Balephi A",
     "ok": true,
@@ -73241,7 +73241,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Hewa khola",
     "ok": true,
@@ -74011,7 +74011,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Chake Khola",
     "ok": true,
@@ -74792,7 +74792,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Gandak",
     "ok": false,
@@ -74814,7 +74814,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Khorunga HPP",
     "ok": true,
@@ -75556,7 +75556,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Dordi A HEP",
     "ok": true,
@@ -76342,7 +76342,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Ingwa Khola",
     "ok": true,
@@ -77123,7 +77123,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Likhu -2",
     "ok": true,
@@ -77893,7 +77893,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Super Mai-A HPP",
     "ok": false,
@@ -77915,7 +77915,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Khimti",
     "ok": true,
@@ -78704,7 +78704,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Down Piluwa",
     "ok": true,
@@ -79482,7 +79482,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Lower Modi -1",
     "ok": true,
@@ -80128,7 +80128,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Marsyangdi A",
     "ok": true,
@@ -80889,7 +80889,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Lower Likhu",
     "ok": true,
@@ -81666,7 +81666,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Super Kabeli Khola A HEP",
     "ok": true,
@@ -82436,7 +82436,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Daram Khola HEP",
     "ok": true,
@@ -83146,7 +83146,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Hewa HPP",
     "ok": true,
@@ -83920,7 +83920,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Chepe Khola Small HEP",
     "ok": true,
@@ -84677,7 +84677,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Dordi-1",
     "ok": true,
@@ -85463,7 +85463,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Rahughat",
     "ok": true,
@@ -86213,7 +86213,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Phawa khola Hydropower Project",
     "ok": true,
@@ -86999,7 +86999,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Kalanga",
     "ok": true,
@@ -87760,7 +87760,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Madme Khola HPP",
     "ok": true,
@@ -88510,7 +88510,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Bhotekoshi",
     "ok": true,
@@ -89260,7 +89260,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Hidi Khola HEP",
     "ok": true,
@@ -90046,7 +90046,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Middle Modi",
     "ok": true,
@@ -90800,7 +90800,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Makari gad",
     "ok": true,
@@ -91586,7 +91586,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Sanjen",
     "ok": true,
@@ -92355,7 +92355,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Charnawati Khola Hydroelectric Project",
     "ok": true,
@@ -93125,7 +93125,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Ridi Khola",
     "ok": true,
@@ -93599,7 +93599,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Chhyandi Small HPP",
     "ok": true,
@@ -94381,7 +94381,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Mai -C",
     "ok": false,
@@ -94403,7 +94403,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Pikhuwa Khola",
     "ok": true,
@@ -95140,7 +95140,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Mailung Khola",
     "ok": true,
@@ -95893,7 +95893,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Likhu Khola 'A'",
     "ok": true,
@@ -96635,7 +96635,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Mai Cascade",
     "ok": true,
@@ -96800,7 +96800,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Midim Khola",
     "ok": true,
@@ -97550,7 +97550,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Ankhu Khola - 1",
     "ok": true,
@@ -98272,7 +98272,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Mai",
     "ok": true,
@@ -98826,7 +98826,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Daraundi A",
     "ok": true,
@@ -99556,7 +99556,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Buku-Kapati Hydropower Project",
     "ok": true,
@@ -100330,7 +100330,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Super Kabeli Khola HEP",
     "ok": true,
@@ -101100,7 +101100,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Sanigad",
     "ok": true,
@@ -101882,7 +101882,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Rukum gad",
     "ok": true,
@@ -102656,7 +102656,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Puwa II hydropower Project",
     "ok": true,
@@ -103393,7 +103393,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Gaddi Gad",
     "ok": true,
@@ -104143,7 +104143,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Madi",
     "ok": true,
@@ -104893,7 +104893,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Super Mai Khola Cascade HPP",
     "ok": true,
@@ -105627,7 +105627,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Sunkoshi Small",
     "ok": true,
@@ -106413,7 +106413,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Puwa Khola-1",
     "ok": true,
@@ -107147,7 +107147,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Rudi A",
     "ok": true,
@@ -107873,7 +107873,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Rudi Khola-B Hydropower Project",
     "ok": true,
@@ -108631,7 +108631,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Modi Khola",
     "ok": true,
@@ -109401,7 +109401,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Nau Gad Khola",
     "ok": true,
@@ -110094,7 +110094,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Devighat",
     "ok": true,
@@ -110828,7 +110828,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Lankhuwa Khola",
     "ok": true,
@@ -111598,7 +111598,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Naugad Gad Hydropower Project",
     "ok": true,
@@ -112344,7 +112344,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Khani Khola",
     "ok": true,
@@ -113090,7 +113090,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Jhyadi Khola",
     "ok": true,
@@ -113824,7 +113824,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Tatopani",
     "ok": false,
@@ -113846,7 +113846,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Jiri Khola SHP",
     "ok": true,
@@ -114599,7 +114599,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Panauti",
     "ok": true,
@@ -115332,7 +115332,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Khorunga Khola",
     "ok": true,
@@ -116093,7 +116093,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Lower Chaku Khola",
     "ok": true,
@@ -116882,7 +116882,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Middle Chaku Khola",
     "ok": true,
@@ -117660,7 +117660,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Tinau",
     "ok": true,
@@ -118421,7 +118421,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Gelun Khola HPP",
     "ok": true,
@@ -119198,7 +119198,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Bhairab Kund Khola",
     "ok": true,
@@ -119968,7 +119968,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Bijaypur Khola-2 HPP",
     "ok": true,
@@ -120709,7 +120709,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Upper Syange Khola SHP",
     "ok": true,
@@ -121435,7 +121435,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Bijayapur-1",
     "ok": true,
@@ -122193,7 +122193,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Suri Khola",
     "ok": true,
@@ -122926,7 +122926,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Andhi Khola",
     "ok": true,
@@ -123572,7 +123572,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Yambaling Khola",
     "ok": true,
@@ -124318,7 +124318,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Thapa Khola",
     "ok": true,
@@ -125096,7 +125096,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Indrawati -III",
     "ok": true,
@@ -125846,7 +125846,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Ghatte Khola",
     "ok": true,
@@ -126627,7 +126627,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Jogmai Cascade",
     "ok": true,
@@ -127372,7 +127372,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Dudhkunda Khola HEP",
     "ok": true,
@@ -128158,7 +128158,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Tadi Khola (thaprek)",
     "ok": true,
@@ -128944,7 +128944,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Iwa Khola",
     "ok": true,
@@ -129729,7 +129729,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Super Mai Hydropower Project",
     "ok": true,
@@ -130459,7 +130459,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Taksar Pikhuwa",
     "ok": true,
@@ -131224,7 +131224,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Ghar Khola",
     "ok": true,
@@ -131994,7 +131994,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Siddhi Khola",
     "ok": true,
@@ -132740,7 +132740,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Mai Beni HPP",
     "ok": true,
@@ -133474,7 +133474,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Mai Cascade HPP",
     "ok": true,
@@ -134203,7 +134203,7 @@
     "headBasis": null,
     "energyGwh": 0
    },
-   "engine": "949cb685322e",
+   "engine": "acdb34241895",
    "result": {
     "name": "Lower Khare",
     "ok": true,
