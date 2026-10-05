@@ -42,9 +42,12 @@ sources/local/
 sources/dhm/
 src/data/dhm-records.json
 
-# MERIT Hydro tiles — licensed to one user under CC-BY-NC 4.0 via a registered
-# download, and the terms forbid redistributing the originals. The derived
-# per-vertex catchment areas travel; the GeoTIFFs do not.
+# MERIT Hydro tiles — obtained through a registered download. MERIT is
+# dual-licensed CC BY-NC 4.0 or ODbL 1.0 and this project elects ODbL, so
+# commercial use is fine; what keeps the originals out is the authors' request
+# that the data not be redistributed whole and in its original format without
+# written permission. The derived per-vertex catchment areas travel under ODbL;
+# the GeoTIFFs do not. See LICENSES.md, blocker 5.
 sources/merit-hydro/
 
 # GloFAS reanalysis subset for Nepal. Large, ECMWF's to distribute, and

@@ -24,9 +24,13 @@ OUTPUT: public/nepal-upa.dat — one uint16 per vertex, log-quantised, about 414
 for 207,022 vertices. Parallel to the vertex block in nepal-rivers.dat, same
 order, so the app indexes it with the vertex index it already has.
 
-SOURCE: MERIT Hydro v1.0.1 (Yamazaki et al. 2019), CC-BY-NC 4.0. The source
-GeoTIFFs are NOT redistributable and stay gitignored in sources/merit-hydro/;
-this derived per-vertex array is what travels.
+SOURCE: MERIT Hydro v1.0.1 (Yamazaki et al. 2019), dual-licensed CC BY-NC 4.0
+or ODbL 1.0 at the licensee's choice. This project ELECTS ODbL 1.0, so the
+output below ships as a Derived Database under ODbL -- see the MERIT HYDRO
+section of LICENSE. The source GeoTIFFs stay gitignored in
+sources/merit-hydro/; that is not a licence term under either arm but the
+authors' separate request that the tiles not be redistributed whole and in
+their original format. This derived per-vertex array is what travels.
 """
 import math
 import struct

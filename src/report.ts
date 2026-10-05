@@ -3029,7 +3029,7 @@ const { listed, growing, risky } = glofDangerSignals(u.lakes);
     const src: [string, string, string][] = [
       ['Daily discharge', 'GloFAS v4 (ECMWF / CEMS)', 'Open; ~5 km grid, daily, 2006–2025'],
       ['River network', 'HydroRIVERS', 'CC-BY 4.0; ~500 m derivation, chords real bends'],
-      ['Catchment area', 'MERIT Hydro', 'CC-BY-NC; 92 m, sampled per vertex'],
+      ['Catchment area', 'MERIT Hydro', 'ODbL 1.0 elected (dual with CC-BY-NC); 92 m, per vertex'],
       ['Channel geometry', 'OpenStreetMap', 'ODbL; length correction and drawn geometry'],
       ['Terrain', 'Copernicus GLO-30 (Mapterhorn)', '30 m; best of three on head'],
       ['Bare-earth terrain', 'GEDTM30', 'CC-BY 4.0; 30 m, the cross-check source'],
@@ -3047,7 +3047,7 @@ const { listed, growing, risky } = glofDangerSignals(u.lakes);
       ['Licensed projects', 'DoED register', 'Public register; ~1,048 located'],
       ['Geological mapping', 'DMG province sheets', 'Published 1:350,000, reproduced as issued'],
       ['Hazard records', 'BIPAD portal', 'Public; filed against settlements, not scars'],
-      ['Seismic hazard', 'GEM global model', 'Peak ground acceleration, 475-year return'],
+      ['Seismic hazard', 'GEM global model', 'CC BY-NC-SA 4.0; peak ground acceleration, 475-year return'],
       ['Tariff', 'NEA published base rates', 'Board decision 2074/01/14 (27 April 2017)'],
       /**
        * NAMED AS A CLASS, NOT AS A PROVIDER.
@@ -3094,10 +3094,10 @@ const { listed, growing, risky } = glofDangerSignals(u.lakes);
             'capacity and energy. A quality-controlled measured record should therefore be established ' +
             'before refining the energy case.'
         ) +
-        `<p class="eqnote"><b>MERIT Hydro is CC-BY-NC.</b> Only derived per-vertex catchment values are
-        used and the original raster is not redistributed, which keeps this report inside the licence —
-        but the non-commercial condition attaches to the catchment areas behind every flow figure here,
-        so it travels with any commercial use of this document. The DMG sheet is reproduced as
+        `<p class="eqnote"><b>MERIT Hydro is dual-licensed CC BY-NC 4.0 or ODbL 1.0, and this project
+        elects ODbL.</b> Only derived per-vertex catchment values are used, so commercial use of this
+        document is not restricted; the condition that travels with it is ODbL's, that derived data
+        based on MERIT Hydro be published under the same licence. The DMG sheet is reproduced as
         published, watermark included. The supplied GIS set is used under its provider's terms and is
         neither named nor shipped.</p>`
     );

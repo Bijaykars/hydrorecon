@@ -142,12 +142,14 @@ genuinely different is that NHDPlus reach geometry is far better than
 HydroRIVERS' ~500 m derivation, so the snap has more to work with — which is a
 reason to re-measure, not a reason to assume it is solved.
 
-**And this ends the CC-BY-NC problem.** CLAUDE.md has carried MERIT's
-non-commercial licence as an unpriced liability since the file was written, and
-`checks/merit-vs-reach-area.mjs` recently priced it as *nearly free but not
-provably free*. In the US the question does not arise: NHDPlus carries drainage
-area, it is public domain, and the whole "what would dropping MERIT cost"
-investigation has no US counterpart.
+**And the CC-BY-NC problem it was written to end turned out not to exist.**
+This paragraph claimed MERIT's non-commercial licence as an unpriced liability,
+following CLAUDE.md, which said so in four places. MERIT Hydro is dual-licensed
+CC BY-NC 4.0 **or** ODbL 1.0 at the licensee's choice; ODbL is elected in
+`LICENSE`, so commercial use was never blocked. What stands is the weaker point:
+NHDPlus carries drainage area and is public domain, so in the US no licence
+election is needed at all, and `checks/merit-vs-reach-area.mjs` — which priced
+dropping MERIT as *nearly free but not provably free* — has no US counterpart.
 
 ### Terrain — a 30× resolution jump
 

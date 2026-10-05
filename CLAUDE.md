@@ -385,10 +385,27 @@ fleet and the 69 gauges re-run behind it, and it is not written.
 
 `checks/merit-vs-reach-area.mjs`
 
-MERIT Hydro is the one **CC-BY-NC** licence in this stack, and this file has said
-from the day it was written that going commercial "would require contacting the
-developer or dropping it". Nobody had ever measured what dropping it costs, which
-left an unpriced decision sitting under every flow figure the app produces.
+**The premise was wrong, and the measurement survives it.** This file asserted
+in four places that MERIT Hydro is CC-BY-NC, "the only non-commercial licence in
+the stack", and that going commercial "would require contacting the developer or
+dropping it". MERIT Hydro is **dual-licensed: CC BY-NC 4.0 or ODbL 1.0,
+licensee's choice** — the vendor's own data policy at
+https://global-hydrodynamics.github.io/MERIT_Hydro/ says so in those words.
+Electing ODbL permits commercial use provided derived data is published under
+the same licence, which this public repository already does for five
+OpenStreetMap-derived files. The election costs one sentence and adds no class
+of obligation the repo does not already carry. LICENSES.md, blocker 5, holds the
+accurate wording.
+
+**A licence claim in a document is not a licence term on disk.** Same shape as
+the gitignore note that says a claim in a document is not a rule on disk, and it
+lasted longer, because nobody re-reads a licence they have already summarised
+once.
+
+So what follows is an **optional** finding, not a price list: it was run to cost
+a migration nothing forces. It is kept because the result is still true and
+still interesting — dropping MERIT is very nearly free on the gauges, which is a
+statement about how much the 92 m accumulation is actually buying.
 
 It is cheap to price, because the alternative is already in hand: `rivers.ts`
 carries both `uplandKm2` (MERIT's 92 m accumulation, per vertex) and
@@ -424,10 +441,13 @@ against one gauge in two — and the gauges sit on catchments **twelve times
 larger**. That is the recurring trap in its usual clothes, and it means the
 gauge A/B above cannot close this decision however comfortable it looks.
 
-**So: the licence is far less expensive than feared, and it is not yet free.**
-What would settle it is a fleet re-run against a MERIT-free build, which is an
-engine change that moves the signature and re-stales the whole accuracy table.
-That is a deliberate piece of work, not a side effect, and it is not done.
+**So: the licence costs nothing, and the swap is cheap, optional and still
+unsettled.** ODbL covers MERIT where it sits, so nothing about the licence has
+to move; what is left is a data-quality question alone, and the gauge A/B cannot
+close it. What would settle it is a fleet re-run against a MERIT-free build,
+which is an engine change that moves the signature and re-stales the whole
+accuracy table. That is a deliberate piece of work, nobody is obliged to do it,
+and it is not done.
 
 Two things this does establish. The flow would not obviously get worse, which is
 the part that decides whether the app still works at all. And MERIT's own
@@ -766,10 +786,12 @@ two point samples kilometres apart, where the same smoothing is just blur.
 FathomDEM v1-0 beats GEDTM30 by roughly 25% against GNSS benchmarks, and it was
 still the wrong choice here:
 
-- **CC-BY-NC-SA.** MERIT Hydro is already the one non-commercial licence in this
-  stack and this file already calls that a liability. A second one — plus a
-  ShareAlike clause the first does not carry — deepens exactly the trap rather
-  than paying it down. GEDTM30 is CC-BY-4.0 with no restriction at all.
+- **CC-BY-NC-SA.** The stack already carries one genuinely non-commercial
+  licence — GEM's seismic hazard raster, CC BY-NC-SA 4.0 — which LICENSES.md
+  names as a release blocker. A second deepens exactly that trap rather than
+  paying it down. GEDTM30 is CC-BY-4.0 with no restriction at all. *This bullet
+  used to cite MERIT as the stack's NC licence; MERIT is dual-licensed and ODbL
+  is elected, so the example changed and the conclusion did not.*
 - **The one published mountain result runs against its lineage.** FathomDEM
   succeeds FABDEM from the same group, and the GEDTM30 paper reports FABDEM
   overestimating terrain height with visible pit holes on steep slopes. Nepal is
@@ -916,7 +938,7 @@ shaft or a support change. The 1:350,000 province sheets are better and the
 |---|---|---|
 | Daily discharge | **GloFAS v4** from ECMWF (CEMS EWDS) | Nepal only, 2006–2025, local 219 MB store. Open-Meteo is the fallback. |
 | River network | HydroRIVERS | ~500 m derivation; chords real bends |
-| Catchment area | **MERIT Hydro** (CC-BY-**NC**) | per-vertex, 92 m. *The only non-commercial licence in the stack.* |
+| Catchment area | **MERIT Hydro** (dual: CC BY-NC 4.0 **or ODbL 1.0**; ODbL elected) | per-vertex, 92 m. Derived areas ship under ODbL, alongside the five OSM-derived files; the GeoTIFFs do not travel. |
 | Channel geometry | OpenStreetMap | length correction + drawn geometry |
 | Terrain | Copernicus GLO-30 (Mapterhorn) | primary; best of three on head |
 | Bare-earth terrain | **GEDTM30** (CC-BY-4.0) | local ~0.97 GB Nepal cut; the cross-check source, AWS where absent |
@@ -1185,8 +1207,8 @@ Mapterhorn applies.
 ## Harnesses
 
 `npm run check` — 361 unit assertions across 37 files, all fast and offline.
-`node --experimental-strip-types checks/merit-vs-reach-area.mjs` — prices the
-CC-BY-NC licence against the gauges and the fleet; offline, under a minute.
+`node --experimental-strip-types checks/merit-vs-reach-area.mjs` — prices
+dropping MERIT against the gauges and the fleet; offline, under a minute.
 `node --experimental-strip-types checks/glaciers-vs-waterbalance.mjs` — routes RGI
 ice to all 69 gauges; about a minute, offline.
 `npm run build:fleet 1000 1` — run the whole eligible register through the
@@ -1380,6 +1402,11 @@ failed on plants for this reason.
   `sources/glofas`. `sources/gedtm/`, `sources/geology/` and
   `sources/worldcover/` are gitignored for SIZE, not licence — every one of them
   rebuilds from a public source with one command.
-- **MERIT Hydro is CC-BY-NC.** Derived per-vertex data ships; originals do not.
-  Going commercial would require contacting the developer or dropping it.
+- **MERIT Hydro is dual-licensed: CC BY-NC 4.0 or ODbL 1.0, licensee's choice.**
+  ODbL is elected, so commercial use is permitted provided the derived data is
+  published under ODbL — which this repository does, citing Yamazaki et al.
+  2019. Derived per-vertex data ships; originals do not, because the authors ask
+  that the tiles not be redistributed whole and in their original format without
+  written permission. Four sections of this file used to say going commercial
+  "would require contacting the developer or dropping it". It does not.
 - Credentials live in `~/.cdsapirc`, never in the repo.

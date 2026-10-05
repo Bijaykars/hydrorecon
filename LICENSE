@@ -39,3 +39,27 @@ each source requires.
 If LICENSES.md is not yet present in your copy, treat every file under
 `public/` and `src/data/` as separately licensed and check the build script in
 `pipeline/` that produced it before redistributing or using it commercially.
+
+---
+
+MERIT HYDRO: THIS PROJECT ELECTS ODbL 1.0.
+
+MERIT Hydro v1.0.1 (Yamazaki et al. 2019) is dual-licensed by its authors — CC
+BY-NC 4.0 or ODbL 1.0, at the licensee's choice — per the vendor's data
+policy at https://global-hydrodynamics.github.io/MERIT_Hydro/. HydroRecon
+elects ODbL 1.0, and accepts what that election carries: derived data based on
+MERIT Hydro is published under ODbL 1.0.
+
+That applies to `public/nepal-upa.dat`, the one file in this repository built
+from MERIT Hydro — one log-quantised per-vertex catchment area, parallel to the
+river vertex block. It is offered as a Derived Database under ODbL 1.0.
+
+Cite: Yamazaki, D., Ikeshima, D., Sosa, J., Bates, P. D., Allen, G. H., &
+Pavelsky, T. M. (2019). MERIT Hydro: a high-resolution global hydrography map
+based on latest topography datasets. Water Resources Research, 55, 5053-5073.
+https://doi.org/10.1029/2019WR024873
+
+The original MERIT Hydro GeoTIFFs are NOT in this repository and will not be.
+That is not a licence term under either arm — the authors separately request
+that the data not be redistributed whole and in its original format without
+written permission, and that request is honoured.

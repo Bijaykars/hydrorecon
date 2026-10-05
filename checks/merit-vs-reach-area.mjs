@@ -3,11 +3,18 @@
  *
  *   node --experimental-strip-types --no-warnings checks/merit-vs-reach-area.mjs
  *
- * MERIT Hydro is the one CC-BY-NC licence in this stack. CLAUDE.md has said
- * since it was written that going commercial "would require contacting the
- * developer or dropping it", and in all that time nobody has measured what
- * dropping it would actually cost. That makes it an unpriced decision sitting
- * under every flow figure the app produces.
+ * THE PREMISE WAS WRONG AND THE MEASUREMENT SURVIVES IT. This header, and
+ * CLAUDE.md in four places, called MERIT Hydro the one CC-BY-NC licence in the
+ * stack and said going commercial "would require contacting the developer or
+ * dropping it". MERIT Hydro is dual-licensed CC BY-NC 4.0 **or** ODbL 1.0, at
+ * the licensee's choice, and this project elects ODbL -- see the MERIT HYDRO
+ * section of LICENSE and blocker 5 of LICENSES.md. So nothing forces a
+ * migration and this is not a price list.
+ *
+ * It is kept because the result is still true and still interesting: dropping
+ * MERIT is very nearly free on the gauges, which is a statement about how much
+ * the 92 m accumulation is actually buying under every flow figure the app
+ * produces.
  *
  * It is measurable, and cheaply, because the alternative is already in hand:
  * `rivers.ts` carries BOTH `uplandKm2` — MERIT's 92 m flow-accumulation area,

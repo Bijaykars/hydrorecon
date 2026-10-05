@@ -45,7 +45,7 @@ Columns are abbreviated: **R?** redistribute, **C?** commercial, **SA?** share-a
 | data file | upstream source | built by | licence | R? | C? | SA? | Att? |
 |---|---|---|---|---|---|---|---|
 | `nepal-rivers.dat` (1.4 MB) | HydroRIVERS v1.0 (HydroSHEDS, (c) WWF Inc. 2006-2013) | `build-hydrorivers.mjs` | HydroSHEDS License Agreement — see **CONFLICT, sec. 3** | Yes, as a "Licensee Derivative Product" | **Yes** per product page | No | **Yes**, verbatim ([vendor-mirrored](https://dataportal.ponderful.eu/dataset/wwf-hydrosheds)) |
-| `nepal-upa.dat` (404 KB) | MERIT Hydro v1.0.1 (Yamazaki et al. 2019) | `build_merit_upa.py` | **Dual: CC BY-NC 4.0 OR ODbL 1.0** ([vendor](https://global-hydrodynamics.github.io/MERIT_Hydro/)) | Yes under ODbL | **Only under ODbL** | **Yes under ODbL** | Yes, cite Yamazaki 2019 |
+| `nepal-upa.dat` (404 KB) | MERIT Hydro v1.0.1 (Yamazaki et al. 2019) | `build_merit_upa.py` | **Dual: CC BY-NC 4.0 OR ODbL 1.0** ([vendor](https://global-hydrodynamics.github.io/MERIT_Hydro/)); **ODbL elected, see blocker 5** | Yes under ODbL | **Only under ODbL** | **Yes under ODbL** | Yes, cite Yamazaki 2019 |
 | `nepal-osm-rivers.json` (13.6 MB) | OpenStreetMap, Geofabrik Nepal extract | `build-osm-rivers.mjs` | **ODbL 1.0** ([vendor](https://opendatacommons.org/licenses/odbl/)) | Yes | Yes | **Yes** | **Yes** |
 | `nepal-osm-snapped.dat` (1.6 MB) | OpenStreetMap | `snap-vertices-to-osm.mjs` | **ODbL 1.0** | Yes | Yes | **Yes** | Yes |
 | `nepal-elev.dat` (82 KB) | Re:Earth Terrain -> **Mapterhorn** -> Copernicus GLO-30 | `build-hypsometry.mjs` | Mapterhorn **CC BY 4.0**; GLO-30 "COPERNICUS full, free and open" ([vendor](https://download.mapterhorn.com/attribution.json), [vendor](https://terrain.reearth.land/)) | Yes | Yes | No | **Yes**, see sec. 4 |
@@ -256,6 +256,16 @@ obligation class. **It retires the "MERIT is the non-commercial liability" findi
 CLAUDE.md**, and makes the "what dropping MERIT would cost" decision optional rather than
 licence-forced. Worth recording there.
 
+**APPLIED 2026-10-05.** The election is now a term on disk, not an intention in a document:
+`LICENSE` carries a MERIT HYDRO section electing ODbL 1.0, naming the consequence accepted
+(derived data based on MERIT Hydro is published under ODbL 1.0), naming the file it applies
+to (`public/nepal-upa.dat`, the only MERIT-derived file in the repository), citing Yamazaki
+et al. 2019 and linking the vendor policy. CLAUDE.md's four CC-BY-NC assertions were
+corrected the same day, as were the two in `src/report.ts` that print into every generated
+desk study, plus the build and harness headers in `pipeline/build_merit_upa.py` and
+`checks/merit-vs-reach-area.mjs`. **Blocker 5 is closed.** The GeoTIFFs still do not ship —
+that is the authors' separate *request*, not a term of either licence arm.
+
 ### BLOCKER 6 — `fleet-validation.json` and `validation.json`: derived through the whole stack
 
 2.8 MB of engine output computed from MERIT catchment areas, HydroRIVERS geometry, GloFAS
@@ -359,7 +369,7 @@ For each: what was checked, and what it did not settle.
 sufficient on its own:
 
 1. Five files are ODbL 1.0 (share-alike, OSM-derived).
-2. `nepal-upa.dat` is MERIT — ODbL 1.0 once elected, otherwise non-commercial.
+2. `nepal-upa.dat` is MERIT — ODbL 1.0, elected in `LICENSE` (blocker 5); share-alike, not non-commercial.
 3. `nepal-faults.json` is CC BY-SA 4.0 (share-alike).
 4. `nepal-pga.json` is CC BY-NC-SA 4.0 (**non-commercial** and share-alike).
 5. ~~`dhm-records.json` has no licence at all and derives from a privately supplied source the
@@ -403,7 +413,7 @@ is actually being published to npm; it is orthogonal to the repo licence.
 
 | step | cost | effect |
 |---|---|---|
-| Elect **ODbL 1.0** for MERIT in writing; label `nepal-upa.dat` | one paragraph | Retires the repo's biggest believed liability |
+| ~~Elect **ODbL 1.0** for MERIT in writing; label `nepal-upa.dat`~~ | **DONE 2026-10-05** — `LICENSE` carries the election | Blocker 5 **closed**; the repo's biggest believed liability was half a licence |
 | Label the 5 ODbL files and the 1 CC BY-SA file | labels only | Closes blockers 3 and 4 |
 | Write `NOTICE` with the sec. 4 strings | one file | Closes the attribution obligations |
 | Fix the `LICENSE` holder; set `package.json` to `SEE LICENSE IN LICENSE` | two edits | Closes blockers 7 and 8 |
