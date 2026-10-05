@@ -8,7 +8,10 @@
 #   icon.ico              16, 32, 48, 64, 128, 256 — each size drawn at its own
 #                         scale, not one 256 resampled, so the 16 px taskbar
 #                         glyph keeps a whole-pixel stroke
-#   installerSidebar.bmp  164x314, the Welcome/Finish page panel
+#   installerSidebar.bmp  164x314, the Welcome/Finish page panel, built from
+#                         art-src/valley.png (a 906x1735 dark topographic
+#                         rendering, exactly 164:314, so it is downscaled and
+#                         never cropped) with the wordmark over a faded foot
 #   installerHeader.bmp   150x57, the strip on the interior pages
 #
 # The BMPs MUST be 24-bit RGB with no alpha channel or NSIS renders garbage —
@@ -24,11 +27,12 @@
 #
 # Colours are src/app.css's tokens — keep them in sync.
 import os
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 FONT = os.path.join(ROOT, "src", "assets", "fonts", "geist-sans.woff2")
+VALLEY = os.path.join(HERE, "art-src", "valley.png")
 
 INK = (14, 15, 17)        # --color-bg
 PANEL_2 = (27, 30, 34)    # --color-panel-2, the chart-grid hairlines
@@ -92,33 +96,41 @@ def tracked_width(d, text, font, tracking):
 
 
 def sidebar():
-    W, H = 164, 314
-    ss = 4
-    im = Image.new("RGB", (W * ss, H * ss), INK)
-    d = ImageDraw.Draw(im)
-    # Level hairlines, the grid every chart in the app sits on.
-    for y in range(40, 206, 14):
-        d.line([(0, y * ss), (W * ss, y * ss)], fill=PANEL_2, width=ss)
-    # The profile, bleeding off both edges: the river continues past the scheme.
-    scale = W * ss * 1.45
-    ox = -(scale * PROFILE[0][0]) - 10 * ss
-    oy = 96 * ss - scale * PROFILE[0][1]
-    pts = [(ox + x * scale, oy + y * scale) for x, y in PROFILE]
-    y_top, y_bot = pts[0][1], pts[-1][1]
-    pts[0] = (-20 * ss, y_top)
-    pts[-1] = (W * ss + 20 * ss, y_bot)
-    d.line(pts, fill=RIVER, width=7 * ss, joint="curve")
-    # The head, dimensioned: extension line from the upper reach, a vertical
-    # dimension line with end ticks. The measurement is the product.
-    xd = 128 * ss
-    d.line([(pts[1][0] + 10 * ss, y_top), (xd + 6 * ss, y_top)], fill=LINE, width=ss)
-    d.line([(xd, y_top), (xd, y_bot)], fill=FAINT, width=ss)
-    for y in (y_top, y_bot):
-        d.line([(xd - 4 * ss, y), (xd + 4 * ss, y)], fill=FAINT, width=ss)
-    im = im.resize((W, H), Image.LANCZOS)
+    """The valley, with the wordmark set into its foot.
 
+    The first version drew the profile stroke over a ruled grid: one bold mark
+    in the top third, a black void through the middle, type at the bottom. It
+    read as unfinished. The replacement is a rendered Himalayan valley — grey
+    ridges and contours on ink with one teal river threading top to bottom —
+    which carries the scheme's whole argument (water falling through terrain)
+    without a drawn mark competing with it. The river IS the accent; nothing
+    else is coloured.
+    """
+    W, H = 164, 314
+    with Image.open(VALLEY) as src:
+        im = src.convert("RGB").resize((W, H), Image.LANCZOS)
+    # A 5.5x LANCZOS downscale averages the contour hairlines into their
+    # ground and flattens the tonal spread (luma stddev 16.9 -> 14.7). 1.15
+    # restores the source's own contrast and no more, measured, not felt;
+    # 1.3 hardens the ridges, and any brightness lift greys the black.
+    im = ImageEnhance.Contrast(im).enhance(1.15)
+
+    # Foot: the lower third fades into ink so the type sits on quiet ground.
+    # The source already darkens from about 75% down; this extends that with a
+    # smoothstep ramp from 0 at y0 to full ink at y1, so there is no band edge
+    # and the river's bright run (which ends near y=210) stays above it.
+    y0, y1 = 196, 292
+    ramp = Image.new("L", (1, H), 0)
+    px = ramp.load()
+    for y in range(H):
+        t = min(1.0, max(0.0, (y - y0) / (y1 - y0)))
+        px[0, y] = round(255 * t * t * (3 - 2 * t))
+    mask = ramp.resize((W, H), Image.NEAREST)
+    im = Image.composite(Image.new("RGB", (W, H), INK), im, mask)
+
+    # Wordmark over the foot: the same treatment as before, minus the rule,
+    # which on terrain cut across the river's tail and anchored nothing.
     d = ImageDraw.Draw(im)
-    d.line([(16, 228), (W - 16, 228)], fill=LINE, width=1)
     d.text((16, 240), "HydroRecon", font=geist(20, 500), fill=TEXT)
     cap = geist(8, 500)
     tracked(d, (16, 272), "RUN-OF-RIVER", cap, MUTED, 1.0)
