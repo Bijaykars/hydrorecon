@@ -5295,7 +5295,7 @@ export default function App() {
             </select>
           </label>
           <p className="mb-2">Distance along the river between intake and powerhouse. Actual tunnel routing may be shorter. {wideSearch ? 'Corridor search may move the intake.' : 'Intake held at the selected model river position.'}</p>
-          {!scheme && !busy && <p className="mb-2 text-amber">No viable layout found within {maxWaterwayKm} km. Try a different intake or a longer limit.</p>}
+          {!scheme && !busy && <p data-tour="no-scheme" className="mb-2 text-amber">No viable layout found within {maxWaterwayKm} km. Try a different intake or a longer limit.</p>}
           <strong className="text-ink">{riverDisplay ? 'River alignment · OpenStreetMap trace' : 'River alignment · model geometry'}</strong>
           {riverDisplay && scheme ? <>
             <p className="mt-1">Intake display offset: <b className="text-river">{Math.round(riverDisplay.points[scheme.i].offsetM)} m</b> from the calculation point. Powerhouse: {Math.round(riverDisplay.points[scheme.j].offsetM)} m.</p>

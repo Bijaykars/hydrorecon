@@ -20,6 +20,14 @@ export type TourStep = {
   advanceOn?: string;
   /** Selector that must exist before Next is offered — the study takes a few seconds after the click. */
   ready?: string;
+  /**
+   * Selector that means the wait ended without `ready` arriving — no layout fits, or the study
+   * failed. The step swaps to `failedTitle`/`failedBody`, offers Next, and keeps watching: a
+   * click on another river that does yield a scheme puts the normal copy back by itself.
+   */
+  failed?: string;
+  failedTitle?: string;
+  failedBody?: string;
   /** Skip the step when false — used where the thing it asks for has already happened. */
   when?: () => boolean;
 };
@@ -48,8 +56,11 @@ const STEPS: TourStep[] = [
     target: '.reading-panel',
     placement: 'left',
     ready: '[data-tour="headline"]',
+    failed: '[data-tour="no-scheme"]',
     title: 'The scheme',
     body: 'The app placed an intake and a powerhouse on the river, sized the waterway between them and selected a turbine.',
+    failedTitle: 'No scheme fits here',
+    failedBody: 'Big rivers in wide valleys often have no useful head drop within the layout limit — the panel says what it found. Click a steeper tributary, or raise the maximum layout length; the tour picks up again when a scheme is found.',
   },
   {
     id: 'numbers',
@@ -69,6 +80,8 @@ const STEPS: TourStep[] = [
     id: 'move',
     target: '[data-tour="intake"]',
     placement: 'right',
+    // The intake marker sits at the click even when no layout was found; this step is about re-solving one.
+    when: () => !!document.querySelector('[data-tour="headline"]'),
     title: 'Move the scheme',
     body: 'Drag the intake or the powerhouse to another position. The scheme re-solves where you drop it.',
   },
@@ -100,13 +113,19 @@ export const tourWide = () => window.matchMedia(WIDE).matches;
 const GAP = 14;
 const PAD = 8;
 const MARGIN = 12;
+/** A study takes 4–5 s measured; past this the step says so and offers Next rather than pulsing forever. */
+const SLOW_MS = 30_000;
 const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
+
+/** What a step is waiting on. `failed` and `slow` both offer Next; only `wait` withholds it. */
+type Status = 'ready' | 'wait' | 'slow' | 'failed';
 
 export function Tour({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [index, setIndex] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  const [ready, setReady] = useState(true);
+  const [status, setStatus] = useState<Status>('ready');
+  const waitedSince = useRef<number | null>(null);
   const tip = useRef<HTMLDivElement>(null);
   const step = STEPS[index];
 
@@ -134,7 +153,11 @@ export function Tour({ open, onClose }: { open: boolean; onClose: () => void }) 
     const measure = () => {
       const el = step.target ? document.querySelector(step.target) : null;
       setRect(el ? el.getBoundingClientRect() : null);
-      setReady(!step.ready || !!document.querySelector(step.ready));
+      // A found scheme wins over a stale failure notice; the clock only runs while neither is on the page.
+      const ready = !step.ready || !!document.querySelector(step.ready);
+      const failed = !ready && !!step.failed && !!document.querySelector(step.failed);
+      if (ready || failed) waitedSince.current = null; else waitedSince.current ??= Date.now();
+      setStatus(ready ? 'ready' : failed ? 'failed' : Date.now() - (waitedSince.current ?? 0) > SLOW_MS ? 'slow' : 'wait');
     };
     if (step.target) document.querySelector(step.target)?.scrollIntoView({ block: 'center' });
     measure();
@@ -174,6 +197,14 @@ export function Tour({ open, onClose }: { open: boolean; onClose: () => void }) 
 
   if (!open) return null;
   const dim = step.dim !== false;
+  const failed = status === 'failed';
+  const slow = status === 'slow';
+  const title = failed ? step.failedTitle ?? step.title : slow ? 'Still studying the river' : step.title;
+  const body = failed ? step.failedBody ?? step.body
+    : slow ? 'A study usually takes about five seconds; this one is taking longer. Give it a moment, click another river, or move on.'
+    : step.body;
+  // "Done" on the last step this layout actually has, not the last one in the list.
+  const last = !STEPS.some((_, k) => k > index && usable(k));
   return (
     <div className="tour" aria-hidden={false}>
       {dim && (
@@ -194,15 +225,15 @@ export function Tour({ open, onClose }: { open: boolean; onClose: () => void }) 
         style={{ left: pos?.x ?? 0, top: pos?.y ?? 0, visibility: pos ? 'visible' : 'hidden' }}
       >
         <span className="explorer-eyebrow">Tour · {index + 1} of {STEPS.length}</span>
-        <strong id="tour-title">{step.title}</strong>
-        <p id="tour-body">{step.body}</p>
+        <strong id="tour-title">{title}</strong>
+        <p id="tour-body">{body}</p>
         <div className="tour-actions">
           <button type="button" className="tour-skip" onClick={onClose}>Skip</button>
-          {step.advanceOn || !ready
+          {step.advanceOn || status === 'wait'
             ? <span className="tour-wait"><i /> {step.advanceOn ? 'Waiting for a river click' : 'Studying the river'}</span>
             : <span className="tour-nav">
                 {index > 0 && <button type="button" onClick={back}>Back</button>}
-                <button type="button" className="tour-next" onClick={next}>{index === STEPS.length - 1 ? 'Done' : 'Next'}</button>
+                <button type="button" className="tour-next" onClick={next}>{last ? 'Done' : 'Next'}</button>
               </span>}
         </div>
       </div>

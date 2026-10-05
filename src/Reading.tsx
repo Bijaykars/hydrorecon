@@ -701,13 +701,13 @@ export function Reading(props: {
       )}
 
       {error && (
-        <div className="border-b border-line bg-[color-mix(in_srgb,var(--color-red)_9%,transparent)] px-4 py-2.5 text-[11.5px] leading-relaxed text-muted">
+        <div data-tour="no-scheme" className="border-b border-line bg-[color-mix(in_srgb,var(--color-red)_9%,transparent)] px-4 py-2.5 text-[11.5px] leading-relaxed text-muted">
           <b className="text-red">{error}</b>
         </div>
       )}
 
       {at && !study && !busy && flowOnly && (
-        <div className="border-b border-line px-4 py-3 text-[12px] leading-relaxed text-muted">
+        <div data-tour="no-scheme" className="border-b border-line px-4 py-3 text-[12px] leading-relaxed text-muted">
           The terrain here does not descend far enough to trace a river course.{' '}
           <b className="text-ink">Click directly on a watercourse</b> in a valley.
         </div>

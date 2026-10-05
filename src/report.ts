@@ -1194,7 +1194,7 @@ export function deskStudyHtml(
        * Eight rows of nothing, on page three, before the report had said what it
        * DID find. It also told the reader less than it could: "Site
        * reconnaissance - Not undertaken" hides the fact that a 30 m terrain
-       * model and a 10 m land-cover raster were read over the whole alignment.
+       * model and a 30 m land-cover raster were read over the whole alignment.
        *
        * Every discipline here rests on something. Naming that something is what
        * lets a reader judge the result, and the gap then states itself at the
@@ -1202,7 +1202,7 @@ export function deskStudyHtml(
        */
       '<h2>What each discipline rests on</h2>' +
       facts([
-        ['Site conditions', `${n(c.demResolutionM, 0)} m terrain model and 10 m land cover over the whole alignment; no ground visit`],
+        ['Site conditions', `${n(c.demResolutionM, 0)} m terrain model and 30 m land cover over the whole alignment; no ground visit`],
         ['River flow', `${c.flowYears} years of daily flood-model record, cross-checked against three published Nepali regressions; no site gauging`],
         ['Topography', `${esc(c.demSource ?? 'terrain model')} at ${n(c.demResolutionM, 0)} m, cross-checked against a second elevation product; no survey`],
         ['Engineering geology', 'Published national and provincial geological mapping; no ground traverse, drilling or testing'],
