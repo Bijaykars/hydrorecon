@@ -19,8 +19,16 @@
  *   src/data/dhm-records.json  — one row per station: position, years held,
  *     monthly mean regime, flow-duration quantiles, annual mean. Small enough
  *     to bundle, and enough to answer "what does this river actually do".
+ *     GITIGNORED: those statistics are derived from a privately supplied,
+ *     unlicensed source and may not be published (LICENSES.md, blocker 1).
+ *   src/data/dhm-records.public.json  — the same rows with every discharge
+ *     statistic removed. Tracked, published, and the only copy a fresh clone
+ *     has. Written by pipeline/dhm-public-index.mjs.
  *   sources/dhm/<station>.json  — the full daily series, fetched only when a
  *     site is near that station.
+ *
+ * So running this is what a licence holder does to turn a published checkout
+ * back into the full-accuracy tool.
  *
  * PROVENANCE: Department of Hydrology and Meteorology, Government of Nepal.
  * Supplied privately. The daily series land in sources/dhm/, which is gitignored
@@ -28,13 +36,14 @@
  */
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { FULL_INDEX, writePublicIndex } from './dhm-public-index.mjs';
 
 const ROOT = process.argv[2];
 if (!ROOT || !existsSync(ROOT)) {
   console.error('usage: node pipeline/build-dhm-records.mjs "<path to hydrological data>"');
   process.exit(1);
 }
-const OUT_INDEX = 'src/data/dhm-records.json';
+const OUT_INDEX = FULL_INDEX;
 const OUT_DIR = 'sources/dhm';
 if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
 
@@ -258,6 +267,7 @@ const bundle = {
   stations: index,
 };
 writeFileSync(OUT_INDEX, JSON.stringify(bundle));
+writePublicIndex(bundle);
 
 console.log(`scanned ${files.length} files · parsed ${parsed} · ${skipped} had no station header`);
 if (misshapenRows > 0) {

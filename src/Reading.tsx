@@ -44,6 +44,7 @@ import { FAULT_COLOR, type FaultScreen } from './faults.ts';
 import { PGA_RETRIEVED, QUAKE_COUNT, type SeismicScreen } from './seismic.ts';
 import type { CollectorScreen } from './collector.ts';
 import { DHM_STATION_COUNT, transferMeetsBar, type Transfer } from './dhm.ts';
+import { DHM_STATISTICS_BUNDLED, DHM_STATISTICS_ABSENT_NOTE } from './dhm-statistics.ts';
 import type { GeologyScreen } from './geology.ts';
 import { BUILT_UP, CROPLAND, TREE_COVER, type LandcoverScreen } from './landcover.ts';
 import { geologySpans, type GeologyTraverse } from './geology-units.ts';
@@ -1324,6 +1325,21 @@ export function Reading(props: {
             station above and scale it by catchment area, which is what a feasibility study would do
             with it.
           </Fine>
+        </div>
+      )}
+
+      {/* ---- the records themselves, where this build does not hold them ----
+           Said rather than left blank. Without the statistics `bestTransfer`
+           refuses every donor on its own specific-discharge screen, so the
+           panel below never renders and the reader would see a screen that
+           simply is not there. See src/dhm-statistics.ts. */}
+      {scheme && !DHM_STATISTICS_BUNDLED && (
+        <div className="border-b border-line px-4 py-3.5">
+          <H right="not bundled">borrowed gauge record</H>
+          <div className="rounded-lg border border-line bg-panel-2 px-3 py-2.5 text-[11px] leading-relaxed text-muted">
+            <b className="text-ink">No DHM record can be transferred in this build.</b>{' '}
+            {DHM_STATISTICS_ABSENT_NOTE}
+          </div>
         </div>
       )}
 

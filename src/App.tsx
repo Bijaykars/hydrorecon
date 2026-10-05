@@ -80,6 +80,7 @@ import {
 import { mhspScreen } from './engine/mhsp.ts';
 import { osmLengthFactor, stretchPath } from './osm-rivers.ts';
 import { judgeShape, correctShape } from './engine/fdcshape.ts';
+import { DHM_STATISTICS_BUNDLED } from './dhm-statistics.ts';
 import {
   download,
   fieldPlanToCsv,
@@ -2221,7 +2222,19 @@ export default function App() {
      * nothing happens, and a measured record supplied by the engineer is never
      * touched — it is the evidence, not a candidate for correction.
      */
-    const shape = measured || !isNepal ? null : judgeShape(modelled, assume.exceedance);
+    /**
+     * Skipped outright where the DHM statistics are not bundled: the national
+     * band is assembled from the gauges' own quantiles, so without them
+     * `judgeShape` would return a verdict built from zero stations — a band of
+     * undefineds that compares false, reads as "inside the measured range" and
+     * silently leaves the design flow uncorrected. Not running it is the
+     * honest version of the same outcome, and report.ts says the check did not
+     * run. See src/dhm-statistics.ts.
+     */
+    const shape =
+      measured || !isNepal || !DHM_STATISTICS_BUNDLED
+        ? null
+        : judgeShape(modelled, assume.exceedance);
     const series = shape?.implausible ? correctShape(modelled, assume.exceedance) : modelled;
     const seriesMean = meanOf(series);
     const minMonth = minMonthlyMean(dates, series);
@@ -2364,7 +2377,7 @@ export default function App() {
    * A correction the reader cannot see is a correction they cannot argue with.
    */
   const flowShape = useMemo(() => {
-    if (!study || measured || !isNepal) return null;
+    if (!study || measured || !isNepal || !DHM_STATISTICS_BUNDLED) return null;
     return judgeShape(study.flow.values, assume.exceedance);
   }, [study, measured, isNepal, assume.exceedance]);
 

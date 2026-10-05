@@ -12,10 +12,11 @@
  * dailies, so it is carried over from the existing index rather than invented.
  * Everything below it is recomputed.
  */
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { FULL_INDEX, PUBLIC_INDEX, writePublicIndex } from './dhm-public-index.mjs';
 
 const DIR = 'sources/dhm';
-const OUT = 'src/data/dhm-records.json';
+const OUT = FULL_INDEX;
 
 const MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 const isLeap = (y) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
@@ -28,7 +29,12 @@ const quantile = (sorted, frac) => {
 };
 const r3 = (v) => (v == null ? null : Math.round(v * 1000) / 1000);
 
-const prior = JSON.parse(readFileSync(OUT, 'utf8'));
+// Identity falls back to the published twin, which is the only copy a fresh
+// clone has: the full index is gitignored (LICENSES.md, blocker 1), so a
+// licence holder rebuilding from sources/dhm/ on a clean checkout would
+// otherwise find no positions to carry over.
+const priorPath = existsSync(OUT) ? OUT : PUBLIC_INDEX;
+const prior = JSON.parse(readFileSync(priorPath, 'utf8'));
 const identity = new Map(prior.stations.map((s) => [String(s.id), s]));
 
 const index = [];
@@ -102,7 +108,11 @@ for (const file of readdirSync(DIR).filter((f) => f.endsWith('.json'))) {
 
 index.sort((a, b) => Number(a.id) - Number(b.id));
 const bundle = { ...prior, _built: new Date().toISOString().slice(0, 10), stations: index };
+// `_statistics` only ever marks the reduced twin. Carrying it over from the
+// twin would tell the app the real statistics are absent.
+delete bundle._statistics;
 writeFileSync(OUT, JSON.stringify(bundle));
+writePublicIndex(bundle);
 
 const missing = index.filter((s) => s.lat == null).length;
 console.log(`wrote ${OUT}: ${index.length} stations (was ${prior.stations.length})`);

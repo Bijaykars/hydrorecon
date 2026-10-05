@@ -32,8 +32,15 @@ pipeline/.cache/
 sources/local/
 
 # Private DHM daily discharge records — supplied privately, not redistributable.
-# The derived index in src/data/dhm-records.json travels; the records do not.
+# DHM sells hydrological data through a procurement process and publishes no
+# open licence, so neither the dailies nor the statistics derived from them may
+# ship. src/data/dhm-records.json used to travel and no longer does: the
+# identity-only twin src/data/dhm-records.public.json is tracked in its place,
+# pipeline/restore-dhm-records.mjs copies that into position when the licensed
+# index is absent, and pipeline/build-dhm-records.mjs rebuilds the full one from
+# the yearbooks. See LICENSES.md, blocker 1.
 sources/dhm/
+src/data/dhm-records.json
 
 # MERIT Hydro tiles — licensed to one user under CC-BY-NC 4.0 via a registered
 # download, and the terms forbid redistributing the originals. The derived

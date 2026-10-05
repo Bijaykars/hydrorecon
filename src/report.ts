@@ -33,6 +33,7 @@
 import type { ExportContext } from './export.ts';
 import { geologySpans, type GeologyUnitHit } from './geology-units.ts';
 import { stationDisplayName } from './gauges.ts';
+import { DHM_STATISTICS_BUNDLED, DHM_STATISTICS_ABSENT_NOTE } from './dhm-statistics.ts';
 import type { ConnectedGlacialLake } from './connectivity.ts';
 import { buildFdc, minMonthlyMean, seasonalRatio } from './engine/hydro.ts';
 import {
@@ -1549,6 +1550,32 @@ export function deskStudyHtml(
               `<b>The modelled curve sits inside the range Nepali gauges show</b>, so no shape correction ` +
                 `was applied and the flow figures are the model's own.`
             ));
+  } else if (!DHM_STATISTICS_BUNDLED) {
+    /**
+     * The shape check is "disclosed either way: fired or not" — and there is a
+     * third way, which is that this build cannot run it at all. The national
+     * band is assembled from the gauges' own flow-duration quantiles, and those
+     * are not redistributable, so a published build has no band to test
+     * against. Saying nothing here would be the worst of the three: the
+     * correction fires on about 16% of sites and LOWERS the design flow, so its
+     * absence makes this document's flow figures less conservative than a
+     * licensed build's, and silence about that is the kind of thing that should
+     * end an engineer's trust in the whole report.
+     */
+    hydrologyAppendix +=
+      '<h2>Flow-duration shape check</h2>' +
+      `<p>A design flow is a point on the flow-duration curve, and a flood model's low-flow tail is
+      the part least constrained by what it was calibrated against. The app tests the modelled curve
+      against a national curve assembled from DHM gauge records, and corrects it where the tail
+      falls outside the range Nepali rivers exhibit.</p>` +
+      finding(
+        'limit',
+        '<b>This check did not run: the DHM gauge statistics are not bundled in this build.</b> ' +
+          DHM_STATISTICS_ABSENT_NOTE +
+          ' The correction fires on about 16% of project sites and where it fires it lowers the ' +
+          'design flow, so the flow, capacity and energy figures here are the raw model’s and are ' +
+          'less conservative than a licensed build would report.'
+      );
   }
 
   if (c.gauges?.length) {
@@ -1607,6 +1634,14 @@ export function deskStudyHtml(
             'so the flow here is modelled rather than measured. Commissioning a season of stage-discharge ' +
             'measurement at the intake is the single change that most reduces the error in this report.'
         );
+
+    // Which station to request is unaffected — that comes from DHM's own public
+    // station API. What is affected is whether this build could transfer one.
+    if (!DHM_STATISTICS_BUNDLED)
+      gs += finding(
+        'limit',
+        '<b>No measured record is transferred in this report.</b> ' + DHM_STATISTICS_ABSENT_NOTE
+      );
 
     sec.push(gs);
 
@@ -3002,7 +3037,13 @@ const { listed, growing, risky } = glofDangerSignals(u.lakes);
       ['Rainfall and hypsometry', 'CHPclim + HydroBASINS', 'Open; per catchment'],
       ['Glaciers', 'Randolph Glacier Inventory 7.0', 'CC-BY 4.0; outlines dated 2000–2010 by submission'],
       ['Glacial lakes', 'Sentinel-2 transboundary inventory + ICIMOD 2020 danger list', 'CC-BY 4.0; centroids only, no lake area'],
-      ['Gauges', 'DHM Nepal', 'Supplied; 136 daily records'],
+      [
+        'Gauges',
+        'DHM Nepal',
+        DHM_STATISTICS_BUNDLED
+          ? 'Supplied; 136 daily records'
+          : 'Station list only; the daily records are not bundled',
+      ],
       ['Licensed projects', 'DoED register', 'Public register; ~1,048 located'],
       ['Geological mapping', 'DMG province sheets', 'Published 1:350,000, reproduced as issued'],
       ['Hazard records', 'BIPAD portal', 'Public; filed against settlements, not scars'],

@@ -5,6 +5,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
+    "postinstall": "node pipeline/restore-dhm-records.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
@@ -28,6 +29,8 @@
     "desktop:pack": "npm run build && electron-builder --dir",
     "desktop:dist": "npm run build && electron-builder",
     "build:dhm": "node pipeline/build-dhm-stations.mjs",
+    "build:dhm-records": "node pipeline/build-dhm-records.mjs",
+    "build:dhm-index": "node pipeline/build-dhm-index.mjs",
     "build:dhm-liveness": "node pipeline/build-dhm-liveness.mjs",
     "check:dhm-liveness": "node pipeline/build-dhm-liveness.mjs --self-check",
     "build:rivers": "node pipeline/build-hydrorivers.mjs",

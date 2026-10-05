@@ -9,6 +9,19 @@
  */
 import assert from 'node:assert/strict';
 import { judgeShape, correctShape, NATIONAL_SHAPE } from '../src/engine/fdcshape.ts';
+import { DHM_STATISTICS_BUNDLED } from '../src/dhm-statistics.ts';
+
+/**
+ * The national curve is built from DHM's flow-duration quantiles, which are not
+ * redistributable and so are absent from a published build (LICENSES.md,
+ * blocker 1). Every assertion below is about that curve, so there is nothing
+ * here to check without it. Skipped out loud rather than relaxed: a check that
+ * passes on an empty curve would be a check that cannot fail.
+ */
+if (!DHM_STATISTICS_BUNDLED) {
+  console.log('fdcshape.check skipped — DHM gauge statistics are not bundled in this build');
+  process.exit(0);
+}
 
 const mean = (v: readonly number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 
