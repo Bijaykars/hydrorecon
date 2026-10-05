@@ -129,3 +129,9 @@ sources/gsw/
 # not about the app.
 .claude/agent-memory/
 .claude/autoroute/
+
+# Derived from the private DHM records: carries measured per-station flow in a
+# `truth` field, so it inherits their licence exactly. Rebuilt by the analogue
+# builder on a machine that holds the yearbooks. Purged from history alongside
+# src/data/dhm-records.json before the first public push.
+src/data/flow-analogues.json
