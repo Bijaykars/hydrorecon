@@ -55,6 +55,11 @@ body,
   height: 100%;
 }
 
+/* On the root too, so the very first paint is ink and never white. */
+html {
+  background: var(--color-bg);
+}
+
 body {
   margin: 0;
   background: var(--color-bg);
@@ -309,6 +314,38 @@ input[type='range'] {
 }
 .map-credit a { pointer-events: auto; color: var(--color-muted); text-decoration: none; }
 .map-credit a:hover { color: var(--color-river); }
+
+/*
+ * First-run tour. The spotlight is one fixed box whose shadow dims the rest
+ * of the screen; the whole overlay ignores the pointer except the tooltip,
+ * so the river click the tour asks for lands on the map. The tooltip reuses
+ * the explorer's surface, eyebrow and button styles so it reads as part of
+ * the workbench rather than a plug-in.
+ */
+.tour { position: fixed; inset: 0; z-index: 40; pointer-events: none; }
+.tour-spotlight {
+  position: absolute; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--color-river) 55%, transparent);
+  box-shadow: 0 0 0 9999px color-mix(in srgb, var(--color-bg) 62%, transparent);
+  transition: top 160ms ease, left 160ms ease, width 160ms ease, height 160ms ease;
+}
+.tour-tip {
+  position: absolute; width: 300px; pointer-events: auto; padding: 16px 18px 14px;
+  background: #141619f5; border: 1px solid var(--color-line-strong); border-radius: 12px;
+  box-shadow: 0 16px 50px #0005; backdrop-filter: blur(14px); color: var(--color-muted);
+}
+.tour-tip:focus { outline: none; }
+.tour-tip strong { display: block; color: var(--color-ink); font-size: 14px; font-weight: 600; letter-spacing: -0.01em; margin-top: 8px; }
+.tour-tip p { margin: 6px 0 0; font-size: 12px; line-height: 1.55; }
+.tour-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-line); }
+.tour-actions button { border: 1px solid #3b454d; border-radius: 7px; padding: 6px 10px; color: var(--color-ink); background: #222a2e; font-size: 11px; cursor: pointer; }
+.tour-actions button:hover { background-color: #ffffff0b; }
+.tour-nav { display: flex; gap: 6px; }
+.tour-actions .tour-next { background: #214b56; border-color: #3a6c78; }
+.tour-actions .tour-skip { border-color: transparent; background: transparent; color: var(--color-faint); padding-left: 0; }
+.tour-actions .tour-skip:hover { color: var(--color-ink); background: transparent; }
+.tour-wait { display: flex; align-items: center; gap: 7px; font-size: 10.5px; color: var(--color-river); }
+.tour-wait i { width: 6px; height: 6px; border-radius: 50%; background: var(--color-river); animation: tour-pulse 1.6s ease-in-out infinite; }
+@keyframes tour-pulse { 50% { opacity: 0.25; } }
 
 @media (max-width: 1023px) {
   .map-credit { display: none; }

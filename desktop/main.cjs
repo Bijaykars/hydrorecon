@@ -9,6 +9,7 @@ const { app, BrowserWindow, protocol, net, shell, Menu } = require('electron');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { createLocalStores, dataRoot } = require('./local-stores.cjs');
+const windowState = require('./window-state.cjs');
 
 /** Set by `npm run desktop:dev` so the window points at Vite instead of dist/. */
 const DEV_URL = process.env.GHATTA_DEV_URL;
@@ -82,12 +83,17 @@ function serveFromDist() {
 }
 
 function createWindow() {
+  const saved = windowState.load();
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
+    ...saved,
     minWidth: 900,
     minHeight: 600,
-    backgroundColor: '#0b0f14', // matches the app, so no white flash on launch
+    // Hidden until the first frame is painted, on the app's own ink — the two
+    // together are what stop the white flash on launch.
+    show: false,
+    backgroundColor: '#0e0f11', // --color-bg in src/app.css
     title: 'Ghatta',
     autoHideMenuBar: true,
     webPreferences: {
@@ -98,6 +104,12 @@ function createWindow() {
       sandbox: true,
     },
   });
+
+  win.once('ready-to-show', () => {
+    if (saved && saved.maximized) win.maximize();
+    win.show();
+  });
+  windowState.track(win);
 
   win.loadURL(DEV_URL || 'app://ghatta/index.html');
 

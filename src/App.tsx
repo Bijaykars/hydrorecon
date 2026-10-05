@@ -3,6 +3,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapExplorer } from './MapExplorer.tsx';
 import { HydrologyComparison } from './HydrologyComparison.tsx';
+import { Tour, TOUR_EVENTS, tourDone, tourWide } from './Tour.tsx';
 import { buildRiverDisplay, displayGeoJson, type RiverDisplay } from './river-display.ts';
 import { NEPAL_VIEW, NEPAL_BOUNDS, mapPadding, validPoint, readPreference, savePreference } from './map-navigation.ts';
 import {
@@ -489,6 +490,13 @@ export default function App() {
 
   /** Where the user clicked on the river. The only input the app needs. */
   const [at, setAt] = useState<Pt | null>(initial.at);
+  // First run only; a skip counts as done, otherwise it nags. Hidden below 1024px with the header.
+  const [tourOpen, setTourOpen] = useState(() => tourWide() && !tourDone());
+  const closeTour = useCallback(() => {
+    setTourOpen(false);
+    try { localStorage.setItem('hydrorecon.tour.done', '1'); } catch { /* Browsing works without storage. */ }
+  }, []);
+  useEffect(() => { if (at) window.dispatchEvent(new Event(TOUR_EVENTS.site)); }, [at]);
   const region: RegionMode = useMemo(
     () => (at ? regionFor(at.lat, at.lon) : 'global'),
     [at]
@@ -3491,6 +3499,7 @@ export default function App() {
       }
       const el = document.createElement('div');
       el.className = 'marker';
+      el.dataset.tour = key === 'a' ? 'intake' : 'powerhouse';
       el.style.setProperty('--c', color);
       el.title = title;
       const tag = document.createElement('span');
@@ -5245,15 +5254,17 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col lg:block">
-      <div ref={mapEl} className="h-[46vh] w-full shrink-0 lg:absolute lg:inset-0 lg:h-full" />
+      <div ref={mapEl} data-tour="map" className="h-[46vh] w-full shrink-0 lg:absolute lg:inset-0 lg:h-full" />
 
       <header className="pointer-events-none absolute left-3 top-3 z-10 hidden lg:block">
         <div className="flex items-center gap-2 rounded-full border border-line bg-bg/75 py-1.5 pl-3 pr-4 backdrop-blur-md">
           <Mark />
           <span className="text-[13.5px] font-semibold tracking-tight">HydroRecon</span>
           <span className="mt-px text-[11px] text-muted">hydropower scheme finder</span>
+          <button type="button" onClick={() => setTourOpen(true)} className="pointer-events-auto ml-1 border-l border-line pl-2.5 text-[11px] text-faint hover:text-river">Take the tour</button>
         </div>
       </header>
+      <Tour open={tourOpen} onClose={closeTour} />
 
       <div className="map-credit">
         <span>Built by <a href="https://www.linkedin.com/in/bijay-karki-/" target="_blank" rel="noopener noreferrer">Bijay Karki</a></span>

@@ -125,7 +125,7 @@ function Verdict({
   const regional = flowChoice?.judgeCms ?? 0;
   const apart = network > 0 && regional > 0 ? Math.max(network / regional, regional / network) : 0;
   return (
-    <div className="border-b border-line bg-panel-2/40 px-4 py-3.5">
+    <div data-tour="headline" className="border-b border-line bg-panel-2/40 px-4 py-3.5">
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
         <div className="min-w-0">
           <div className="text-[10px] uppercase tracking-[0.1em] text-faint">Capacity</div>
@@ -3986,7 +3986,7 @@ export function Reading(props: {
       )}
 
       {canExport && (
-        <div className="border-b border-line px-4 py-3.5">
+        <div data-tour="export" className="border-b border-line px-4 py-3.5">
           <H>Take it with you</H>
           <div className="grid grid-cols-2 gap-2">
             <button

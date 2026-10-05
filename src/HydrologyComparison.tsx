@@ -38,7 +38,7 @@ export function HydrologyComparison({ input, scheme, reach, networkMeanCms, flow
     const a = document.createElement('a'); a.href = url; a.download = 'hydrorecon-flow-comparison.csv'; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
-  return <details open className="border-b border-line px-4 py-3 text-[11px] leading-relaxed text-muted" aria-label="Hydrology method comparison">
+  return <details open data-tour="methods" className="border-b border-line px-4 py-3 text-[11px] leading-relaxed text-muted" aria-label="Hydrology method comparison">
     <summary className="cursor-pointer text-[12px] font-semibold text-ink">Compare flow methods & capacity</summary>
     <p className="mt-2">Same intake, powerhouse and flow pattern. Each estimate recalculates turbine sizing, hydraulic losses and energy. Alternatives do not replace the estimate in use.</p>
     <div className="mt-3 overflow-x-auto">
