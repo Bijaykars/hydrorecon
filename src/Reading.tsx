@@ -77,6 +77,15 @@ const n = (v: number, d = 1) =>
       ? Math.round(v).toLocaleString('en-US')
       : v.toLocaleString('en-US', { maximumFractionDigits: d });
 
+/**
+ * Percentage points inside which a dry share cannot call a PPA bar either way.
+ * Carried over from the desk-study report (`Math.abs(closest) <= 5`), which sat
+ * on the measured error: dry share under-read by 3.7 pt, typical error 5.1, at
+ * 74 DHM gauges (CLAUDE.md, "The dry season, measured for the first time").
+ * Display only — nothing in the engine reads it.
+ */
+const DRY_SHARE_ERROR_PT = 5;
+
 /** Section heading — one style for the whole panel, so hierarchy comes free. */
 function H({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
   return (
@@ -1013,15 +1022,20 @@ export function Reading(props: {
                   ['8 + 4 months', scheme.reliability.ppaEightFour, 15],
                 ].map(([label, result, required]) => {
                   const r = result as typeof scheme.reliability.ppaSixSix;
+                  // Not decided inside the measured error — same rule and constant the
+                  // desk-study report used (|share − bar| <= 5 pt), see DRY_SHARE_ERROR_PT.
+                  const open = Math.abs(r.dryShare * 100 - Number(required)) <= DRY_SHARE_ERROR_PT;
                   return (
                     <div key={String(label)} className="border-t border-line py-1 first:border-0 first:pt-0 last:pb-0">
                       <div className="flex items-baseline gap-2 text-[11px]">
                         <span className="w-24 shrink-0 text-muted">{String(label)}</span>
-                        <span className={`num ${r.meets ? 'text-green' : 'text-amber'}`}>
+                        <span className={`num ${open ? 'text-ink' : r.meets ? 'text-green' : 'text-amber'}`}>
                           {n(r.dryShare * 100, 1)}% dry
                         </span>
                         <span className="text-faint">
-                          {r.meets ? 'meets' : 'below'} {String(required)}%
+                          {open
+                            ? `not decided · within ${DRY_SHARE_ERROR_PT} pt of ${String(required)}%`
+                            : `${r.meets ? 'meets' : 'below'} ${String(required)}%`}
                         </span>
                       </div>
                       <div className="ml-[6.5rem] text-[10.5px] leading-relaxed text-faint">
@@ -1033,6 +1047,12 @@ export function Reading(props: {
                     </div>
                   );
                 })}
+                <div className="mt-1.5 border-t border-line pt-1.5 text-[10px] leading-relaxed text-faint">
+                  The model reads the dry share low: −3.7 pt on average, ±5.1 typical, at 74 DHM
+                  gauges. A &ldquo;below&rdquo; can therefore clear — 24 of those 74 rivers clear 30%
+                  where the model says they do not. Within {DRY_SHARE_ERROR_PT} pt of a bar the share
+                  does not decide it; dry-season gauging does.
+                </div>
               </div>
               <div className="mt-2.5 grid grid-cols-2 gap-2.5 px-1.5">
                 <Fact
