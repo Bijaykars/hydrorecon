@@ -4,6 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapExplorer } from './MapExplorer.tsx';
 import { HydrologyComparison } from './HydrologyComparison.tsx';
 import { Tour, TOUR_EVENTS, tourDone, tourWide } from './Tour.tsx';
+import { installUpdate, useUpdateStatus } from './updater.ts';
 import { buildRiverDisplay, displayGeoJson, type RiverDisplay } from './river-display.ts';
 import { NEPAL_VIEW, NEPAL_BOUNDS, mapPadding, validPoint, readPreference, savePreference } from './map-navigation.ts';
 import {
@@ -468,6 +469,7 @@ export default function App() {
   const [at, setAt] = useState<Pt | null>(initial.at);
   // First run only; a skip counts as done, otherwise it nags. Hidden below 1024px with the header.
   const [tourOpen, setTourOpen] = useState(() => tourWide() && !tourDone());
+  const update = useUpdateStatus();
   const closeTour = useCallback(() => {
     setTourOpen(false);
     try { localStorage.setItem('hydrorecon.tour.done', '1'); } catch { /* Browsing works without storage. */ }
@@ -4222,6 +4224,9 @@ export default function App() {
           <span className="text-[13.5px] font-semibold tracking-tight">HydroRecon</span>
           <span className="mt-px text-[11px] text-muted">hydropower scheme finder</span>
           <button type="button" onClick={() => setTourOpen(true)} className="pointer-events-auto ml-1 border-l border-line pl-2.5 text-[11px] text-faint hover:text-river">Take the tour</button>
+          {update?.state === 'ready' && (
+            <button type="button" onClick={installUpdate} title="Installs the downloaded update and reopens HydroRecon" className="pointer-events-auto ml-1 border-l border-line pl-2.5 text-[11px] text-faint hover:text-river">Restart to update{update.version ? ` to v${update.version}` : ''}</button>
+          )}
         </div>
       </header>
       <Tour open={tourOpen} onClose={closeTour} />

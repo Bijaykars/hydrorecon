@@ -10,6 +10,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { createLocalStores, dataRoot } = require('./local-stores.cjs');
 const windowState = require('./window-state.cjs');
+const updater = require('./updater.cjs');
 
 /** Set by `npm run desktop:dev` so the window points at Vite instead of dist/. */
 const DEV_URL = process.env.GHATTA_DEV_URL;
@@ -102,6 +103,8 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      // Exposes the updater status and nothing else — see desktop/preload.cjs.
+      preload: path.join(__dirname, 'preload.cjs'),
     },
   });
 
@@ -135,6 +138,7 @@ app.whenReady().then(async () => {
   }
   Menu.setApplicationMenu(null);
   createWindow();
+  updater.start();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

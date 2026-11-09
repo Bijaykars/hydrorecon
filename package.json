@@ -57,6 +57,7 @@
     "build:fleet": "node pipeline/build-fleet-validation.mjs"
   },
   "dependencies": {
+    "electron-updater": "^6.8.11",
     "maplibre-gl": "^5.6.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
@@ -71,6 +72,11 @@
       "pipeline/glofas-store.mjs",
       "package.json"
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "Bijaykars",
+      "repo": "hydrorecon"
+    },
     "directories": {
       "output": "release",
       "buildResources": "build"
