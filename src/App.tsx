@@ -27,7 +27,7 @@ import {
   SNAP_KM,
   type Reach,
 } from './rivers.ts';
-import { glaciersUpstreamOf, type GlacierScreen } from './glaciers.ts';
+import { glacierInventory, glaciersUpstreamOf, type GlacierScreen } from './glaciers.ts';
 import { assessCollectors } from './collector.ts';
 import { bestTransfer, loadStationSeries, transferMeetsBar, type Transfer } from './dhm.ts';
 import { discover, evaluate, SEARCH_KM, type Scheme, type SchemeInput } from './engine/discover.ts';
@@ -301,6 +301,7 @@ const DEFAULT_LAYERS = {
   projects: true,
   areas: true,
   geology: false,
+  glaciers: false,
   grid: true,
   protected: true,
   quakes: true,
@@ -322,6 +323,7 @@ const LAYER_GROUPS: Record<Exclude<keyof LayerToggles, 'labels' | 'geology' | 'g
   ],
   projects: ['licences', 'licence-labels', 'cascade-routes', 'cascade-projects', 'cascade-labels'],
   areas: ['licence-area-fill', 'licence-area-line'],
+  glaciers: ['glaciers-national-fill', 'glaciers-national-line'],
   grid: ['grid-lines', 'grid-line-labels', 'grid-substations', 'grid-substation-labels'],
   protected: ['protected-area-fill', 'protected-area-line'],
   quakes: ['quakes'],
@@ -1062,6 +1064,40 @@ export default function App() {
       // Directed channel-topology candidates upstream of the intake. Lines are
       // deliberately dashed: they are HydroRIVERS walks, not simulated runout
       // or a design flood envelope.
+      /**
+       * Nepal's ice as context, drawn nationally and independent of any pick.
+       * The source starts empty and is filled the first time the layer is
+       * switched on (see the effect beside `layersOn`), so the 2.5 MB bundle
+       * is still fetched on demand and never at startup. Quiet on purpose:
+       * fainter than the per-intake ice below, under the routes and every
+       * hydropower marker. The `attribution` shows in the map's bar only while
+       * the layer is visible.
+       */
+      m.addSource('glaciers-national', {
+        type: 'geojson',
+        data: empty(),
+        attribution: 'Glaciers: RGI 7.0 (RGI Consortium 2023), CC-BY-4.0',
+      });
+      m.addLayer({
+        id: 'glaciers-national-fill',
+        type: 'fill',
+        source: 'glaciers-national',
+        paint: {
+          'fill-color': '#8fd6ef',
+          // Strongest at national zoom, where a 0.1 km2 outline is a sub-pixel speck.
+          'fill-opacity': ['interpolate', ['linear'], ['zoom'], 6, 0.5, 10, 0.26, 13, 0.2],
+        },
+      });
+      m.addLayer({
+        id: 'glaciers-national-line',
+        type: 'line',
+        source: 'glaciers-national',
+        paint: {
+          'line-color': '#4aa8cc',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.5, 12, 0.7],
+          'line-opacity': 0.75,
+        },
+      });
       m.addSource('upstream-routes', { type: 'geojson', data: empty() });
       m.addLayer({
         id: 'upstream-routes',
@@ -3101,6 +3137,33 @@ export default function App() {
     }
   }, [layersOn, mapReady]);
   /**
+   * Nepal's glaciers, national. The only place the bundle is requested for
+   * display, and only once the layer is first on — `glaciers.ts` caches it, so
+   * switching off and on again costs nothing. A failed fetch is said aloud: a
+   * toggle that quietly draws nothing is a defect, not a fallback.
+   */
+  const nationalIceLoaded = useRef(false);
+  useEffect(() => {
+    const m = map.current;
+    if (!layersOn.glaciers || !m || !mapReady || nationalIceLoaded.current) return;
+    nationalIceLoaded.current = true;
+    void glacierInventory().then((all) => {
+      const src = m.getSource('glaciers-national') as maplibregl.GeoJSONSource | undefined;
+      if (!all) {
+        console.warn('glacier layer: public/nepal-glaciers.json could not be loaded');
+        return;
+      }
+      src?.setData({
+        type: 'FeatureCollection',
+        features: all.map((g) => ({
+          type: 'Feature' as const,
+          geometry: { type: 'Polygon' as const, coordinates: g.rings },
+          properties: { id: g.id, name: g.name ?? '', areaKm2: g.areaKm2 },
+        })),
+      });
+    });
+  }, [layersOn.glaciers, mapReady]);
+  /**
    * The DMG geological sheets. Driven like the topo scans — image sources added
    * and removed as the view moves — rather than through LAYER_GROUPS, which
    * only toggles visibility on layers that already exist.
@@ -4519,6 +4582,11 @@ function MapLegend({
           'geology',
           <i className="size-4 shrink-0 rounded-sm border border-[#b06a4f] bg-[linear-gradient(135deg,#7fb069_50%,#c9a227_50%)]" />,
           'geological map, 1:350,000'
+        )}
+        {row(
+          'glaciers',
+          <i className="size-4 shrink-0 rounded-sm border border-[#4aa8cc] bg-[#8fd6ef]/35" />,
+          'glaciers · RGI 7.0'
         )}
         {row(
           'grid',
