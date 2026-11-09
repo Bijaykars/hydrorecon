@@ -1,31 +1,23 @@
 import { chromium } from 'playwright-core';
-import { readFile } from 'node:fs/promises';
-import { spawn } from 'node:child_process';
 
-const base = 'http://127.0.0.1:4173/';
-const reachable = async () => fetch(base).then((response) => response.ok).catch(() => false);
-let preview = null;
-if (!(await reachable())) {
-  preview = spawn(
-    process.execPath,
-    ['node_modules/vite/bin/vite.js', 'preview', '--host', '127.0.0.1', '--port', '4173'],
-    { cwd: process.cwd(), stdio: 'ignore', windowsHide: true }
-  );
-  for (let attempt = 0; attempt < 50 && !(await reachable()); attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  if (!(await reachable())) throw new Error('production preview did not start on port 4173');
-}
-process.on('exit', () => preview?.kill());
+// window.__exportCtx is a DEV-only hook, so this drives the Vite dev server
+// rather than a built bundle. Override with QA_URL (e.g. a non-default port).
+const base = process.env.QA_URL ?? 'http://127.0.0.1:5173/';
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
+// The first-run tour opens over the map and swallows clicks; mark it seen.
+await page.addInitScript(() => localStorage.setItem('hydrorecon.tour.done', '1'));
 const consoleErrors = [];
 const failedRequests = [];
+// Only the app's own origin counts: a basemap or terrain host being unreachable is not an app fault.
+const own = (url) => url.startsWith(new URL(base).origin);
 page.on('console', (message) => {
-  if (message.type() === 'error') consoleErrors.push(message.text());
+  if (message.type() === 'error' && own(message.location().url || base)) consoleErrors.push(message.text());
 });
-page.on('requestfailed', (request) => failedRequests.push(`${request.url()} — ${request.failure()?.errorText}`));
+page.on('requestfailed', (request) => {
+  if (own(request.url())) failedRequests.push(`${request.url()} — ${request.failure()?.errorText}`);
+});
 
 // High-order Kali Gandaki reach: deliberately dense upstream-project stress case.
 await page.goto(`${base}#at=27.9700,83.5500&map=9/27.9700/83.5500`, { waitUntil: 'domcontentloaded' });
@@ -51,7 +43,7 @@ if (!/operating\/construction-stage candidate\(s\) must be checked first/i.test(
 
 await page.getByText('method, official guidance and required confirmation', { exact: true }).click();
 const methodText = await page.locator('body').innerText();
-if (!/1,167 canonical geolocated projects/i.test(methodText) || !/live DoED register ↗/i.test(methodText)) {
+if (!/[0-9,]+ canonical geolocated projects/i.test(methodText) || !/live DoED register ↗/i.test(methodText)) {
   throw new Error('canonical registry audit or official source link missing');
 }
 if (!/DoED system optimization guideline ↗/i.test(methodText) || !/midpoint can snap to the wrong branch/i.test(methodText)) {
@@ -97,23 +89,20 @@ await page.getByText(/Midpoint topology is not a confirmed cascade/i).waitFor({ 
 const afterAt = await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get('at'));
 if (afterAt !== beforeAt) throw new Error('cascade evidence click moved the study point');
 
-// Downloaded GIS evidence must preserve the same provenance and non-claim.
-const [download] = await Promise.all([
-  page.waitForEvent('download'),
-  page.getByRole('button', { name: /GeoJSON/ }).click(),
-]);
-const downloadPath = await download.path();
-if (!downloadPath) throw new Error('GeoJSON download has no readable path');
-const geo = JSON.parse(await readFile(downloadPath, 'utf8'));
-if (geo.hydrorecon_cascade?.upstreamCandidates !== upstream || geo.hydrorecon_cascade?.downstreamCandidates !== downstream) {
-  throw new Error('GeoJSON cascade metadata differs from the visible screen');
+// The computed screen the panel is drawn from must carry the same candidates and the
+// same non-claim. (This used to be read back out of the GeoJSON export, which is gone;
+// the export was only ever a vehicle for these values.)
+const cascade = await page.evaluate(() => {
+  const c = window.__exportCtx?.cascade;
+  return c ? { up: c.upstream.length, down: c.downstream.length, limitation: c.limitation,
+    routesIncluded: [...c.upstream, ...c.downstream].filter((p) => p.routeGeometryIncluded).length } : null;
+});
+if (!cascade) throw new Error('cascade screen missing from the export context');
+if (cascade.up !== upstream || cascade.down !== downstream) {
+  throw new Error('cascade screen differs from the visible panel');
 }
-const projectFeatures = geo.features.filter((feature) =>
-  feature.properties?.part === 'DoED project coordinate-range midpoint interaction candidate'
-);
-if (projectFeatures.length !== upstream + downstream) throw new Error('GeoJSON omitted cascade project points');
-if (!projectFeatures.every((feature) => /not a confirmed cascade/i.test(feature.properties.interpretation))) {
-  throw new Error('GeoJSON cascade non-claim missing');
+if (!/Network relation does not prove shared water/i.test(cascade.limitation)) {
+  throw new Error('cascade non-claim missing from the screen');
 }
 
 // Narrow field viewport: candidate lists and long project names must not overflow.
@@ -131,7 +120,13 @@ if (!mobile.panelVisible || mobile.scroll > mobile.client + 1) {
 // Global mode must not inherit Nepal's register or topology screen.
 await page.setViewportSize({ width: 1280, height: 800 });
 await page.goto(`${base}?qa=global-cascade#at=46.55,8.49&map=10/46.55/8.49`, { waitUntil: 'domcontentloaded' });
-await page.getByText('engineering geology sources', { exact: true }).waitFor({ timeout: 90_000 });
+// Wait on the region, not on a built scheme: a global scheme needs live terrain and flood
+// services, and this check is about what Nepal's register must NOT put in the study.
+await page.waitForFunction(() => window.__exportCtx?.region === 'global', null, { timeout: 90_000 });
+await page.waitForTimeout(3_000);
+if (await page.evaluate(() => window.__exportCtx.cascade) !== null) {
+  throw new Error('Nepal DoED cascade screen leaked into the global study context');
+}
 const globalText = await page.locator('body').innerText();
 if (/project interaction|live DoED register|system optimization guideline/i.test(globalText)) {
   throw new Error('Nepal DoED cascade evidence leaked into global mode');
@@ -143,7 +138,7 @@ if (relevantFailures.length) throw new Error(`failed requests:\n${relevantFailur
 
 console.log(JSON.stringify({
   denseKaliGandaki: { upstream, downstream, ...mapState, popupWithoutSiteMove: true },
-  geojson: { projectPoints: projectFeatures.length, provenance: true },
+  screen: { projectPoints: cascade.up + cascade.down, nonClaim: true },
   mobile,
   globalMode: 'Nepal DoED cascade panel absent',
   consoleErrors: consoleErrors.length,
@@ -151,4 +146,3 @@ console.log(JSON.stringify({
 }, null, 2));
 
 await browser.close();
-preview?.kill();

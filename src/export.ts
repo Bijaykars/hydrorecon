@@ -1,13 +1,21 @@
 /**
- * Taking the work away.
+ * What the app still shares, and what it no longer does.
  *
- * A screening tool that cannot hand its result to the next person is a toy. Two
- * formats, because engineers want two different things: a CSV of the numbers to
- * put in front of a colleague, and a GeoJSON of the geometry to drop into QGIS
- * next to their own layers.
+ * This module was written to hand a screening result to the next person: a CSV,
+ * a GeoJSON and a field plan, each stamped with the provenance of every source
+ * behind it. The desk study went first (2026-11-09), then those three exports.
  *
- * Both carry a header naming every source, assumption and limitation, so the
- * file still explains itself a year later when nobody remembers what produced it.
+ * What remains live is `ExportContext` — the shape App.tsx publishes on
+ * `window.__exportCtx`, which four live harnesses read — and `download()`, used
+ * by the map explorer. `waterBalance` and `RUNOFF_PLAUSIBLE_MAX` moved here
+ * when report.ts was deleted and are held by checks/waterbalance.check.ts.
+ *
+ * The rest — `stamp`, `provenance`, `schemesToCsv`, `fieldPlanToCsv` and
+ * `schemesToGeoJson`, roughly four fifths of this file — has no caller in the
+ * app and is kept alive by checks/export.check.ts alone. It is deliberately not
+ * deleted: `provenance` is 530 lines of source citation that took real work to
+ * assemble, and the output this tool most plausibly needs next is a monthly
+ * flow table by method, which would be built from exactly this material.
  */
 import type { Scheme } from './engine/discover.ts';
 import { DOED_RETRIEVED, DOED_UPDATED, type Licence } from './context.ts';
@@ -1471,10 +1479,6 @@ export function download(filename: string, mime: string, text: string) {
   a.click();
   // Revoking immediately can cancel the download in some browsers.
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
-}
-
-export function fileStem(at: { lat: number; lon: number }): string {
-  return `hydrorecon_${at.lat.toFixed(4)}_${at.lon.toFixed(4)}`;
 }
 
 /*

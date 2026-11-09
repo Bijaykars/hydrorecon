@@ -92,13 +92,6 @@ const STEPS: TourStep[] = [
     title: 'Map layers',
     body: 'Fourteen switchable layers: gauges, glacial lakes, hazard reports, licensed projects, geology, grid and protected areas.',
   },
-  {
-    id: 'export',
-    target: '[data-tour="export"]',
-    placement: 'left',
-    title: 'Take it with you',
-    body: 'CSV and GeoJSON of every alternative, each with a header naming its sources, assumptions and limitations, plus a field-plan CSV of what to verify next.',
-  },
 ];
 
 const KEY = 'hydrorecon.tour.done';

@@ -78,13 +78,45 @@ const n = (v: number, d = 1) =>
       : v.toLocaleString('en-US', { maximumFractionDigits: d });
 
 /**
- * Percentage points inside which a dry share cannot call a PPA bar either way.
- * Carried over from the desk-study report (`Math.abs(closest) <= 5`), which sat
- * on the measured error: dry share under-read by 3.7 pt, typical error 5.1, at
- * 74 DHM gauges (CLAUDE.md, "The dry season, measured for the first time").
- * Display only — nothing in the engine reads it.
+ * Percentage points inside which a dry share cannot call a PPA bar either way,
+ * and the measured bias beside it. Display only — nothing in the engine reads
+ * either, so no dry share moves.
+ *
+ * Measured by checks/dryshare-vs-gauges.mjs at 74 DHM gauges, the `shipped` arm
+ * (CLAUDE.md, "The dry season, measured for the first time"), and it depends on
+ * the MACHINE: a Francis trips out below 40% of design flow, and dry-season days
+ * sit exactly in the band where the unit decides whether to run at all.
+ *
+ *   machine                              plan     bias      typical error
+ *   Pelton-like, idles to 10% of design  6 + 6    -3.7 pt   5.1 pt
+ *   Francis-like, trips below 40%        6 + 6    -5.6 pt   8.8 pt
+ *   Francis-like, trips below 40%        8 + 4    -3.9 pt   6.8 pt
+ *
+ * One band serves both PPA splits, and for a Francis it is the 6 + 6 figure — the
+ * wider of its two, so the 8 + 4 line errs towards "not decided". Widening the band
+ * declines to decide more often; the bar is never shifted by the bias, because that
+ * is the optimistic move the fdcshape widening was refused for (false qualifications
+ * 5 -> 12 of 74).
  */
-const DRY_SHARE_ERROR_PT = 5;
+const DRY_SHARE_PELTON = { errorPt: 5.1, biasPt: 3.7, falseRejects: 24 } as const;
+const DRY_SHARE_FRANCIS = { errorPt: 8.8, biasPt: 5.6, falseRejects: 20 } as const;
+
+/**
+ * Which measurement applies to the selected runner. Only two machines were measured,
+ * at a 10% and a 40% minimum flow. turbine.ts gives Pelton and Turgo the 10% curve
+ * and Francis the 40% one; Crossflow (12%), Kaplan (20%), Propeller and "no runner"
+ * sit between or outside the two, so they take the wider Francis figure rather than a
+ * guessed mapping, and `measured: false` lets the footnote say so.
+ */
+function dryShareError(turbine: string | null) {
+  if (turbine === 'Pelton' || turbine === 'Turgo') {
+    return { ...DRY_SHARE_PELTON, measured: true, machine: 'a machine that idles to 10% of design' };
+  }
+  if (turbine === 'Francis') {
+    return { ...DRY_SHARE_FRANCIS, measured: true, machine: 'a machine that trips below 40% of design' };
+  }
+  return { ...DRY_SHARE_FRANCIS, measured: false, machine: 'a machine that trips below 40% of design' };
+}
 
 /** Section heading — one style for the whole panel, so hierarchy comes free. */
 function H({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
@@ -521,8 +553,6 @@ export function Reading(props: {
   onClearMeasured: () => void;
   wideSearch: boolean;
   onWideSearch: (v: boolean) => void;
-  canExport: boolean;
-  onExport: (kind: 'csv' | 'geojson' | 'field-plan') => void;
   busy: string | null;
   error: string | null;
   neighbours: { lat: number; lon: number; meanCms: number }[] | null;
@@ -597,8 +627,6 @@ export function Reading(props: {
     onClearMeasured,
     wideSearch,
     onWideSearch,
-    canExport,
-    onExport,
     busy,
     error,
     neighbours,
@@ -639,6 +667,7 @@ export function Reading(props: {
   const verdict = grid ? connectionVerdict(grid) : null;
 
   const alternatives = found?.schemes ?? [];
+  const dryErr = dryShareError(scheme?.turbine ?? null);
   const turbineEvidence = scheme
     ? explainTurbineSelection(scheme.designFlowCms, scheme.netHeadM)
     : null;
@@ -1023,8 +1052,8 @@ export function Reading(props: {
                 ].map(([label, result, required]) => {
                   const r = result as typeof scheme.reliability.ppaSixSix;
                   // Not decided inside the measured error — same rule and constant the
-                  // desk-study report used (|share − bar| <= 5 pt), see DRY_SHARE_ERROR_PT.
-                  const open = Math.abs(r.dryShare * 100 - Number(required)) <= DRY_SHARE_ERROR_PT;
+                  // desk-study report used (|share − bar| <= the measured error), see DRY_SHARE_*.
+                  const open = Math.abs(r.dryShare * 100 - Number(required)) <= dryErr.errorPt;
                   return (
                     <div key={String(label)} className="border-t border-line py-1 first:border-0 first:pt-0 last:pb-0">
                       <div className="flex items-baseline gap-2 text-[11px]">
@@ -1034,7 +1063,7 @@ export function Reading(props: {
                         </span>
                         <span className="text-faint">
                           {open
-                            ? `not decided · within ${DRY_SHARE_ERROR_PT} pt of ${String(required)}%`
+                            ? `not decided · within ${dryErr.errorPt} pt of ${String(required)}%`
                             : `${r.meets ? 'meets' : 'below'} ${String(required)}%`}
                         </span>
                       </div>
@@ -1048,9 +1077,13 @@ export function Reading(props: {
                   );
                 })}
                 <div className="mt-1.5 border-t border-line pt-1.5 text-[10px] leading-relaxed text-faint">
-                  The model reads the dry share low: −3.7 pt on average, ±5.1 typical, at 74 DHM
-                  gauges. A &ldquo;below&rdquo; can therefore clear — 24 of those 74 rivers clear 30%
-                  where the model says they do not. Within {DRY_SHARE_ERROR_PT} pt of a bar the share
+                  The model reads the dry share low: −{dryErr.biasPt} pt on average, ±{dryErr.errorPt} typical,
+                  at 74 DHM gauges scored for {dryErr.machine}.{' '}
+                  {!dryErr.measured &&
+                    `A ${scheme.turbine ?? 'review'} was not one of the two machines measured, so the wider figure is used. `}
+                  A
+                  &ldquo;below&rdquo; can therefore clear — {dryErr.falseRejects} of those 74 rivers clear 30%
+                  where the model says they do not. Within {dryErr.errorPt} pt of a bar the share
                   does not decide it; dry-season gauging does.
                 </div>
               </div>
@@ -2337,7 +2370,7 @@ export function Reading(props: {
                   <p>{cascade.method}</p>
                   <p>{cascade.limitation}</p>
                   <p>
-                    DoED registry updated {cascade.registry.updated}, bundled {cascade.registry.retrieved}: {cascade.registry.canonicalRecords.toLocaleString('en-US')} canonical geolocated projects after collapsing {cascade.registry.duplicateRowsCollapsed} duplicate lifecycle row(s). Retained route geometry is capped at {cascade.thresholds.routeGeometryLimit} candidates for responsive maps and exports.
+                    DoED registry updated {cascade.registry.updated}, bundled {cascade.registry.retrieved}: {cascade.registry.canonicalRecords.toLocaleString('en-US')} canonical geolocated projects after collapsing {cascade.registry.duplicateRowsCollapsed} duplicate lifecycle row(s). Retained route geometry is capped at {cascade.thresholds.routeGeometryLimit} candidates to keep the map responsive.
                   </p>
                   <div className="flex flex-wrap gap-x-3 gap-y-1">
                     <a href={cascade.registry.source} target="_blank" rel="noreferrer" className="text-river hover:underline">live DoED register ↗</a>
@@ -2926,7 +2959,7 @@ export function Reading(props: {
                 ))}
                 {faults.nearby.length > 4 && (
                   <div className="text-[10px] text-faint">
-                    +{faults.nearby.length - 4} more regional traces are shown on the map and included in GeoJSON.
+                    +{faults.nearby.length - 4} more regional traces are shown on the map.
                   </div>
                 )}
               </div>
@@ -3057,7 +3090,7 @@ export function Reading(props: {
                 ))}
                 {hazards.records.length > 5 && (
                   <div className="pl-3.5 text-[10px] text-faint">
-                    +{hazards.records.length - 5} more points are shown on the map and included in GeoJSON.
+                    +{hazards.records.length - 5} more points are shown on the map.
                   </div>
                 )}
               </div>
@@ -3224,7 +3257,7 @@ export function Reading(props: {
                     })}
                     {upstreamConnectivity.lakes.length > 5 && (
                       <div className="text-[10px] text-faint">
-                        +{upstreamConnectivity.lakes.length - 5} more candidate centroids are on the map and in GeoJSON.
+                        +{upstreamConnectivity.lakes.length - 5} more candidate centroids are on the map.
                       </div>
                     )}
                   </div>
@@ -3264,7 +3297,7 @@ export function Reading(props: {
                     ))}
                     {upstreamConnectivity.incidents.length > 5 && (
                       <div className="pl-3.5 text-[10px] text-faint">
-                        +{upstreamConnectivity.incidents.length - 5} more report candidates are on the map and in GeoJSON.
+                        +{upstreamConnectivity.incidents.length - 5} more report candidates are on the map.
                       </div>
                     )}
                   </div>
@@ -3997,41 +4030,6 @@ export function Reading(props: {
                 ` Walked ${n(study.path[study.path.length - 1].km, 1)} km downstream.`}
             </div>
           )}
-        </div>
-      )}
-
-      {canExport && (
-        <div data-tour="export" className="border-b border-line px-4 py-3.5">
-          <H>Take it with you</H>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => onExport('csv')}
-              className="flex-1 rounded-lg border border-line bg-panel-2 px-3 py-2 text-[12px] font-medium text-ink hover:border-river/60 hover:bg-[color-mix(in_srgb,var(--color-river)_8%,transparent)] hover:text-river"
-            >
-              CSV — the numbers
-            </button>
-            <button
-              type="button"
-              onClick={() => onExport('geojson')}
-              className="flex-1 rounded-lg border border-line bg-panel-2 px-3 py-2 text-[12px] font-medium text-ink hover:border-river/60 hover:bg-[color-mix(in_srgb,var(--color-river)_8%,transparent)] hover:text-river"
-            >
-              GeoJSON — for QGIS
-            </button>
-            <button
-              type="button"
-              onClick={() => onExport('field-plan')}
-              className="col-span-2 rounded-lg border border-river/30 bg-[color-mix(in_srgb,var(--color-river)_6%,transparent)] px-3 py-2 text-[12px] font-medium text-river hover:border-river/60 hover:text-ink"
-            >
-              Field plan CSV — gates, priorities & deliverables
-            </button>
-          </div>
-
-          <Fine>
-            Every alternative, plus a header naming each source, assumption and limitation — so the
-            file still explains itself when nobody remembers where it came from. The link in your
-            address bar reopens this exact study.
-          </Fine>
         </div>
       )}
 

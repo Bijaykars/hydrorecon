@@ -82,14 +82,7 @@ import { mhspScreen } from './engine/mhsp.ts';
 import { osmLengthFactor, stretchPath } from './osm-rivers.ts';
 import { judgeShape, correctShape } from './engine/fdcshape.ts';
 import { DHM_STATISTICS_BUNDLED } from './dhm-statistics.ts';
-import {
-  download,
-  fieldPlanToCsv,
-  fileStem,
-  schemesToCsv,
-  schemesToGeoJson,
-  type ExportContext,
-} from './export.ts';
+import type { ExportContext } from './export.ts';
 import { Reading } from './Reading.tsx';
 import { distanceToNepalBoundaryKm, regionFor, type RegionMode } from './region.ts';
 import { assessReadiness } from './readiness.ts';
@@ -4086,21 +4079,6 @@ export default function App() {
     };
   }, [study, maxWaterwayKm]);
 
-  const onExport = useCallback(
-    (kind: 'csv' | 'geojson' | 'field-plan') => {
-      if (!exportCtx) return;
-      const stem = fileStem(exportCtx.at);
-      if (kind === 'csv') {
-        download(`${stem}.csv`, 'text/csv;charset=utf-8', schemesToCsv(exportCtx));
-      } else if (kind === 'geojson') {
-        download(`${stem}.geojson`, 'application/geo+json', schemesToGeoJson(exportCtx));
-      } else {
-        download(`${stem}_field_plan.csv`, 'text/csv;charset=utf-8', fieldPlanToCsv(exportCtx));
-      }
-    },
-    [exportCtx]
-  );
-
   const reset = useCallback(() => {
     setAt(null);
     setStudy(null);
@@ -4285,7 +4263,7 @@ export default function App() {
             <label className="mt-2 flex items-center gap-2"><input type="checkbox" checked={showModelGeometry} onChange={(e) => setShowModelGeometry(e.target.checked)} />Show model reference geometry</label>
             <details className="mt-2"><summary className="cursor-pointer text-river">Coordinates and source limits</summary>
               <p>Displayed intake: {riverDisplay.points[scheme.i].lat.toFixed(6)}, {riverDisplay.points[scheme.i].lon.toFixed(6)}<br/>Calculation point: {scheme.intake.lat.toFixed(6)}, {scheme.intake.lon.toFixed(6)}</p>
-              <p className="mt-1">This is a map alignment correction, not a surveyed relocation. Head, flow, pondage, engineering exports and report figures retain their model coordinates. Confirm positions before engineering use.</p>
+              <p className="mt-1">This is a map alignment correction, not a surveyed relocation. Head, flow and pondage values retain their model coordinates. Confirm positions before engineering use.</p>
               <a className="text-river" href="https://www.hydrosheds.org/products/hydrorivers" target="_blank" rel="noopener noreferrer">HydroRIVERS model source ↗</a><span> · </span><a className="text-river" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OSM channel trace · ODbL ↗</a>
             </details>
           </> : <p className="mt-1">{study.tracedFromTerrain ? 'The course was inferred from terrain.' : displayResult?.path === study.path ? 'A channel trace is unavailable; the displayed positions are approximate model coordinates.' : 'Checking the available channel trace…'}</p>}
@@ -4372,8 +4350,6 @@ export default function App() {
         onClearMeasured={() => setMeasured(null)}
         wideSearch={wideSearch}
         onWideSearch={setWideSearch}
-        canExport={Boolean(exportCtx && exportCtx.schemes.length > 0)}
-        onExport={onExport}
         neighbours={neighbours}
         onProbe={runProbe}
         onReset={reset}
