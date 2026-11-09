@@ -1,6 +1,6 @@
 # HydroRecon — run-of-river screening
 
-![MIT](https://img.shields.io/badge/license-MIT-blue) ![no backend](https://img.shields.io/badge/backend-none-success) ![no API keys](https://img.shields.io/badge/API%20keys-none-success) ![checks](https://img.shields.io/badge/checks-287%20passing-brightgreen)
+![MIT](https://img.shields.io/badge/license-MIT-blue) ![no backend](https://img.shields.io/badge/backend-none-success) ![no API keys](https://img.shields.io/badge/API%20keys-none-success) ![checks](https://img.shields.io/badge/checks-361%20passing-brightgreen)
 
 **Click a river. Get the schemes worth studying.**
 
@@ -68,9 +68,8 @@ and thalweg/abutment control.
 
 The intake and powerhouse are also snapped to a live OpenStreetMap-derived car-routing graph. The
 map and panel show the straight-line gap to each road and link to the snapped OSM position. This is
-a motor-road proximity floor, not a buildable access alignment or proof of road condition. Both
-screens and their caveats travel into CSV and GeoJSON. See [the pondage and road-access
-method](docs/pondage-road-access.md).
+a motor-road proximity floor, not a buildable access alignment or proof of road condition. See
+[the pondage and road-access method](docs/pondage-road-access.md).
 
 ## Nepal first, globally honest
 
@@ -105,8 +104,8 @@ transients, costs and risks. See [the readiness method](docs/engineering-readine
 
 At Nepal reaches with catchment inputs, HydroRecon evaluates the legacy WECS/DHM 1990 monthly-flow
 regression and the full Q2–Q500 regional flood series. It uses the monthly regime as an independent
-Nepal-specific magnitude cross-check, shows disagreement instead of averaging it away, and carries
-every area/rainfall input, equation, return period, source and limitation into CSV and GeoJSON.
+Nepal-specific magnitude cross-check, shows disagreement instead of averaging it away, and shows
+every area/rainfall input, equation, return period, source and limitation.
 
 The flood values are deliberately labelled **regional flood estimates**, never design floods.
 Current DoED guidance requires comparison with other applicable methods, gauge-frequency and
@@ -120,7 +119,7 @@ See [the Nepal regional-hydrology method](docs/nepal-regional-hydrology.md).
 Nepal mode screens the selected intake-powerhouse reach against 9,102 approved, verified records
 from the Government of Nepal BIPAD portal: landslide, flood, earthquake, GLOF, avalanche and
 inundation. Matching reports within a 15 km investigation corridor are shown on the map, linked to
-their official records and carried into the geology/hazards gate and GeoJSON export.
+their official records and carried into the geology/hazards gate.
 
 These are reports, not a probability model. Points can be municipality/ward locations, repeated
 reports are not deduplicated into invented events, reporting coverage changes over time, and point
@@ -133,7 +132,7 @@ Nepal mode also walks 4,152 CC BY 4.0 Sentinel-2 glacial-lake centroids and rele
 verified BIPAD reports through the directed HydroRIVERS network. It reports sources whose mapped
 channel reaches the selected intake, the along-channel distance, vertex-snap distance, and the
 lake dataset's published 2017–2024 expansion and outlier flags. The map shows a capped set of
-overlapping routes while GeoJSON retains every candidate point and metric.
+overlapping routes.
 
 This is deliberately called a channel-connectivity candidate. It does not classify a lake as
 dangerous, prove that a reported landslide entered the river, or calculate breach probability,
@@ -147,7 +146,7 @@ Nepal mode also measures the reach against 55 Nepal-plus-buffer active-fault tra
 [GEM Global Active Faults Database](https://github.com/GEMScienceTools/gem-global-active-faults),
 pinned to an immutable source commit. It reports the nearest regional trace and shows every trace
 within a 50 km investigation window. Exact polyline intersections carry reach chainage into the
-map, readiness gate, field plan and GeoJSON.
+map, readiness gate and field plan.
 
 This is regional context, not fault set-out or seismic design. “Intersects” means the generalized
 fault trace intersects the mapped river centreline—not a surveyed canal, tunnel, penstock or
@@ -158,7 +157,7 @@ method](docs/fault-screen.md).
 
 Nepal mode matches the selected reach against the current official DMG catalog of 41 published
 1:50,000 map products. It shows only the publications and derived sheet footprints that touch the
-reach, carries the named maps into the field plan and exports, and links the official previews.
+reach, carries the named maps into the field plan, and links the official previews.
 Usable maps are hard-copy DMG products: HydroRecon does not bundle or trace the all-rights-reserved
 imagery. A no-match means no product was identified in that online catalog, not no geology.
 
@@ -166,15 +165,6 @@ At intake, mid-reach and powerhouse, the app also samples open CC BY 4.0 Macrost
 geology while retaining each original reference. This is visibly small-scale context and the
 geology gate remains `weak`; it cannot locate contacts or determine rock mass, permeability,
 foundation, tunnel or slope conditions. See [the geology source method](docs/geology-sources.md).
-
-## Taking the work away
-
-Three exports: a **CSV** of the numbers to put in front of a colleague, a **GeoJSON** of the
-geometry to drop into QGIS, and an assignable **field-plan CSV** of gates, priorities and
-deliverables. All carry their mode, evidence and limitations; the main exports carry a header naming every source,
-assumption and limitation — including a warning listing any licensed project
-already on the reach — so the file still explains itself a year later. The link
-in the address bar reopens the exact study.
 
 ## Is the river already taken?
 
@@ -196,7 +186,7 @@ the source update and bundle dates, and every panel links back to the live regis
 After removing the direct reach records, Nepal mode walks canonical DoED project coordinate-range
 midpoints through the directed HydroRIVERS network. A midpoint must snap within 2 km, and an
 upstream-to-intake or powerhouse-to-downstream route must be no longer than 200 km. The result
-separates upstream and downstream candidates on the map and in CSV/GeoJSON, with stage, route,
+separates upstream and downstream candidates on the map, with stage, route,
 snap distance, source dates and a warning when the published range itself is wide.
 
 This is deliberately not a cascade declaration. DoED does not publish component locations in the
@@ -233,7 +223,7 @@ efficiency and hydraulic loss are calculated per duty point rather than exposed 
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm run check    # 287 assert-based checks
+npm run check    # 361 assert-based checks
 npm run build    # typecheck + production build
 ```
 
@@ -321,8 +311,8 @@ npm run build:glacial-lakes # open Sentinel-2 lake centroids and published chang
 npm run check            # integrity, privacy, geometry and engineering checks
 npm run check:live:geology # production-browser map, CORS, popup and mobile geology QA
 npm run check:live:connectivity # upstream lake/report map and non-clearance QA
-npm run check:live:cascade # directed DoED map, export and global-isolation QA
-npm run check:live:hydest # regional-hydrology terminology, export and mobile QA
+npm run check:live:cascade # directed DoED map and global-isolation QA
+npm run check:live:hydest # regional-hydrology terminology and mobile QA
 ```
 
 The builders retry public endpoints and fail before replacing a bundle when a
