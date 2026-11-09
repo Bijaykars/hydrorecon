@@ -95,7 +95,7 @@ before release would include them. Decide each deliberately.
 | `public/nepal-glaciers.json` (2.5 MB) | **RGI 7.0** region 15 | **CC BY 4.0** ([vendor](https://rgidata.org/)) — cite RGI 7.0 Consortium (2023), DOI 10.5067/f6jmovy5navz |
 | `public/nepal-channel.dat` | OpenStreetMap | **ODbL 1.0** |
 | `src/data/dhm-liveness.json` | DHM telemetry endpoints | **UNDETERMINED**, same family as `dhm-stations.json` |
-| `src/data/flow-analogues.json` | Derived from DHM records | Inherits the old **BLOCKER 1**: it holds measured per-station flow (`truth`) and must stay untracked. Outside the scope of the blocker-1 split, which touched the index only |
+| `src/data/flow-analogues.json` | Derived from DHM records | Inherits the old **BLOCKER 1**: it holds measured per-station flow (`truth`) and must stay untracked; the tracked public twin is `src/data/flow-analogues.public.json` (all 69 donors, `truth` null). Outside the scope of the blocker-1 split, which touched the index only |
 | `src/data/pondage-validation.gsw*.json`, `pipeline/pondage-references-gsw.json` | Derived vs **JRC Global Surface Water v1.4** | GSW is free and unrestricted (Pekel et al. 2016); these hold scores, not GSW data |
 | `a.json` ... `chunk.bin` (19 US-sources scratch files) | Exploration exhaust | **Now gitignored** (`.gitignore:101-119`). Confirmed excluded. |
 
@@ -163,16 +163,18 @@ before.
 | | licensed index | published index |
 |---|---|---|
 | Stations on the map and in listings | 131 positioned | **131 positioned** |
-| Gauge transfer | offered and adoptable | **unavailable, and the panel and the report say why** |
-| Flow-duration shape check | national band from 81 gauges | **not run, and the report says so** |
+| Gauge transfer | offered and adoptable | **unavailable, and the panel says why** |
+| Flow-duration shape check | national band from 81 gauges | **not run; the panel's note names it as absent** (the report that said so in full was removed 2026-11-09) |
 | `npm run check` | exit 0 | exit 0 (`fdcshape.check` skips out loud) |
 | `npx tsc -b --force --noEmit`, `npm run build` | exit 0 | exit 0 |
 
 The second row is the point: a published build reports that it cannot transfer a record instead
 of transferring one badly. The third row is the honest cost — `engine/fdcshape.ts` fires on about
 16% of sites and LOWERS design flow, so a published build's flow figures are the raw model's and
-are **less conservative** than a licensed build's. `src/report.ts` states that in the
-flow-duration appendix rather than letting the section disappear.
+are **less conservative** than a licensed build's. `src/report.ts` used to state that in
+its flow-duration appendix; the report was removed on 2026-11-09, so the panel's note
+(`DHM_STATISTICS_ABSENT_NOTE`, which names the flow-duration screen) is now the only
+disclosure, and it does not say what the absence costs.
 
 #### No computed number moved, and the signature proves it
 
@@ -181,7 +183,8 @@ This is packaging. `src/dhm.ts` and `src/engine/fdcshape.ts` are both covered by
 CLAUDE.md's accuracy table. **Neither was touched**: the engine signature reads `9ee12d76c779`
 before and after, `NATIONAL_SHAPE` reproduces all 21 of its numbers bit for bit, and
 `npm run check` passes at the same count. The availability flag lives in a new unsigned module,
-`src/dhm-statistics.ts`, read only by `App.tsx`, `Reading.tsx` and `report.ts`.
+`src/dhm-statistics.ts`, read only by `App.tsx` and `Reading.tsx` (and, until the desk-study report was
+removed on 2026-11-09, `report.ts`).
 
 #### Rebuilding the full index
 
@@ -202,7 +205,8 @@ Before the first public push, either rewrite that path out of history (`git filt
 remaining action on blocker 1**, and it is a release step, not a code change.
 
 Also outstanding and unchanged by this: `src/data/flow-analogues.json` (untracked, sec. 1d) holds
-measured per-station flow and must stay untracked, and `fleet-validation.json` carries transferred
+measured per-station flow and must stay untracked (its tracked public twin,
+`src/data/flow-analogues.public.json`, carries all 69 donors with `truth` null), and `fleet-validation.json` carries transferred
 gauge values — see blocker 6.
 
 ### BLOCKER 2 — `src/data/nepal-pga.json`: CC BY-NC-SA 4.0, incompatible with an MIT/open release
@@ -262,7 +266,7 @@ licence-forced. Worth recording there.
 to (`public/nepal-upa.dat`, the only MERIT-derived file in the repository), citing Yamazaki
 et al. 2019 and linking the vendor policy. CLAUDE.md's four CC-BY-NC assertions were
 corrected the same day, as were the two in `src/report.ts` that print into every generated
-desk study, plus the build and harness headers in `pipeline/build_merit_upa.py` and
+desk study (the file was deleted with the report on 2026-11-09), plus the build and harness headers in `pipeline/build_merit_upa.py` and
 `checks/merit-vs-reach-area.mjs`. **Blocker 5 is closed.** The GeoTIFFs still do not ship —
 that is the authors' separate *request*, not a term of either licence arm.
 

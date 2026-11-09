@@ -20,6 +20,39 @@ Read the comment block above it first.
 
 ---
 
+## The desk-study report was removed, and several sections here still describe it
+
+Commit `d4404b4` (2026-11-09) deleted `src/report.ts` (3,423 lines) and
+`pipeline/render-report.mjs`, with the print control, the figure capture, the
+report metadata inputs and the hidden capture-only map layers. CSV, GeoJSON and
+the field-plan export remain.
+
+Where a section below says "the report", "the PDF" or "the document", it means
+that deleted feature, and each such section carries a marker saying so. The
+findings are left as written: they are measurements of the engine and its data,
+and what each one caught is the kind of mistake this project will make again.
+What changed is only whether the thing described still exists.
+
+Four things in `report.ts` were not report-only and were moved rather than
+deleted: `waterBalance()` and `RUNOFF_PLAUSIBLE_MAX` to `src/export.ts`,
+`glofDangerSignals()` and `GLOF_ROUTE_KM` to `src/connectivity.ts`. Their checks,
+`checks/waterbalance.check.ts` and `checks/glof.check.ts` (all ten cases,
+including the regression where the screen failed open), still run. **Both now
+have no user-facing surface at all.** The runoff-coefficient disclosure and the
+glacial-lake danger screen were printed in the document and nowhere else, and
+nothing in the app calls either function. That is a consequence of the removal
+rather than a decision about hazard disclosure, and it is recorded here so it is
+not discovered later. The report-only "typical" runoff tier
+(`RUNOFF_TYPICAL_MAX = 1.2`) went with the document.
+
+A third consequence, smaller: the measured dry-share error and the refusal to
+call a scheme decided within 5 points of its threshold were also printed only in
+the report. The dry-share panel in `Reading.tsx` shows the share and the NPR
+reference without them; the design-flow panel and the text export still say the
+dry share reads 4-6 points low against DHM gauges.
+
+---
+
 ## Accuracy, as measured
 
 **Every row below is one engine, `acdb34241895`, re-measured 2026-08-25.** The
@@ -166,8 +199,8 @@ not.
 Every other gauge harness here scores MAGNITUDE. None scored the seasonal split,
 and the seasonal split is where the money is: NEA pays NPR 8.40/kWh dry against
 4.80 wet, and a scheme only reaches the 6+6 option by delivering 30% of its
-energy in the dry season (15% on 8+4). The app prints that verdict in a report
-beside a rupee figure, and nothing had ever checked it.
+energy in the dry season (15% on 8+4). The app prints that verdict beside a
+rupee figure, and nothing had ever checked it.
 
 At 74 DHM gauges, dispatching the app's own flow series and the gauge's measured
 record through ONE identical plant on the days both cover, with the model handed
@@ -192,8 +225,10 @@ decide a tariff.
 
 **So a "below" verdict is the one more likely to be wrong.** 24 of these 74
 gauged rivers clear the 30% bar while the app says they do not. `src/report.ts`
-now prints that error beside the test and refuses to call a scheme decided when
-it sits within 5 points of its threshold.
+printed that error beside the test and refused to call a scheme decided when it
+sat within 5 points of its threshold. *The report was removed on 2026-11-09 and
+that disclosure went with it; see the section near the top. The design-flow panel
+and the text export still say the dry share reads 4-6 points low.*
 
 ### And it settles two fdcshape questions
 
@@ -248,8 +283,13 @@ bankable.
 
 ## Rain in, runoff out — and the ceiling the gauges had to set
 
-`waterBalance()` in `src/report.ts`, measured by
+`waterBalance()` in `src/export.ts`, measured by
 `checks/waterbalance-vs-fleet.mjs`.
+
+*It began in `src/report.ts` and was moved when the desk-study report was removed
+(2026-11-09). It survives with `checks/waterbalance.check.ts`, but nothing in the
+app now calls it: the runoff-coefficient disclosure described below was printed
+in the document and nowhere else. See the section near the top.*
 
 A catchment cannot deliver much more water than falls on it. Mean flow,
 catchment area and rainfall were all being printed, in three different sections,
@@ -369,10 +409,11 @@ Five rows cannot support a change to arbitration, and arbitration is not where
 the defect is anyway: the network candidate at the failing site was right and
 available, and the referee had no absolute anchor to prefer it with.
 
-**So `flowchoice.ts` is untouched and no measured number moves.** What ships is
+**So `flowchoice.ts` is untouched and no measured number moves.** What shipped was
 disclosure only — the coefficient printed beside every mean flow, in three tiers,
-with the wording escalating past 2.0. Do not fix this by moving `BOTH_LOST`;
-that is the trap this file names four times over.
+with the wording escalating past 2.0. *As of 2026-11-09 even that is gone: the
+report was removed and nothing in the app displays the coefficient.* Do not fix
+this by moving `BOTH_LOST`; that is the trap this file names four times over.
 
 **What would settle it** is an absolute anchor in the arbitration rather than a
 relative one — scoring each candidate against the water balance and preferring
@@ -458,6 +499,11 @@ twice the reach's own area, with the Seti reading 7,358 km² against a reach of 
 
 ## Collector intakes, finally in the report
 
+*The PDF this section describes was removed on 2026-11-09. The disclosure survives
+in the text export, which prints a `COLLECTOR INTAKES` line with the number added
+and the design-flow gain; the verification below, which injected a context into
+`deskStudyHtml`, can no longer be run.*
+
 A panel-against-report audit found three things the app knew and the document
 did not say. Two were closed at the time — the wrong-river warning and the
 flow-duration shape check. This was the third, left open for two sessions while
@@ -478,6 +524,12 @@ that it stays silent when `collectors` is null.
 ---
 
 ## Three things that were broken and did not announce it
+
+*Two of the four findings here lived in the desk-study report, removed on
+2026-11-09. The GLOF screen is now `glofDangerSignals()` in `src/connectivity.ts`,
+still guarded by `checks/glof.check.ts`, and has no user-facing surface;
+`pipeline/render-report.mjs` no longer exists. The render-loop and glacier-bundle
+findings are about the app and still hold.*
 
 **The GLOF screen could not fire.** `report.ts` filtered upstream lakes on
 `areaHa ?? areaKm2 * 100 ?? 0`, through an `as unknown as` cast, and
@@ -856,6 +908,11 @@ window it was about to need again and re-downloaded the lot on every change.
 
 `npm run build:geology-units`, guarded by `checks/geology-units.check.ts`.
 
+*Wording note, 2026-11-09: "the report" in this section is the removed desk-study
+document. The panel in `Reading.tsx` still counts contacts, labels code-only units
+and says "not mapped" for the digitisation gap. The regional-correlation caveat
+below was printed only in the report and now appears nowhere in the app.*
+
 The app held three geological things and none could name the rock under an
 intake. `nepal-geology-maps.json` is an AVAILABILITY index — which DMG sheets
 cover the alignment, never what is printed on them. The province sheets are
@@ -954,6 +1011,10 @@ shaft or a support change. The 1:350,000 province sheets are better and the
 
 ## The hazard figure, and what it caught
 
+*The figure was part of the desk-study report, removed on 2026-11-09, and no
+longer exists. The measurement about BIPAD records below is about the records, not
+the figure, and stands.*
+
 The hazard evidence used to be a screenshot of the DARK basemap with a hundred
 three-pixel triangles on it — dark on dark, markers below what a page can
 resolve. It proved records exist and answered nothing else.
@@ -1003,6 +1064,8 @@ now a full section reporting whether each record can actually be transferred.
 
 ### The geological sheet needed the opposite treatment
 
+*Removed with the report on 2026-11-09, as above; the figure no longer exists.*
+
 Framed on the scheme, the DMG figure was a blow-up of one polygon: a flat green
 field with the sheet's own labels three times the size of the report's type,
 jagged because a 200 dpi tile was being magnified perhaps eightfold past what
@@ -1026,6 +1089,11 @@ showing its background clearly and the project poorly, which is backwards.
 ---
 
 ## The report was apologising, and it had a lot to be proud of
+
+*The report was removed on 2026-11-09, so nothing below describes current
+behaviour. It is kept because the numbers it quotes are measurements of the
+engine and because the mistakes it caught are ones a document, or a panel, can
+make again. See the section near the top.*
 
 Counted on one real site, the sixteen body pages carried **29 finding badges**,
 and **not one of them read as a result**. Thirteen said REQUIRED FIELD
@@ -1367,13 +1435,170 @@ Do not re-try these without reading the comment blocks:
   the same thing — `usable` 1.40× against `close` 1.44× with 10+ year donors —
   and the fleet's refutation still stands. The repair did not reopen this.
 
+- **An applicability gate on the analogue transfer's area ratio, and an exponent
+  other than 1.** The transfer shipped with neither measured. Scored leave-one-out
+  on 69 gauges the exponent curve is flat from 0.5 to 1.1 (1.20–1.23×), and the
+  optimum at 0.85 beats 1.0 by 0.6% — closer on 41 sites, further on 28, interval
+  includes zero. The USGS 0.5–1.5 window improves typical error 1.21× → 1.16× only
+  by dropping six sites, five of them all five gauges under 100 km² (median error
+  1.96× dropped against 1.21× kept), and the wider 0.33–3 window makes
+  project-weighted error **worse**, 1.58× → 1.68×. A gate that improves the average
+  by refusing the catchment sizes projects sit on is harness rule 2 once more.
+  Both constants are named in `flow-analogue.ts` at 1 and unbounded.
+  `checks/analogue-exponent-gate.mjs` re-runs the whole comparison.
+
 ### The trap that recurs
 
-**The gauge population is systematically easier than the use population.** DHM
-gauges sit on rivers with a median catchment of ~800 km²; DoED projects sit near
-~100 km². Gauges are order 4–5, projects order 1–3. MERIT's bleed rate is ~1% at
-gauges and ~9% at projects. Three separate changes looked good on gauges and
-failed on plants for this reason.
+**The gauge population is systematically easier than the use population.** The
+69 gauges that carry the headline sit on a median catchment of 1,957 km²; DoED
+projects sit near ~100 km². Gauges are order 4–5, projects order 1–3. MERIT's
+bleed rate is ~1% at gauges and ~9% at projects. Three separate changes looked
+good on gauges and failed on plants for this reason.
+
+**The cause is not what this file said it was.** It used to read "DHM gauges sit
+on rivers with a median catchment of ~800 km²", as though that were a property of
+the network. The network's own median is **538 km²**, and ~800 was true only of
+the set the project holds (813 km²). The distance from there to 1,957 km² is the
+10+ complete years bar, which is this project's choice. The trap is real and its
+conclusion stands; its cause is largely our own filter, measured in the section
+below.
+
+---
+
+## The gauge network is not a big-river network — our own filter made it one
+
+`python pipeline/build-dhm-catchments.py` (once; needs DHM's published
+catchment-area table), then
+`node --experimental-strip-types --no-warnings checks/gauge-catchment-bands.mjs`
+
+"The gauge population is systematically easier than the use population" is this
+file's oldest known weakness, and for most of that time it was treated as a fact
+about DHM: gauges sit on big rivers. It had never been set against the network.
+DHM publishes the catchment area of every hydrological station as an open table,
+with no reference to how long anyone holds a record, so the network's own size
+distribution can be read off and compared with the one this project scores.
+
+**190 stations, parsed. Median 538 km², 28 under 100 km², 93 under 500.** That is
+not a big-river network. Joined to the 136 records the project holds, 119 of the
+190 match, and what is held has a median of **813 km²** — so the old "~800 km²"
+was right for the held set, and holding is a mild skew. The bar is the large one.
+Requiring **10 or more complete years** takes the held median to **2,370 km²**, by
+removing two thirds of the gauges under 500 km² against a fifth of those over
+2,000. The 69-gauge table's 1,957 km² is a consequence of that bar, not of where
+DHM puts gauges.
+
+**So the penalty is now measured rather than inferred, and it is real.** Below
+500 km² the typical error is **1.65–1.8×**; above 500 km² it is **1.26–1.40×**.
+That holds at every record-length tier and survives restricting to rows where the
+engine's catchment area agrees with DHM's. Weighted to where plants sit — 41%
+under 100 km², 41% at 100–500 km², median intake 163 km² — the error is **1.72×
+at 10+ years, 1.66× at 5+ and 1.73× at 3+**, against 1.37×, 1.49× and 1.54×
+unweighted. The project-weighted **1.64×** quoted at the top of this file was
+derived a different way, from the leave-one-out blend, and lands in the same
+place. Two independent routes to one number is worth more than either alone.
+
+**Three things this cannot say.**
+
+- **The band where plants sit is still unreadable.** The under-100 km² band holds
+  41% of plants and **4 gauges at 10+ years, 10 at 5+**, so its own error cannot
+  be pinned tighter than 1.4–2.4×. Relaxing the bar does not fix that: it adds
+  short records, not small catchments.
+- **Short records are not the cause.** Resampling the 70 stations with 12+ years,
+  a 3-year mean is off by about **1.11×** typical. That is nowhere near the
+  1.7–1.9× measured below 500 km², so the small-catchment error belongs to the
+  model and not to the sample.
+- **The cumulative tiers are not comparable to each other.** The all-gauges row
+  rises from 1.37× to 1.54× as the bar relaxes only because small catchments join
+  the mix. Each band's own row is the fair comparison, and none of these figures
+  is offered against the headline as an improvement or a regression.
+
+Two things found on the way. **58 of 115 matched stations disagree with DHM's own
+published coordinates by more than 1 km, 3 by more than 20 km, one by 111 km.**
+Everything is scored on the records' coordinates so the headline replicates, but
+which set is right is open. And the 100–500 km² band's bias flips from **0.75× on
+long records to 1.30× on short ones**, which is the per-band-constants finding
+above arriving again.
+
+No engine module, computed number or shipped data file moved. This is measurement
+only.
+
+---
+
+## The analogue transfer's two silent constants, measured and kept
+
+`node --experimental-strip-types --no-warnings checks/analogue-exponent-gate.mjs`
+
+The analogue transfer (PCAR, in `src/engine/flow-analogue.ts`) assumed an
+area-ratio exponent of 1.0 and no applicability gate at all. Neither had been
+measured; unity is what practice assumes rather than what the literature
+supports. USGS work reports exponents from about **0.47** on very large basins to
+about **1.02** seasonally, and a donor-to-target area window of **0.5–1.5**,
+widened to **0.33–3** by a later USGS study that found the wider window performed
+as well or better. There is no published error bound for precipitation-weighted
+catchment-area ratio specifically, so nothing external says what to expect.
+
+Both are now named constants, `AREA_RATIO_EXPONENT = 1` and `AREA_RATIO_WINDOW`
+(unbounded), with the literature ranges beside them, and `analogueFlow` takes
+them as options so a harness can sweep without reimplementing the transfer. The
+shipped values are unchanged. Scored leave-one-out on the 69 donors:
+
+**The exponent does not matter between 0.5 and 1.1.** Typical error is
+**1.20–1.23×** throughout. The optimum at 0.85 beats 1.0 by **0.6%**, is closer on
+41 sites and further on 28, and its 95% paired bootstrap interval includes zero.
+There is one real signal underneath: the five gauges under 100 km² read 1.12×
+biased at an exponent of 1 and want a lower one, which is the direction the
+literature predicts. Five gauges cannot carry it.
+
+**The gate is refused, for the reason harness rule 2 exists.** At 0.5–1.5 the
+typical error improves **1.21× → 1.16×**, and it does so by dropping six sites,
+five of which are **all five gauges under 100 km²**. Median error on the dropped
+sites is **1.96×** against 1.21× on the kept ones; median catchment 74 km²
+dropped against 2,453 km² kept. Project-weighted error gets **worse** under
+0.33–3, **1.58× → 1.68×**. A window that improves the average by refusing the
+catchment sizes projects actually sit on has improved nothing.
+
+**Three things the audit found, none of them about the constants.**
+
+- `analogueFlow` has **no self-exclusion**. Leave-one-out is entirely the caller's
+  job, and `HydrologyComparison` hands it the full station list, so clicking a
+  gauge lets that gauge donate its own measurement to itself at the maximum
+  weight the distance term allows.
+- **DHM stations 220 and 225 are the same gauge filed twice**, 0.0 km apart at
+  1,750 km² each. Excluding by id leaves the twin donating at distance zero.
+  Eight further pairs of nested gauges sit within 5 km; they are not leaks, but
+  they flatter any leave-one-out against a genuinely ungauged site.
+- The donor set is selected on a **specific-runoff bound of 0.005–0.25
+  m³/s/km²**, which is a selection on the measured flow. Removing it takes
+  project-weighted error from about **1.6× to 3.0–3.4×** at every exponent.
+  Whatever that bound is doing, it is not independent of the truth it is scored
+  against.
+
+None of the three is fixed by this measurement. `flow-analogue.ts` is not among
+the sixteen signed modules and the shipped blend does not call it, so no figure in
+the accuracy table re-stales.
+
+---
+
+## Not built: the MIP method, and what would unblock it
+
+AEPC's guidelines name MIP as the method Nepali practice uses below 100 km²
+(HYDEST above), which is exactly the band the gauge-network section above shows
+the engine reading worst. It was investigated and not built, because it cannot be
+built from what is available or scored fairly against what is held.
+
+AEPC 2014 §2.4.5.1 (p. 19) says MIP requires **"one flow measurement in the low
+flow period from November to May"**, then scales a seven-zone monthly unit
+hydrograph by catchment area. The zone hydrographs and the zone map are in the
+HMG/N Medium Irrigation Project Design Manuals (1982) and the DoI PDSP Design
+Manuals (1990), and neither is available online. Separately, it cannot be scored
+against the DHM gauges: the required lean-season reading would have to come from
+the same record being scored, which makes the test circular.
+
+**What would unblock it** is two things, and the second is the harder. The two
+manuals, for the zone map and the seven hydrographs. And a set of sites carrying a
+lean-season measurement made independently of any record used as truth, which the
+DHM gauges cannot supply. Until both exist this is a good idea that cannot yet be
+measured, not one that measured badly.
 
 ---
 
