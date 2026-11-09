@@ -18,7 +18,7 @@
  * starting to call a third of Nepal's gauged rivers impossible.
  */
 import assert from 'node:assert/strict';
-import { waterBalance, RUNOFF_PLAUSIBLE_MAX } from '../src/report.ts';
+import { waterBalance, RUNOFF_PLAUSIBLE_MAX } from '../src/export.ts';
 import type { ExportContext } from '../src/export.ts';
 
 let passed = 0;

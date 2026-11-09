@@ -9,6 +9,13 @@ import { analogueFlow } from './engine/flow-analogue.ts';
 import { compareFlowMagnitudes, comparisonCsv, comparisonSeriesMean, type FlowComparisonRow } from './engine/flow-comparison.ts';
 import data from './data/flow-analogues.json';
 
+// The published build carries the donor catchments but not their measured flows (`truth` is null,
+// see pipeline/flow-analogues-public.mjs). analogueFlow drops a donor unless `truth > 0`, so with
+// none it returns null by its own rule; this flag only lets the panel say WHY, since "no match" and
+// "no donor flows in this build" are different statements. The full table has no such key.
+const DONORS_BUNDLED = (data as unknown as { _statistics?: string })._statistics !== 'not-bundled';
+const donors = data.stations.map((s) => ({ ...s, truth: s.truth ?? NaN }));
+
 const number = (v: number) => Number.isFinite(v) ? v.toLocaleString('en', { maximumSignificantDigits: 3 }) : 'Unavailable';
 
 export function HydrologyComparison({ input, scheme, reach, networkMeanCms, flowChoice, measured, head, auditBusy, auditCompleted, auditError, auditYears, onAudit, terrainSource }: {
@@ -19,7 +26,7 @@ export function HydrologyComparison({ input, scheme, reach, networkMeanCms, flow
 }) {
   const result = useMemo(() => {
     const r = reach;
-    const analogue = r ? analogueFlow({ area: r.uplandKm2, rain: r.annualPrecipMm, elevation: r.averageAltitudeM, low: r.below3000Frac, high: 1 - r.below5000Frac }, data.stations) : null;
+    const analogue = r ? analogueFlow({ area: r.uplandKm2, rain: r.annualPrecipMm, elevation: r.averageAltitudeM, low: r.below3000Frac, high: 1 - r.below5000Frac }, donors) : null;
     const modified = r ? modifiedHydestAnnualMean({ below3000Km2: r.uplandKm2 * r.below3000Frac, below5000Km2: r.uplandKm2 * r.below5000Frac, averageAltitudeM: r.averageAltitudeM, annualWetnessMm: r.annualPrecipMm }) : NaN;
     const mhsp = r ? mhspScreen(r.uplandKm2, Number.isFinite(r.monsoonMm) ? r.monsoonMm : undefined) : null;
     const name = measured ? 'Supplied / borrowed record' : flowChoice?.magnitudeFactor ? 'Network + Modified HYDEST' : flowChoice?.authority === 'hydest' ? 'Regional fallback' : flowChoice?.authority === 'model' ? 'Flood model' : 'Mapped network';
@@ -56,7 +63,7 @@ export function HydrologyComparison({ input, scheme, reach, networkMeanCms, flow
     <button type="button" onClick={exportCsv} className="mt-2 rounded border border-line px-2 py-1 text-river">Export method comparison</button>
     <details className="mt-3"><summary className="cursor-pointer text-river">DHM analogue evidence</summary>
       <p className="mt-2">Transfers observed runoff from five catchments matched on size, rainfall, elevation and altitude bands. This is a statistical comparison, not a calibrated rainfall–runoff model.</p>
-      {result.analogue ? <ul className="mt-2 space-y-1">{result.analogue.donors.map(({ station: s, weight }) => <li key={s.id}>{s.river} · DHM {s.id}: {number(s.area)} km², {s.from}–{s.to} ({s.years} complete years), {Math.round(weight * 100)}% weight</li>)}</ul> : <p className="mt-2">Insufficient catchment inputs for an analogue estimate.</p>}
+      {result.analogue ? <ul className="mt-2 space-y-1">{result.analogue.donors.map(({ station: s, weight }) => <li key={s.id}>{s.river} · DHM {s.id}: {number(s.area)} km², {s.from}–{s.to} ({s.years} complete years), {Math.round(weight * 100)}% weight</li>)}</ul> : <p className="mt-2">{DONORS_BUNDLED ? 'Insufficient catchment inputs for an analogue estimate.' : "The donor gauges' measured flows are not bundled in this build (DHM records carry no redistributable licence), so no analogue estimate is made."}</p>}
       <p className="mt-2">Tested on 69 gauges: typical mean-flow error 1.31× versus 1.40× for Modified HYDEST. With gauges within 50 km excluded, its project-weighted error was 1.73× versus 1.65× for the current blend. Only five test catchments were below 100 km². These are error factors, not confidence limits.</p>
       <p className="mt-2">Historical donor periods differ and do not establish today's flow. Similarity does not confirm a connected river or shared operating conditions.</p>
       <a href="https://doi.org/10.1016/j.ejrh.2023.101359" target="_blank" rel="noopener noreferrer" className="text-river">Nepal research on catchment similarity ↗</a>

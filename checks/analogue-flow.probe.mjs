@@ -1,5 +1,6 @@
 /** Independent gauge analogue experiment. No runtime algorithm is changed. */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { writePublicAnalogues } from '../pipeline/flow-analogues-public.mjs';
 globalThis.fetch = async (url) => {
   try { return new Response(readFileSync(`public/${String(url).replace(/^undefined/, '').replace(/^\//, '')}`)); }
   catch { return new Response(null, { status: 404 }); }
@@ -58,10 +59,13 @@ console.table(scores.map((s) => ({ ...s, typical: s.typical.toFixed(3), weighted
 mkdirSync('.codex-dev.accuracy', { recursive: true });
 writeFileSync('.codex-dev.accuracy/analogue-benchmark.json', JSON.stringify({ bands: [0, 1, 2].map((b) => rows.filter((r) => r.band === b).length), scores }, null, 2));
 if (process.argv.includes('--build')) {
-  writeFileSync('src/data/flow-analogues.json', JSON.stringify({
+  const full = {
     source: 'DHM published discharge summaries in dhm-records.json; catchment features from bundled river data',
     method: 'Five physically similar catchments; inverse-distance weighted geometric mean of rainfall-normalized specific runoff. Experimental comparison only.',
     built: '2026-09-11', scores,
     stations: rows.map(({ modified, blend, band, ...r }) => r),
-  }, null, 2) + '\n');
+  };
+  writeFileSync('src/data/flow-analogues.json', JSON.stringify(full, null, 2) + '\n');
+  // The full table is gitignored (its `truth` is DHM's measured flow); the truth-free twin is what ships.
+  writePublicAnalogues(full);
 }

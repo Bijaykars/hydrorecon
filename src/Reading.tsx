@@ -64,7 +64,6 @@ import {
   type CascadeScreen,
 } from './cascade.ts';
 import { PONDAGE_METHOD, pondageDemand, type PondageResult } from './pondage.ts';
-import type { ReportMeta } from './report.ts';
 import {
   ROAD_ACCESS_METHOD,
   roadMapUrl,
@@ -514,9 +513,7 @@ export function Reading(props: {
   wideSearch: boolean;
   onWideSearch: (v: boolean) => void;
   canExport: boolean;
-  onExport: (kind: 'csv' | 'geojson' | 'field-plan' | 'report') => void;
-  reportMeta: ReportMeta;
-  onReportMeta: (m: ReportMeta) => void;
+  onExport: (kind: 'csv' | 'geojson' | 'field-plan') => void;
   busy: string | null;
   error: string | null;
   neighbours: { lat: number; lon: number; meanCms: number }[] | null;
@@ -593,8 +590,6 @@ export function Reading(props: {
     onWideSearch,
     canExport,
     onExport,
-    reportMeta,
-    onReportMeta,
     busy,
     error,
     neighbours,
@@ -4012,38 +4007,6 @@ export function Reading(props: {
             </button>
           </div>
 
-          {/**
-            * The desk study needs three things the river cannot supply. They are
-            * remembered between studies because a consultancy files many
-            * reports under one letterhead.
-            */}
-          <div className="mt-3 grid grid-cols-1 gap-1.5">
-            {(
-              [
-                ['projectName', 'Project name', 'e.g. Chepe Kalika Hydropower Project'],
-                ['developer', 'Developer', 'Submitted by'],
-                ['consultant', 'Consultant', 'Prepared by'],
-              ] as const
-            ).map(([key, label, placeholder]) => (
-              <label key={key} className="flex items-center gap-2 text-[10.5px] text-muted">
-                <span className="w-[74px] shrink-0">{label}</span>
-                <input
-                  type="text"
-                  value={reportMeta[key]}
-                  placeholder={placeholder}
-                  onChange={(e) => onReportMeta({ ...reportMeta, [key]: e.target.value })}
-                  className="min-w-0 flex-1 rounded-md border border-line bg-panel-2 px-2 py-1 text-[11px] text-ink placeholder:text-faint focus:border-river/60 focus:outline-none"
-                />
-              </label>
-            ))}
-            <button
-              type="button"
-              onClick={() => onExport('report')}
-              className="mt-1 rounded-lg border border-river/40 bg-[color-mix(in_srgb,var(--color-river)_10%,transparent)] px-3 py-2 text-[12px] font-medium text-river hover:border-river hover:text-ink"
-            >
-              Desk study report — print or save as PDF
-            </button>
-          </div>
           <Fine>
             Every alternative, plus a header naming each source, assumption and limitation — so the
             file still explains itself when nobody remembers where it came from. The link in your

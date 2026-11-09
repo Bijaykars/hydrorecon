@@ -235,3 +235,58 @@ export const ICIMOD_GLOF_DATABASE =
   'https://rds.icimod.org/metadata/8881454b-6f7c-461b-95c2-eaf7618230d9';
 export const ICIMOD_KOSHI_LANDSLIDES =
   'https://rds.icimod.org/metadata/af73da0a-885b-459d-95ba-2ea0662a7e7c';
+
+/*
+ * MOVED from the desk-study report when that feature was removed. Nothing in the app calls it now;
+ * it stays because checks/glof.check.ts guards the filter and the report had been its only caller.
+ */
+/**
+ * WHICH UPSTREAM LAKES CARRY A PUBLISHED DANGER SIGNAL.
+ *
+ * Lifted out of the report body so it can be tested directly. It was inline
+ * once, and inline it was WRONG in the only direction that matters: it filtered
+ * on `areaHa ?? areaKm2 * 100 ?? 0` through an `as unknown as` cast, and
+ * `ConnectedGlacialLake` carries neither field — the builder keeps centroids and
+ * drops the polygons. Area was therefore 0 on every lake, the risky set was
+ * empty on every site, and the report printed "none is both large and close"
+ * whatever sat upstream. A hazard screen failing OPEN, hidden from the compiler
+ * by the cast, and unnoticed because the safe branch is the one that renders on
+ * almost every site.
+ *
+ * It now screens on what the inventory actually publishes, which is better
+ * evidence than an area threshold anyway:
+ *
+ *   LISTED — ICIMOD's 2020 assessment of 47 potentially dangerous glacial
+ *   lakes has judged dam type, source glacier and surroundings. No area figure
+ *   can see any of that.
+ *
+ *   GROWING — a glacier-fed lake with a significant published expansion trend
+ *   is the remotely-sensed version of the same worry. Non-glacier-fed lakes are
+ *   excluded because the mechanism is not there, and lakes the source flags as
+ *   time-series outliers are excluded because the trend is not trusted by the
+ *   people who measured it.
+ *
+ * AREA IS STILL THE MISSING TERM and it is worth having: a 2 ha pond and a
+ * 200 ha lake at the same distance are not the same question. Restoring it means
+ * adding the area column to `pipeline/build-glacial-lakes.mjs` and re-running it.
+ * Until then the report says so rather than implying the screen is complete.
+ */
+export const GLOF_ROUTE_KM = 60;
+
+export function glofDangerSignals(lakes: readonly ConnectedGlacialLake[]): {
+  listed: ConnectedGlacialLake[];
+  growing: ConnectedGlacialLake[];
+  risky: ConnectedGlacialLake[];
+} {
+  const near = lakes.filter((l) => l.routeKm <= GLOF_ROUTE_KM);
+  const listed = near.filter((l) => l.pdgl != null);
+  const growing = near.filter(
+    (l) =>
+      l.pdgl == null &&
+      l.connectivity === 'Glacier-fed' &&
+      l.expansionSignificant === true &&
+      (l.expansionRateKm2Yr ?? 0) > 0 &&
+      l.timeSeriesOutlier !== true
+  );
+  return { listed, growing, risky: [...listed, ...growing] };
+}

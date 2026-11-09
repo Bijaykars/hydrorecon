@@ -138,3 +138,7 @@ sources/gsw/
 # builder on a machine that holds the yearbooks. Purged from history alongside
 # src/data/dhm-records.json before the first public push.
 src/data/flow-analogues.json
+
+# DHM station catchment table (pipeline/build-dhm-catchments.py): no stated licence,
+# owner decides whether it ships. Reference metadata only, read by a harness only.
+sources/dhm-catchments.json

@@ -16,8 +16,7 @@
  * when a dangerous site happens to be opened.
  */
 import assert from 'node:assert/strict';
-import { glofDangerSignals, GLOF_ROUTE_KM } from '../src/report.ts';
-import type { ConnectedGlacialLake } from '../src/connectivity.ts';
+import { glofDangerSignals, GLOF_ROUTE_KM, type ConnectedGlacialLake } from '../src/connectivity.ts';
 
 let passed = 0;
 const ok = (n: string, f: () => void) => {

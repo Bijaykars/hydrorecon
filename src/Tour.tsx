@@ -97,7 +97,7 @@ const STEPS: TourStep[] = [
     target: '[data-tour="export"]',
     placement: 'left',
     title: 'Take it with you',
-    body: 'A full desk-study report with figures, assumptions and sources, plus CSV and GeoJSON of every alternative.',
+    body: 'CSV and GeoJSON of every alternative, each with a header naming its sources, assumptions and limitations, plus a field-plan CSV of what to verify next.',
   },
 ];
 

@@ -1476,3 +1476,104 @@ export function download(filename: string, mime: string, text: string) {
 export function fileStem(at: { lat: number; lon: number }): string {
   return `hydrorecon_${at.lat.toFixed(4)}_${at.lon.toFixed(4)}`;
 }
+
+/*
+ * MOVED from the desk-study report when that feature was removed. Nothing in the app calls waterBalance
+ * now; it stays because checks/waterbalance.check.ts guards the calibration of RUNOFF_PLAUSIBLE_MAX.
+ * The report-only "typical" tier (RUNOFF_TYPICAL_MAX = 1.2) went with the document.
+ */
+const meanAtIntake = (c: ExportContext): number => c.flowMeanCms * (c.selected?.flowScale ?? 1);
+
+/** Catchment at the INTAKE vertex, not at the click — they differ by a lot. */
+function catchmentKm2(c: ExportContext): number | null {
+  const i = c.selected?.i;
+  const v = typeof i === 'number' ? c.path[i]?.uplandKm2 : undefined;
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * WHERE THE WATER WOULD HAVE TO COME FROM.
+ *
+ * Every flow figure in this app arrives from a model or a regression, and none
+ * of them is required to respect the one constraint that is not negotiable: a
+ * catchment cannot deliver much more water than falls on it. Rain in, runoff
+ * out. It is arithmetic on three numbers the report already printed in three
+ * separate places, which is exactly why nobody had put them together.
+ *
+ * IT CAUGHT A LIVE SITE. At 27.65 N, 85.90 E the app shipped a modelled mean of
+ * 1.70 m3/s on a mapped 5.5 km2 catchment with 1,589 mm of rain - a runoff
+ * coefficient of 6.2, where the mapped network said 0.20 m3/s and Modified
+ * HYDEST said 0.67. A 5.5 km2 catchment sits well inside one ~5 km GloFAS cell,
+ * so the cell was draining something much larger, and `flowchoice.ts` chose it
+ * anyway because it only ever compares the candidates against each other.
+ *
+ * THE CEILING IS 2.0, AND IT IS MEASURED, NOT PHYSICAL. The obvious bound is
+ * 1.0, and 1.0 is wrong for Nepal. `checks/waterbalance-vs-fleet.mjs` scores the
+ * coefficient of the MEASURED mean at 69 DHM gauges with ten or more complete
+ * years, and the median is 0.87 with a maximum of 1.89. The whole country runs
+ * near 1 - roughly 225 km3/yr off 147,181 km2 is about 1,530 mm of runoff
+ * against about 1,600 mm of rain - so 1.0 sits in the middle of the
+ * distribution, not above it.
+ *
+ * SNOW AND ICE MELT WAS THE OBVIOUS EXPLANATION FOR THE TAIL, AND IT WAS TESTED
+ * AND IS NOT IT. Ranked against the share of catchment above 5,000 m - the
+ * hypsometry WECS/DHM already uses, and the best proxy for perennial ice the app
+ * holds - the measured coefficient correlates at only rho 0.26, and rho 0.32
+ * against mean catchment altitude. The Surnagad gauges have NO ground above
+ * 5,000 m at all, at mean altitudes of 1,900 and 1,782 m, and still read 1.31
+ * and 1.08; the most glaciated band, over 20% above 5,000 m, tops out at 1.61
+ * against 1.89 for the 5-20% band. A two-tier ceiling would need 1.52 for low
+ * catchments and 1.89 for high ones, which is not a separation worth a rule.
+ *
+ * So the tail is spread in the INPUTS - a ~5 km climatology cannot resolve
+ * orographic gradients, its rain gauges sit in valleys, and MERIT's area carries
+ * its own error - and one empirical constant is all the evidence supports.
+ *
+ *   ceiling   fires on measured gauges   fires on the fleet
+ *     1.00          22/69 = 31.9%          100/168 = 59.5%
+ *     1.50           5/69 =  7.2%           22/168 = 13.1%
+ *     2.00           0/69 =  0.0%            5/168 =  3.0%
+ *
+ * So a ceiling of 1.0 would call a third of Nepal's gauged rivers impossible.
+ * 2.0 is the first round number above everything 69 measured records show, it
+ * fires on 3% of the commissioned fleet, and it still catches the site above by
+ * a factor of three. The constant is set by the gauge population against a
+ * zero-false-positive target - not tuned until one site behaved.
+ *
+ * RAINFALL MUST BE THE SAME QUANTITY THE CEILING WAS FITTED TO. That is
+ * `catchmentRainMm`: CHPclim's catchment-mean ANNUAL total, off the bundled
+ * network. An earlier version preferred the private isohyet layer and otherwise
+ * grossed up WECS/DHM's monsoon figure, and both are a different quantity -
+ * the isohyet is a point band, and the monsoon share ranges 0.65 to 0.83 across
+ * these same gauges, so a fixed gross-up carries 15% of its own. Where the
+ * annual figure is absent this returns null and the row simply does not print,
+ * which is better than printing a number the ceiling does not apply to.
+ *
+ * WHAT IT IS NOT. Above the ceiling is not proof of an error, and this does not
+ * refuse anything: `flowchoice.ts` is untouched, so no measured result moves.
+ * It is a disclosure - the report says what the arithmetic implies and leaves
+ * the reader to weigh it.
+ */
+export const RUNOFF_PLAUSIBLE_MAX = 2.0;
+const SECONDS_PER_YEAR = 31_556_952;
+
+export function waterBalance(c: ExportContext): {
+  runoffMm: number;
+  rainfallMm: number;
+  coefficient: number;
+  ceilingCms: number;
+} | null {
+  const areaKm2 = catchmentKm2(c);
+  const meanCms = meanAtIntake(c);
+  const rainfallMm = c.catchmentRainMm ?? null;
+  if (!(areaKm2 && areaKm2 > 0) || !(meanCms > 0) || !(rainfallMm && rainfallMm > 0)) return null;
+
+  const areaM2 = areaKm2 * 1e6;
+  const runoffMm = (meanCms * SECONDS_PER_YEAR * 1000) / areaM2;
+  return {
+    runoffMm,
+    rainfallMm,
+    coefficient: runoffMm / rainfallMm,
+    ceilingCms: ((rainfallMm * RUNOFF_PLAUSIBLE_MAX) / 1000) * areaM2 / SECONDS_PER_YEAR,
+  };
+}
