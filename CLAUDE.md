@@ -1514,8 +1514,9 @@ place. Two independent routes to one number is worth more than either alone.
 
 Two things found on the way. **58 of 115 matched stations disagree with DHM's own
 published coordinates by more than 1 km, 3 by more than 20 km, one by 111 km.**
-Everything is scored on the records' coordinates so the headline replicates, but
-which set is right is open. And the 100–500 km² band's bias flips from **0.75× on
+Everything is scored on the records' coordinates so the headline replicates.
+Which set is right was open when this was written and is not now: DHM's table
+is, measured in the datum section below. And the 100–500 km² band's bias flips from **0.75× on
 long records to 1.30× on short ones**, which is the per-band-constants finding
 above arriving again.
 
@@ -1599,6 +1600,179 @@ manuals, for the zone map and the seven hydrographs. And a set of sites carrying
 lean-season measurement made independently of any record used as truth, which the
 DHM gauges cannot supply. Until both exist this is a good idea that cannot yet be
 measured, not one that measured badly.
+
+---
+
+## The click, measured for the first time (2026-11-16)
+
+`node --experimental-strip-types --no-warnings checks/click-vs-visible-river.mjs`
+
+Every harness here scores the engine at a coordinate somebody else chose. None
+had scored the one thing a user does: click a river they can see. Simulated
+clicks on OpenStreetMap's satellite-traced lines, one per kilometre, through the
+app's own `nearestReach` and `reachToRead`:
+
+| | n | no modelled river within 0.8 km | none within 250 m | intake displacement, median / p90 | read river is not the nearest |
+|---|---|---|---|---|---|
+| river class | 27,814 | 7.7% | 26.1% | 114 m / 399 m | 1.3% |
+| stream class | 83,850 | **29.8%** | **59.0%** | 192 m / 640 m | 2.6% |
+
+**And two of those were not imprecision but silence.** `SNAP_KM = 0.8` only ever
+gated where the marker went. The study re-ran `nearestReach` with no distance
+gate at all, so a click 913 m from any modelled river produced a 0.6 MW scheme
+on a different stream, off-screen, with nothing drawn at the click and the panel
+reading "Intake display offset: 0 m". And a click 5 m from a 64 km² tributary
+beside the Trishuli returned **183.1 MW**, because `OVERWHELMING_RATIO` promoted
+it to the main stem and the promotion notice sat below the fold. Both were found
+by using the app on satellite imagery, not by any check.
+
+**What shipped is disclosure, and no number moves.** A pin at the raw click, a
+dashed connector to the intake past 60 m, one camera fit when the scheme lands
+off-screen, one line at the top of the panel (off-network / promoted / moved),
+a "Study the stream I clicked" control that bypasses promotion for that site
+only (`reachToRead({ nearest, mainStem: null })` in `App.tsx`, `rivers.ts`
+untouched), and a hover preview of the river a click would study. Five sites
+paired before and after: 0.3, 2.3, 0.6, 0.8 and 183.1 MW, identical. A study
+started from a URL gets no pin and no camera move, so the harness path is
+unchanged.
+
+Order-1 reaches are clickable and never drawn (`riversGeoJson` skips them). The
+hover now reveals them; the empty panel still says to click a blue line.
+
+---
+
+## Nepal's datum is not what is moving our coordinates (2026-11-16)
+
+`node --experimental-strip-types --no-warnings checks/datum-shift.probe.mjs`
+
+Nepal's national mapping uses the Everest 1830 ellipsoid, and a coordinate read
+off a Survey Department sheet and treated as WGS84 lands about **216 m west**
+(Molodensky at 28 N 84 E; the three translation constants are quoted from memory
+and are NOT verified against the EPSG registry). That would be a consistent
+vector on every point, so it can be looked for against OSM river lines:
+
+| set | n | median distance to an OSM river | best uniform shift | after the datum correction |
+|---|---|---|---|---|
+| DoED licence boxes (midpoints) | 1,169 | 563 m | (0, +100) | 580 m |
+| fleet plants | 193 | 410 m | (−250, −50) | 389 m |
+| DHM gauges, the records' coordinates | 136 | 227 m | (−100, +200) | 202 m |
+| **DHM gauges, DHM's 2024 table (control)** | 119 | **19 m** | **(0, 0)** | 143 m |
+
+**Refused as an explanation.** No set shows a sharp minimum at the datum vector;
+the heat tables are broad bowls, the fleet improves by 21 m and the gauges by
+25 m, and only 4 of 119 record-to-table vectors look like the datum displacement
+against a median vector of 1 km. There may be a small westward bias in the fleet
+and the gauge records. It is not a uniform shift.
+
+**It did close the question the gauge-network section left open.** DHM's own
+table sits a median **19 m** from a satellite-traced river with its best shift at
+the origin. The coordinates this project scores on sit 227 m away and disagree
+with that table by a median 1 km (62 of 119 over 1 km). The table is right. The
+records' coordinates are still in use and every gauge figure in this file is
+still scored on them; moving to the table is a deliberate re-measurement that has
+not been done. Station 350 is a typo in the table itself (2.5 km from any river,
+sharing 349's longitude).
+
+Every DoED coordinate is the midpoint of a from-to box with a median diagonal of
+4.2 km, so the register set measures box size more than siting error.
+
+---
+
+## GloFAS V5, measured and not adopted (2026-11-16)
+
+`python pipeline/fetch-glofas-nepal.py 2006 2025 --v5`, then
+`python pipeline/build-glofas-store.py --v5`, then
+`node --experimental-strip-types --no-warnings checks/glofas-v4-vs-v5.mjs`
+
+ECMWF's V5.0 reanalysis sits on the identical 0.05° grid (88 x 170 over Nepal)
+and was calibrated on 5,379 stations with an objective that carries a low-flow
+term. Both versions were calibrated only at 500 km² and above, and the roughly
+ten Nepali calibration stations visible on ECMWF's map are shared, so neither arm
+has a head start and everything under 500 km² is out of sample for both. No
+station list is published.
+
+This is also the first time the flood model's own MAGNITUDE was scored against
+gauges; nothing in the repository did that before.
+
+| | V4 | V5 |
+|---|---|---|
+| mean flow, typical error, 78 gauges with 10+ years | 2.22× | 2.20× |
+| the same, 100-500 km² (12 gauges) | 3.89× | 3.85× |
+| Q90-exceedance flow, typical error, 74 gauges, shape only | 2.52× | **1.62×** |
+| dry share, raw shape (Pelton 6+6) | −5.8 pt / 6.5 | −4.1 pt / 6.1 |
+| dry share, as shipped | −3.7 pt / 5.1 | −3.1 pt / 4.5 |
+| false qualifications, as shipped | 5 of 74 | **8 of 77** |
+
+**Magnitude does not move** (closer on 34 gauges, further on 40, interval
+includes zero). **The low-flow tail genuinely improves.** And the dry-share
+verdicts get worse in the dangerous direction, because `fdcshape.ts` was built
+around V4's deficiency and over-corrects on top of V5. The last three rows
+compare 74 gauges with 77 — V5's extra day admits three more — so they are not
+paired; the paired shape-only figures are −6.4 → −5.7 pt bias and 7.0 → 5.6 pt
+median error.
+
+Adopting V5 means re-deciding where `fdcshape` fires and re-running the fleet,
+since `flowchoice.ts` arbitrates on the flood model's magnitude. Neither is done.
+The V5 store is kept beside the V4 one (`pipeline/.cache/glofas-nepal-v5.bin`)
+and `HYDRORECON_GLOFAS_STORE` selects it.
+
+**The flood model alone is a weak magnitude source**, reading 2-4× high below
+500 km². Do not compare its 2.22× with the shipped blend's 1.37×; the blend does
+not use it for magnitude except as one side of an arbitration.
+
+---
+
+## A 30 m network from terrain already on disk — stage one, not integrated (2026-11-16)
+
+`python pipeline/build-fine-network.py --burn 10 --save-raise`, then
+`python checks/fine-network-vs-dhm.py` (add `--diagnose` for the tail)
+
+Priority-flood D8 on the GEDTM30 cut (484.7 M cells), steepest descent outside
+filled ground, upstream area in reverse pop order, in numba with memmapped
+arrays: **135 seconds and 2.2 GB private memory per arm.** Two arms, terrain only
+and with OSM lines burned 10 m. A cell whose catchment touches the raster edge is
+flagged, because the Mahakali and the upper Karnali run off it.
+
+Stream position, distance from an OSM sample to the nearest stream cell, terrain
+only — the burned arm is circular for this test:
+
+| | current network | 30 m, streams ≥ 0.25 km² |
+|---|---|---|
+| river class, median | 114 m | **24 m** |
+| stream class, median | 192 m | **26 m** |
+| stream class, none within 250 m | 59.0% | **7.7%** |
+| stream class, none within 800 m | 29.8% | **0.0%** |
+
+Catchment area at 179 unflagged DHM stations against DHM's published areas,
+burned arm, snap = nearest cell holding 25% of the largest area within 300 m:
+
+| | typical error | within 10% | 30 m closer / further / tied |
+|---|---|---|---|
+| 30 m grid | **1.27×** | **88%** | — |
+| MERIT (shipped) | 1.41× | 75% | 65 / 10 / 104 |
+| HydroRIVERS reach | 1.46× | 77% | 92 / 14 / 73 |
+
+**The first table this produced said the opposite, and it was the snap.** Taking
+the largest cell within 90 m gave a typical error of 1.88×, worse than either
+baseline, because at twelve stations on wide rivers the window found no channel
+at all and returned a few hectares for a 20,000 km² river. Diagnosed: at most of
+them the 30 m channel is within 2-22 m of the OSM line and it is the STATION
+that sits 120-180 m off the river; at Jamadi, Badigad and Likhu the channel
+wanders a filled flat. Picking the cell by the published area — an upper bound,
+it uses the answer — gives 1.07× and 95% within 10%, so the grid's areas are
+right and the residual is snapping. A snap rule decides more than the grid does.
+
+What the flood filled: 779 km² raised more than 50 m. Two are real closed lake
+basins in Tibet — **Paiku Co spills into the Arun**, adding about 520 km² to
+stations that were flagged anyway. A 3,889 m raise is a 0.4 km² hole of bad
+cells in the DEM at 28.486 N 85.148 E. A dozen gorges are falsely dammed by
+300-780 m in GEDTM30; area passes through correctly, channel position inside them
+does not.
+
+**Not integrated.** At a 1 km² threshold the network is 327,000 km of channel,
+about ten times what the app loads, and `rivers.ts` is a signed module: wiring it
+in changes which river every click reads and re-stales the whole accuracy table.
+The grids live in `pipeline/.cache/fine/` (4.7 GB per arm, gitignored).
 
 ---
 
