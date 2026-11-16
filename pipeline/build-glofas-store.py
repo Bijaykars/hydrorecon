@@ -35,11 +35,14 @@ import sys
 import numpy as np
 import netCDF4 as nc
 
-OUT = 'pipeline/.cache/glofas-nepal.bin'
+# --v5 builds the V5.0 evaluation store beside the operational one.
+V5 = '--v5' in sys.argv
+SRC = 'sources/glofas-v5' if V5 else 'sources/glofas'
+OUT = 'pipeline/.cache/glofas-nepal-v5.bin' if V5 else 'pipeline/.cache/glofas-nepal.bin'
 MAGIC = 0x474E5031  # 'GNP1'
 LO, HI = 0.001, 100000.0
 
-files = sorted(glob.glob('sources/glofas/glofas-nepal-*.nc'))
+files = sorted(glob.glob(f'{SRC}/glofas-nepal-*.nc'))
 if not files:
     print('no year files in sources/glofas — run pipeline/fetch-glofas-nepal.py first')
     sys.exit(1)

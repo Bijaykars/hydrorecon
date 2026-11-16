@@ -53,6 +53,7 @@ sources/merit-hydro/
 # GloFAS reanalysis subset for Nepal. Large, ECMWF's to distribute, and
 # reproducible from pipeline/fetch-glofas-nepal.py.
 sources/glofas/
+sources/glofas-v5/
 
 # GEDTM30 is CC-BY-4.0 and redistributable; this is a ~1 GB derived raster kept
 # out of the repository for size, not for licence. pipeline/build-gedtm-nepal.py

@@ -42,7 +42,10 @@ import os
 
 # The box the bundled river network covers. Order is CDS's: N, W, S, E.
 AREA = [30.6, 79.9, 26.2, 88.4]
-OUT_DIR = 'sources/glofas'
+# --v5 fetches the V5.0 reanalysis into its own folder, so the two versions can
+# be scored side by side and never mixed in one store.
+V5 = '--v5' in sys.argv
+OUT_DIR = 'sources/glofas-v5' if V5 else 'sources/glofas'
 EWDS_URL = 'https://ewds.climate.copernicus.eu/api'
 DATASET = 'cems-glofas-historical'
 
@@ -60,7 +63,7 @@ DAYS = [f'{d:02d}' for d in range(1, 32)]
 # evaluation only, so this stays on V4 until there is a reason to move.
 def request_for(year, months, days):
     return {
-        'system_version': ['version_4_0'],
+        'system_version': ['version_5_0' if V5 else 'version_4_0'],
         'hydrological_model': ['lisflood'],
         'product_type': ['consolidated'],
         'timespan': ['time_mean'],

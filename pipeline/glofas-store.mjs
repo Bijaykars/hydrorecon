@@ -30,11 +30,9 @@ const HEADER = 40; // 9 x 4 bytes, then the step
 
 let store = null;
 
-/** Open the store once, or return null if it has not been built. */
-function open() {
-  if (store !== null) return store;
-  const PATH = storePath();
-  if (!existsSync(PATH)) return (store = false);
+/** Open the file at PATH, or return false if it has not been built. */
+function openFile(PATH) {
+  if (!existsSync(PATH)) return false;
   const fd = openSync(PATH, 'r');
   const head = Buffer.alloc(HEADER);
   readSync(fd, head, 0, HEADER, 0);
@@ -42,7 +40,7 @@ function open() {
     closeSync(fd);
     throw new Error(`${PATH}: bad magic — rebuild with pipeline/build-glofas-store.py`);
   }
-  store = {
+  return {
     fd,
     nLat: head.readUInt32LE(4),
     nLon: head.readUInt32LE(8),
@@ -54,7 +52,12 @@ function open() {
     hi: head.readFloatLE(32),
     step: head.readInt32LE(36) / 1e6,
   };
-  return store;
+}
+
+/** Open the default store once, or return null if it has not been built. */
+function open() {
+  if (store !== null) return store;
+  return (store = openFile(storePath()));
 }
 
 /**
@@ -69,8 +72,9 @@ const iso = (ordinal) => new Date((ordinal - PY_EPOCH) * 864e5).toISOString().sl
 export const hasGlofasStore = () => open() !== false;
 
 /** What the store covers, for a harness that wants to say so. */
-export function glofasCoverage() {
-  const s = open();
+export const glofasCoverage = () => coverageOf(open());
+
+function coverageOf(s) {
   if (!s) return null;
   return { from: iso(s.startOrdinal), to: iso(s.startOrdinal + s.nDays - 1), days: s.nDays };
 }
@@ -81,8 +85,9 @@ export function glofasCoverage() {
  * Returns null outside the grid or where the cell carries no record, so a
  * caller can fall through to the network rather than inventing a dry river.
  */
-export function glofasSeries(lat, lon) {
-  const s = open();
+export const glofasSeries = (lat, lon) => seriesOf(open(), lat, lon);
+
+function seriesOf(s, lat, lon) {
   if (!s) return null;
 
   const row = Math.round((s.latTop - lat) / s.step);
@@ -118,4 +123,16 @@ export function glofasSeries(lat, lon) {
     elevation: 0,
     daily: { time, river_discharge },
   };
+}
+
+/**
+ * A second store beside the default one, for an A/B between two builds (V4 vs
+ * V5) in one process. The default handle above is a single cached module-level
+ * value, so it cannot hold two. Returns null if the file is missing, else the
+ * same series/coverage behaviour as the two exports above.
+ */
+export function openGlofasAt(path) {
+  const s = openFile(path);
+  if (!s) return null;
+  return { series: (lat, lon) => seriesOf(s, lat, lon), coverage: () => coverageOf(s) };
 }
