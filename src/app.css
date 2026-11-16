@@ -150,6 +150,76 @@ input[type='range'] {
   white-space: nowrap;
   pointer-events: none;
 }
+/* Where the pointer was when the map was clicked. Hollow, uncoloured and
+   smaller than a scheme marker, and under one: a click that landed true is
+   covered by the intake. White on a dark edge reads on all four basemaps. */
+.click-pin {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: radial-gradient(circle, #fff 0 1.5px, transparent 2px);
+  box-shadow:
+    0 0 0 2px rgba(14, 15, 17, 0.9),
+    inset 0 0 0 1px rgba(14, 15, 17, 0.75),
+    0 2px 8px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.click-pin-tag {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+  border: 1px solid #ffffff55;
+  color: var(--color-ink);
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.click-pin-tag.below {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+.click-pin-tag:empty {
+  display: none;
+}
+/* What a click under the pointer would study. Follows the pointer, never
+   takes it. */
+.hover-chip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: max-content;
+  max-width: 250px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--color-panel-2) 94%, transparent);
+  border: 1px solid var(--color-line-strong);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  color: var(--color-ink);
+  font-size: 11px;
+  line-height: 1.4;
+  pointer-events: none;
+  will-change: transform;
+}
+.hover-chip > span {
+  display: block;
+}
+.hover-chip[hidden],
+.hover-chip > span[hidden] {
+  display: none;
+}
+.hover-chip-away {
+  color: var(--color-muted);
+}
+.hover-chip-note {
+  margin-top: 2px;
+  color: var(--color-amber);
+}
 
 * {
   scrollbar-width: thin;

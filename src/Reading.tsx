@@ -458,6 +458,18 @@ function Slider({
   );
 }
 
+/**
+ * Where a map click went, when that is not where it was aimed. First match
+ * wins in App.tsx: no modelled river in reach, handed to a larger river, the
+ * user's own refusal of that, or simply an intake some way off. Every figure
+ * arrives already worded, so the panel and the map label cannot disagree.
+ */
+export type ClickNotice =
+  | { kind: 'off-network'; limit: string; distance: string; area: string }
+  | { kind: 'promoted'; clickedArea: string; studiedArea: string; distance: string }
+  | { kind: 'kept'; clickedArea: string; largerArea: string; distance: string }
+  | { kind: 'moved'; distance: string };
+
 export function Reading(props: {
   mapAlignment?: React.ReactNode;
   methodComparison?: React.ReactNode;
@@ -490,6 +502,10 @@ export function Reading(props: {
     lat: number;
     lon: number;
   } | null;
+  /** Where the map click went, if not where it was aimed. Null for a clean hit. */
+  clickNotice: ClickNotice | null;
+  /** Study the stream that was clicked (true) or the larger river beside it (false). */
+  onKeepNearest: (keep: boolean) => void;
   /** The nearest DHM record worth transferring to this site, if any. */
   transfer: Transfer | null;
   transferBusy: boolean;
@@ -579,6 +595,8 @@ export function Reading(props: {
     onStudyHere,
     onLocate,
     ambiguity,
+    clickNotice,
+    onKeepNearest,
     transfer,
     transferBusy,
     onAdoptGauge,
@@ -703,6 +721,65 @@ export function Reading(props: {
           <p className="mt-2 text-[12px] leading-relaxed text-muted">
             Blue is the river. Drag the intake or powerhouse marker to test another position.
           </p>
+        </div>
+      )}
+
+      {/* ---- where the click went, before anything is read off it ---- */}
+      {at && clickNotice && (
+        <div
+          role="status"
+          data-click-notice={clickNotice.kind}
+          className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-line px-4 py-2 text-[11.5px] leading-snug ${
+            clickNotice.kind === 'off-network' || clickNotice.kind === 'promoted' ? 'bg-amber/5 text-ink' : 'text-muted'
+          }`}
+        >
+          <p className="min-w-0 flex-1 basis-56">
+            {clickNotice.kind === 'off-network' && (
+              <>
+                <b className="font-semibold text-amber">No modelled river within {clickNotice.limit} of your click.</b>{' '}
+                Studying the nearest one, <b className="num">{clickNotice.distance}</b> away, with a{' '}
+                <b className="num">{clickNotice.area}</b> catchment.
+              </>
+            )}
+            {clickNotice.kind === 'promoted' && (
+              <>
+                Your click is on a <b className="num">{clickNotice.clickedArea}</b> stream. Studying the{' '}
+                <b className="num text-amber">{clickNotice.studiedArea}</b> river{' '}
+                <b className="num">{clickNotice.distance}</b> away instead.
+              </>
+            )}
+            {clickNotice.kind === 'kept' && (
+              <>
+                Studying the <b className="num text-ink">{clickNotice.clickedArea}</b> stream you clicked, not the{' '}
+                <b className="num text-ink">{clickNotice.largerArea}</b> river{' '}
+                <b className="num text-ink">{clickNotice.distance}</b> away.
+              </>
+            )}
+            {clickNotice.kind === 'moved' && (
+              <>
+                The intake is <b className="num text-river">{clickNotice.distance}</b> from your click, on the
+                nearest modelled river.
+              </>
+            )}
+          </p>
+          {clickNotice.kind === 'promoted' && (
+            <button
+              type="button"
+              onClick={() => onKeepNearest(true)}
+              className="rounded-md border border-amber/50 bg-amber/10 px-2.5 py-1.5 text-[11px] font-medium text-amber hover:border-amber hover:text-ink"
+            >
+              Study the stream I clicked
+            </button>
+          )}
+          {clickNotice.kind === 'kept' && (
+            <button
+              type="button"
+              onClick={() => onKeepNearest(false)}
+              className="rounded-md border border-line px-2.5 py-1.5 text-[11px] text-muted hover:border-river/60 hover:text-ink"
+            >
+              Study the larger river
+            </button>
+          )}
         </div>
       )}
 

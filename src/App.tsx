@@ -84,7 +84,7 @@ import { osmLengthFactor, stretchPath } from './osm-rivers.ts';
 import { judgeShape, correctShape } from './engine/fdcshape.ts';
 import { DHM_STATISTICS_BUNDLED } from './dhm-statistics.ts';
 import type { ExportContext } from './export.ts';
-import { Reading } from './Reading.tsx';
+import { Reading, type ClickNotice } from './Reading.tsx';
 import { distanceToNepalBoundaryKm, regionFor, type RegionMode } from './region.ts';
 import { assessReadiness } from './readiness.ts';
 import { HAZARD_COLORS, hazardsFor, hazardInventory } from './hazards.ts';
@@ -374,6 +374,20 @@ const NESTED_KM = 0.3;
 const COLLECTOR_SNAP_KM = 2;
 
 /**
+ * Where a click went, in the two distances that decide whether to say so.
+ *
+ * Under 60 m the intake is where the user pointed, as near as the modelled
+ * network can put it, and a line between the two would be clutter. Past 250 m
+ * the panel says it in words as well: one click in five on a satellite-traced
+ * river lands that far out (checks/click-vs-visible-river.mjs). Display only.
+ */
+const CLICK_ON_TARGET_M = 60;
+const CLICK_MOVED_M = 250;
+const distanceText = (m: number) => (m < 995 ? `${Math.max(10, Math.round(m / 10) * 10)} m` : `${(m / 1000).toFixed(1)} km`);
+const areaText = (km2: number) =>
+  `${km2 < 10 ? km2.toFixed(1) : Math.round(km2).toLocaleString('en-US')} km²`;
+
+/**
  * How close a downstream route must pass to the diverted reach to be a junction.
  *
  * Proximity alone is not enough and this was a real error: in a Himalayan gorge
@@ -469,6 +483,37 @@ export default function App() {
 
   /** Where the user clicked on the river. The only input the app needs. */
   const [at, setAt] = useState<Pt | null>(initial.at);
+  /**
+   * Where the pointer actually was when the MAP was clicked. Not where the
+   * study starts: `at` is that point after the snap, and the intake can sit
+   * somewhere else again. Measured on satellite-traced rivers, the intake lands
+   * a median 114 m from the click and more than 250 m away one time in five,
+   * and nothing on screen said so. This is kept only so the app can show it.
+   *
+   * Only a click on the map sets it. A study started from the URL, the search
+   * box, the panel or a harness has no pin, no connector and no notice, and
+   * nothing numeric reads it. `nearestKm` is the distance from the click to the
+   * closest modelled river, null where the network does not reach.
+   */
+  const [clicked, setClicked] = useState<(Pt & { nearestKm: number | null }) | null>(null);
+  /** The user asked for the stream they clicked, not the larger river beside it. This site only. */
+  const [keepNearest, setKeepNearest] = useState(false);
+  /** Which river the study start chose for `at`, for the notice. Set in the study effect. */
+  const [clickRead, setClickRead] = useState<{
+    at: Pt;
+    keep: boolean;
+    nearestKm2: number;
+    studied: { km2: number; point: Pt };
+    promoted: boolean;
+    /** The larger river that was passed over because `keepNearest` is on. */
+    larger: { km2: number; point: Pt } | null;
+  } | null>(null);
+  /** One camera fit per map click, and none once the user has moved the map. */
+  const framing = useRef({ armed: false, moved: false });
+  /** The click pin's label, filled in once the intake is known to be elsewhere. */
+  const clickPinTag = useRef<HTMLSpanElement | null>(null);
+  /** Clears the hover preview; the map's own handlers install it. */
+  const clearHover = useRef<() => void>(() => {});
   // First run only; a skip counts as done, otherwise it nags. Hidden below 1024px with the header.
   const [tourOpen, setTourOpen] = useState(() => tourWide() && !tourDone());
   const update = useUpdateStatus();
@@ -595,6 +640,11 @@ export default function App() {
 
   const atRef = useRef(at);
   atRef.current = at;
+  /** For the hover preview, bound once with the map like the click handler. */
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  const maxWaterwayKmRef = useRef(maxWaterwayKm);
+  maxWaterwayKmRef.current = maxWaterwayKm;
   /** For the map's click handler, which is bound once and outlives renders. */
   const schemeRef = useRef<Scheme | null>(null);
 
@@ -1524,6 +1574,19 @@ export default function App() {
       });
       m.addLayer({ id: 'scheme-approximate', type: 'line', source: 'scheme', filter: ['==', ['get', 'traced'], false], paint: { 'line-color': '#ffb454', 'line-width': 3, 'line-dasharray': [2, 2] } });
 
+      // From the click to the intake, where the two are not the same place.
+      // White on a dark casing, like the click pin it starts from: neutral, so
+      // it never reads as part of the scheme, and legible on all four basemaps.
+      m.addSource('click-link', { type: 'geojson', data: empty() });
+      m.addLayer({ id: 'click-link-casing', type: 'line', source: 'click-link', layout: { 'line-cap': 'round' }, paint: { 'line-color': '#0e0f11', 'line-width': 4.5, 'line-opacity': 0.6 } });
+      m.addLayer({ id: 'click-link', type: 'line', source: 'click-link', paint: { 'line-color': '#ffffff', 'line-width': 2, 'line-dasharray': [2, 2] } });
+      // The stretch a click under the pointer would study. See the hover handler.
+      m.addSource('hover-reach', { type: 'geojson', data: empty() });
+      m.addLayer({ id: 'hover-reach-casing', type: 'line', source: 'hover-reach', filter: ['==', ['geometry-type'], 'LineString'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0e0f11', 'line-width': 7, 'line-opacity': 0.5 } });
+      m.addLayer({ id: 'hover-reach', type: 'line', source: 'hover-reach', filter: ['all', ['==', ['geometry-type'], 'LineString'], ['!=', ['get', 'traced'], false]], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#a8ecf8', 'line-width': 3.5 } });
+      m.addLayer({ id: 'hover-reach-approximate', type: 'line', source: 'hover-reach', filter: ['all', ['==', ['geometry-type'], 'LineString'], ['==', ['get', 'traced'], false]], paint: { 'line-color': '#a8ecf8', 'line-width': 3, 'line-dasharray': [2, 2] } });
+      m.addLayer({ id: 'hover-reach-start', type: 'circle', source: 'hover-reach', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 5, 'circle-color': '#a8ecf8', 'circle-stroke-color': '#0e0f11', 'circle-stroke-width': 2 } });
+
       // Connected level-pool cells behind the intake's inferred dam axis.
       // The fill sits under the selected waterway; the proposed axis remains
       // crisp above it. Both are empty until the two-dimensional DEM read lands.
@@ -1628,8 +1691,8 @@ export default function App() {
       setMapReady(true);
     });
 
-    m.on('click', (e) => {
-      // Opening evidence must not also move the study point underneath it.
+    /** Evidence under the pointer: a click there opens it and studies nothing. */
+    const overEvidence = (point: maplibregl.PointLike) => {
       const interactive = [
         'protected-area-line',
         'grid-substations',
@@ -1645,14 +1708,135 @@ export default function App() {
         'cascade-projects',
         'cascade-labels',
       ].filter((id) => Boolean(m.getLayer(id)));
-      if (interactive.length && m.queryRenderedFeatures(e.point, { layers: interactive }).length) return;
+      return interactive.length > 0 && m.queryRenderedFeatures(point, { layers: interactive }).length > 0;
+    };
+
+    m.on('click', (e) => {
+      // Opening evidence must not also move the study point underneath it.
+      if (overEvidence(e.point)) return;
       // Ctrl-click with a scheme selected adds a collector intake on that
       // stream instead of restarting the study somewhere else.
       if ((e.originalEvent as MouseEvent).ctrlKey && schemeRef.current) {
         void addExtraIntake({ lat: e.lngLat.lat, lon: e.lngLat.lng });
         return;
       }
-      void onClick(e.lngLat.lat, e.lngLat.lng);
+      clearHover.current();
+      void onClick(e.lngLat.lat, e.lngLat.lng, true);
+    });
+
+    /**
+     * SHOW WHAT A CLICK WILL STUDY, BEFORE THE CLICK.
+     *
+     * The clickable rivers are the modelled network, and that is not what the
+     * user is looking at. Order-1 streams are never drawn, the whole layer is
+     * hidden once a study has its own traced course, and a satellite image
+     * shows a channel the network may hold hundreds of metres away or not at
+     * all. So the pointer says it: the stretch a click here would study is
+     * lit, its catchment is printed beside the pointer, and where the click
+     * would be handed to a larger river the chip says that too.
+     *
+     * It asks `nearestReach` and `reachToRead` the questions the click and the
+     * study start ask, in that order, and draws the answer. One query per
+     * frame, and an answer that arrives after a newer one is dropped. Beyond
+     * SNAP_KM nothing is lit, because nothing there is being aimed at.
+     *
+     * One approximation, stated: the study start asks about the neighbour from
+     * the SNAPPED point and this asks from the pointer, so at the very edge of
+     * the 1.5 km neighbour search the two can differ.
+     */
+    const chip = document.createElement('div');
+    chip.className = 'hover-chip';
+    chip.setAttribute('aria-hidden', 'true');
+    chip.hidden = true;
+    const chipMain = document.createElement('span');
+    const chipAway = document.createElement('span');
+    chipAway.className = 'hover-chip-away';
+    const chipNote = document.createElement('span');
+    chipNote.className = 'hover-chip-note';
+    chip.append(chipMain, chipAway, chipNote);
+    m.getCanvasContainer().appendChild(chip);
+    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+    let hoverSequence = 0;
+    let hoverFrame = 0;
+    let hoverEvent: maplibregl.MapMouseEvent | null = null;
+    let hoverKey = '';
+    let hoverStart: [number, number] = [0, 0];
+    const hideHover = () => {
+      hoverSequence++;
+      hoverEvent = null;
+      if (hoverKey) (m.getSource('hover-reach') as maplibregl.GeoJSONSource | undefined)?.setData(empty());
+      hoverKey = '';
+      chip.hidden = true;
+      m.getCanvas().style.cursor = '';
+    };
+    clearHover.current = hideHover;
+    const runHover = async () => {
+      hoverFrame = 0;
+      const e = hoverEvent;
+      const src = m.getSource('hover-reach') as maplibregl.GeoJSONSource | undefined;
+      if (!e || !src) return;
+      const ev = e.originalEvent;
+      // Not while a study is being computed, not mid-drag, not over evidence,
+      // and not while Ctrl would add a collector instead of starting a study.
+      if (busyRef.current || ev.buttons !== 0 || m.isMoving() || (ev.ctrlKey && schemeRef.current) || overEvidence(e.point)) {
+        hideHover();
+        return;
+      }
+      const sequence = ++hoverSequence;
+      const hit = await nearestReach(e.lngLat.lat, e.lngLat.lng).catch(() => null);
+      if (sequence !== hoverSequence) return;
+      if (!hit || hit.nearest.distanceKm > SNAP_KM) {
+        hideHover();
+        return;
+      }
+      const read = reachToRead(hit);
+      const key = `${read.reach.networkIndex}:${read.reach.networkVertex}`;
+      if (key !== hoverKey) {
+        // The same display geometry a study draws, so what is lit before the
+        // click is where the intake and the orange line appear after it.
+        const path = await downstreamPath(read.reach.point.lat, read.reach.point.lon, maxWaterwayKmRef.current, 0.12).catch(() => null);
+        const display = path && path.length > 1 ? await buildRiverDisplay(path).catch(() => null) : null;
+        if (sequence !== hoverSequence) return;
+        hoverKey = key;
+        const first = display?.points[0] ?? read.reach.point;
+        hoverStart = [first.lon, first.lat];
+        src.setData({
+          type: 'FeatureCollection',
+          features: [
+            ...(display
+              ? displayGeoJson(display).features
+              : path && path.length > 1
+                ? [{ type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: path.map((q) => [q.lon, q.lat]) } }]
+                : []),
+            { type: 'Feature' as const, properties: {}, geometry: { type: 'Point' as const, coordinates: hoverStart } },
+          ],
+        });
+      }
+      const awayM = haversineKm([e.lngLat.lat, e.lngLat.lng], [hoverStart[1], hoverStart[0]]) * 1000;
+      chipMain.textContent = `Modelled river · ${areaText(read.reach.uplandKm2)} catchment`;
+      chipAway.textContent = awayM > CLICK_ON_TARGET_M ? `${distanceText(awayM)} from the pointer` : '';
+      chipAway.hidden = !(awayM > CLICK_ON_TARGET_M);
+      chipNote.textContent = read.overridden
+        ? `A click here studies this river, not the ${areaText(hit.nearest.uplandKm2)} stream at the pointer.`
+        : '';
+      chipNote.hidden = !read.overridden;
+      // Keep the chip out from under the panel on the right.
+      const flip = e.point.x > m.getCanvas().clientWidth - mapPadding().right - 250;
+      chip.style.transform = `translate(${Math.round(e.point.x)}px, ${Math.round(e.point.y)}px) translate(${flip ? 'calc(-100% - 14px)' : '14px'}, 16px)`;
+      chip.hidden = false;
+      m.getCanvas().style.cursor = 'pointer';
+    };
+    m.on('mousemove', (e) => {
+      if (!finePointer.matches) return;
+      hoverEvent = e;
+      if (!hoverFrame) hoverFrame = requestAnimationFrame(() => void runHover());
+    });
+    m.on('mouseout', hideHover);
+    m.on('movestart', (e) => {
+      hideHover();
+      // A move the user made, as opposed to one the app made: after it the
+      // camera is theirs and the study must not take it back.
+      if ((e as { originalEvent?: unknown }).originalEvent) framing.current.moved = true;
     });
     m.on('moveend', () => {
       const c = m.getCenter();
@@ -1672,6 +1856,8 @@ export default function App() {
 
     return () => {
       window.removeEventListener('hashchange', restoreLocation);
+      cancelAnimationFrame(hoverFrame);
+      clearHover.current = () => {};
       ro.disconnect();
       setMapReady(false);
       // Markers die with the map they were added to. Leaving stale Marker
@@ -1787,10 +1973,16 @@ export default function App() {
   );
 
   const clickSequence = useRef(0);
-  const onClick = useCallback(async (lat: number, lon: number) => {
+  const onClick = useCallback(async (lat: number, lon: number, fromMap = false) => {
     const sequence = ++clickSequence.current;
+    // Before the await: a drag begun straight after the click still counts.
+    framing.current = { armed: fromMap, moved: false };
     const hit = await nearestReach(lat, lon).catch(() => null);
     if (sequence !== clickSequence.current) return;
+    // Display only: the raw click, for the pin and the notice. `at` below is
+    // set exactly as it always was.
+    setClicked(fromMap ? { lat, lon, nearestKm: hit ? hit.nearest.distanceKm : null } : null);
+    setKeepNearest(false);
     setPick(null);
     setTweaked(false);
     setWideSearch(false);
@@ -1844,7 +2036,17 @@ export default function App() {
        * still does not move — that is a deliberate promise about what a click
        * means — but the hydrology and the description are finally the same river.
        */
-      const readFrom = reachHit ? reachToRead(reachHit) : null;
+      const promotion = reachHit ? reachToRead(reachHit) : null;
+      /**
+       * The user can refuse the promotion for this one site ("Study the stream
+       * I clicked"). Asking `reachToRead` the same question with no neighbour
+       * on offer returns the nearest reach through its own code path, sourced
+       * area included, so nothing is reimplemented here. With `keepNearest`
+       * off, which is every study nobody has pressed that button on, `readFrom`
+       * IS `promotion` and the study is the one it always was.
+       */
+      const refused = !!reachHit && keepNearest && !!promotion?.overridden;
+      const readFrom = refused ? reachToRead({ nearest: reachHit.nearest, mainStem: null }) : promotion;
       const origin = readFrom?.overridden ? readFrom.reach.point : at;
       /**
        * A refused flow request must not take the terrain with it.
@@ -1897,8 +2099,27 @@ export default function App() {
        * Nothing is offered once a promotion has happened and the two are the
        * same channel; the promotion notice covers that case instead.
        */
+      // Which river this study reads, for the line at the top of the panel.
+      // Only where the study follows the mapped network: a terrain trace starts
+      // at the click itself and reads no modelled river at all.
+      setClickRead(
+        reachHit && readFrom && river && river.length > 8
+          ? {
+              at,
+              keep: keepNearest,
+              nearestKm2: reachHit.nearest.uplandKm2,
+              studied: { km2: readFrom.reach.uplandKm2, point: readFrom.reach.point },
+              promoted: readFrom.overridden,
+              larger: refused && promotion
+                ? { km2: promotion.reach.uplandKm2, point: promotion.reach.point }
+                : null,
+            }
+          : null
+      );
+      // A refused promotion is already stated at the top of the panel, with the
+      // way back; the banner below would offer the same river a second time.
       setAmbiguity(
-        reachHit?.mainStem && reachHit.nearest && !reachRead?.overridden
+        reachHit?.mainStem && reachHit.nearest && !reachRead?.overridden && !refused
           ? {
               nearestKm2: reachHit.nearest.uplandKm2,
               mainKm2: reachHit.mainStem.uplandKm2,
@@ -1987,7 +2208,7 @@ export default function App() {
     return () => {
       dead = true;
     };
-  }, [at]);
+  }, [at, keepNearest]);
 
   /** Flow known but no scheme yet (outside river coverage, before the 2nd click). */
   const [flowOnly, setFlowOnly] = useState<DischargeSeries | null>(null);
@@ -3396,6 +3617,164 @@ export default function App() {
     [gauges]
   );
 
+  // ---------------- where the click went ----------------
+  /**
+   * The study on screen belongs to the click on screen.
+   *
+   * A new click leaves the previous study, and its scheme, in place until the
+   * new one lands, so for a few seconds `clicked` and `scheme` describe two
+   * different rivers. Everything below that joins the two waits for this.
+   */
+  const clickSettled =
+    !busy && !error && !!clickRead && clickRead.at === at && clickRead.keep === keepNearest;
+  /** Where the intake marker is drawn. The same expression the marker effect uses. */
+  const intakeShown: Pt | null = useMemo(() => {
+    const k = pick?.i;
+    const drawn = k != null && study?.path[k] ? riverDisplay?.points[k] ?? study.path[k] : null;
+    return drawn ? { lat: drawn.lat, lon: drawn.lon } : scheme?.intake ?? at;
+  }, [pick, study, riverDisplay, scheme, at]);
+  const clickGapM =
+    clicked && clickSettled && intakeShown
+      ? haversineKm([clicked.lat, clicked.lon], [intakeShown.lat, intakeShown.lon]) * 1000
+      : null;
+
+  // The pin: where the pointer was. Not draggable, not clickable, and drawn
+  // under the intake so a click that landed true is simply covered by it.
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !mapReady || !clicked) return;
+    const el = document.createElement('div');
+    el.className = 'click-pin';
+    const tag = document.createElement('span');
+    tag.className = 'click-pin-tag';
+    el.appendChild(tag);
+    const pin = new maplibregl.Marker({ element: el }).setLngLat([clicked.lon, clicked.lat]).addTo(m);
+    // Markers stack in document order, so the pin goes in ahead of the others.
+    const first = el.parentElement?.querySelector('.maplibregl-marker');
+    if (first && first !== el) el.parentElement?.insertBefore(el, first);
+    clickPinTag.current = tag;
+    return () => {
+      clickPinTag.current = null;
+      pin.remove();
+    };
+  }, [clicked, mapReady]);
+
+  // The connector, and the pin's label, once the intake is somewhere else.
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !mapReady) return;
+    const apart = clicked && intakeShown && clickGapM != null && clickGapM > CLICK_ON_TARGET_M;
+    (m.getSource('click-link') as maplibregl.GeoJSONSource | undefined)?.setData(
+      apart
+        ? {
+            type: 'FeatureCollection',
+            features: [{
+              type: 'Feature',
+              properties: {},
+              geometry: { type: 'LineString', coordinates: [[clicked.lon, clicked.lat], [intakeShown.lon, intakeShown.lat]] },
+            }],
+          }
+        : empty()
+    );
+    const tag = clickPinTag.current;
+    if (!tag) return;
+    tag.textContent = apart ? `your click · intake ${distanceText(clickGapM)} away` : '';
+    if (!apart) return;
+    // The label sits on the side of the pin away from the intake, so it never
+    // covers the line it describes, and slides sideways rather than run under
+    // a panel. Re-placed when the camera comes to rest.
+    const placeTag = () => {
+      const pin = m.project([clicked.lon, clicked.lat]);
+      const intake = m.project([intakeShown.lon, intakeShown.lat]);
+      const pad = mapPadding();
+      const half = tag.offsetWidth / 2 + 6;
+      const x = Math.min(Math.max(pin.x, pad.left + half), Math.max(pad.left + half, m.getCanvas().clientWidth - pad.right - half));
+      tag.classList.toggle('below', intake.y < pin.y);
+      tag.style.transform = `translateX(calc(-50% + ${Math.round(x - pin.x)}px))`;
+    };
+    placeTag();
+    m.on('moveend', placeTag);
+    return () => {
+      m.off('moveend', placeTag);
+    };
+  }, [clicked, intakeShown, clickGapM, mapReady]);
+
+  /**
+   * Bring the scheme into view, once, if the click put it off screen.
+   *
+   * The intake can land at the edge of the frame and the powerhouse kilometres
+   * outside it, and a result the user cannot see reads as a click that did
+   * nothing. Fires once per map click, never zooms in, and stands down the
+   * moment the user has moved the map themselves.
+   *
+   * It waits for the scheme to hold still. The render in which a new study
+   * lands still carries the previous study's pick for one pass, so the first
+   * scheme seen is not always the one that stays. And it waits for the traced
+   * course, because the markers are drawn on that and it is what has to fit.
+   */
+  const displaySettled = !!study && (!!study.tracedFromTerrain || displayResult?.path === study.path);
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !clicked || !clickSettled || !displaySettled || !scheme || !study || !framing.current.armed) return;
+    const drawn = (k: number): Pt => riverDisplay?.points[k] ?? study.path[k];
+    const timer = window.setTimeout(() => {
+      if (!framing.current.armed) return;
+      framing.current.armed = false;
+      if (framing.current.moved) return;
+      const pad = mapPadding();
+      const w = m.getCanvas().clientWidth;
+      const h = m.getCanvas().clientHeight;
+      const visible = (p: Pt) => {
+        const s = m.project([p.lon, p.lat]);
+        return s.x >= pad.left && s.x <= w - pad.right && s.y >= pad.top && s.y <= h - pad.bottom;
+      };
+      if (visible(drawn(scheme.i)) && visible(drawn(scheme.j))) return;
+      const bounds = new maplibregl.LngLatBounds([clicked.lon, clicked.lat], [clicked.lon, clicked.lat]);
+      for (let k = scheme.i; k <= scheme.j; k++) bounds.extend([drawn(k).lon, drawn(k).lat]);
+      m.fitBounds(bounds, {
+        // Room for the marker tags, which hang below and above their points.
+        padding: { top: pad.top + 28, bottom: pad.bottom + 28, left: pad.left + 28, right: pad.right + 28 },
+        maxZoom: m.getZoom(),
+        duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 500,
+      });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [clicked, clickSettled, displaySettled, scheme, study, riverDisplay]);
+
+  // A study being computed has nothing to preview against.
+  useEffect(() => {
+    if (busy) clearHover.current();
+  }, [busy]);
+
+  /** The one line at the top of the panel: where the click went, if not where it was aimed. */
+  const clickNotice: ClickNotice | null = useMemo(() => {
+    if (!clicked || !clickSettled || !clickRead) return null;
+    const metresTo = (p: Pt) => haversineKm([clicked.lat, clicked.lon], [p.lat, p.lon]) * 1000;
+    const studied = clickRead.studied;
+    // With a scheme, "how far away" is the intake, the same figure the map
+    // label carries. Without one the marker has not left the click, so it is
+    // the distance to the river that was read.
+    const away = distanceText(scheme && clickGapM != null ? clickGapM : metresTo(studied.point));
+    if (clicked.nearestKm != null && clicked.nearestKm > SNAP_KM) {
+      return { kind: 'off-network', limit: distanceText(SNAP_KM * 1000), distance: away, area: areaText(studied.km2) };
+    }
+    if (clickRead.promoted) {
+      return { kind: 'promoted', clickedArea: areaText(clickRead.nearestKm2), studiedArea: areaText(studied.km2), distance: away };
+    }
+    if (clickRead.larger) {
+      return { kind: 'kept', clickedArea: areaText(studied.km2), largerArea: areaText(clickRead.larger.km2), distance: distanceText(metresTo(clickRead.larger.point)) };
+    }
+    if (clickGapM != null && clickGapM > CLICK_MOVED_M) return { kind: 'moved', distance: distanceText(clickGapM) };
+    return null;
+  }, [clicked, clickSettled, clickRead, scheme, clickGapM]);
+  /** "Study the stream I clicked" and its way back. Same click, same pin, a fresh camera fit. */
+  const onKeepNearest = useCallback((keep: boolean) => {
+    framing.current = { armed: true, moved: false };
+    setPick(null);
+    setTweaked(false);
+    setKeepNearest(keep);
+  }, []);
+
   // ---------------- markers + highlight ----------------
   useEffect(() => {
     const m = map.current;
@@ -4146,6 +4525,9 @@ export default function App() {
 
   const reset = useCallback(() => {
     setAt(null);
+    setClicked(null);
+    setKeepNearest(false);
+    setClickRead(null);
     setStudy(null);
     setPick(null);
     setTweaked(false);
@@ -4361,6 +4743,8 @@ export default function App() {
         }}
         onLocate={onLocate}
         ambiguity={ambiguity}
+        clickNotice={clickNotice}
+        onKeepNearest={onKeepNearest}
         transfer={transfer}
         transferBusy={transferBusy}
         onAdoptGauge={onAdoptGauge}
